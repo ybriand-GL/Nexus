@@ -210,13 +210,22 @@
   border-radius: 18px;
   color: white;
   text-decoration: none;
+  text-align: left;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+  font: inherit;
+  cursor: pointer;
   transition:
     transform 0.2s ease,
     background-color 0.2s ease,
     border-color 0.2s ease;
+}
+
+.sidebar-link-active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(24, 188, 235, 0.48);
 }
 
 .sidebar-link:hover {
@@ -574,11 +583,69 @@
   color: var(--nexus-muted);
 }
 
-.account-edit-cell {
+.profile-creation-card,
+.profile-editor-card {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 24px;
+  border: 1px solid var(--nexus-border);
+  background: linear-gradient(180deg, rgba(247, 249, 252, 0.88), #fff);
+}
+
+.profile-editor-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.profile-editor-header,
+.profile-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.profile-editor-header h3,
+.profile-editor-header p {
+  margin: 0;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.profile-form-grid-2 {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.profile-form-grid label,
+.profile-label-field,
+.rights-editor-row {
   display: grid;
   gap: 8px;
 }
 
+.profile-form-grid span,
+.profile-label-field span,
+.rights-editor-row span {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--nexus-text);
+}
+
+.profile-form-note {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(11, 30, 117, 0.05);
+  color: var(--nexus-muted);
+}
+
+.profile-form-grid input,
+.profile-label-field input,
+.rights-editor-row select,
 .account-edit-cell select {
   min-height: 42px;
   padding: 0 12px;
@@ -589,9 +656,31 @@
   font: inherit;
 }
 
+.profile-form-grid input:focus,
+.profile-label-field input:focus,
+.rights-editor-row select:focus,
 .account-edit-cell select:focus {
   outline: 2px solid rgba(108, 61, 255, 0.18);
   border-color: var(--nexus-purple);
+}
+
+.rights-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.profile-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.profile-toggle {
+  align-self: end;
+}
+
+.account-edit-cell {
+  display: grid;
+  gap: 8px;
 }
 
 .toggle-label {
@@ -635,7 +724,9 @@
   .metrics-grid,
   .workspace-grid,
   .profile-grid,
-  .hero-card {
+  .hero-card,
+  .rights-editor-grid,
+  .profile-form-grid {
     grid-template-columns: 1fr;
   }
 }

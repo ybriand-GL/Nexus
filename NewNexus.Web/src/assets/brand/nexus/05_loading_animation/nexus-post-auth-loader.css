@@ -1,0 +1,258 @@
+:root {
+  --nexus-navy: #0B1E75;
+  --nexus-gold: #F7B500;
+  --nexus-orange: #FF8A00;
+  --nexus-purple: #6C3DFF;
+  --nexus-cyan: #18BCEB;
+  --nexus-green: #24B05A;
+  --nexus-surface: #FFFFFF;
+  --nexus-muted: #718096;
+}
+
+.nexus-loader-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(108, 61, 255, 0.10), transparent 26rem),
+    linear-gradient(135deg, #ffffff 0%, #f7f9ff 100%);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.nexus-loader-card {
+  display: grid;
+  justify-items: center;
+  gap: 1.35rem;
+  padding: 2.5rem 3rem;
+}
+
+.nexus-loader-icon {
+  position: relative;
+  width: 5rem;
+  height: 5rem;
+  border-radius: 1.35rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 3.5rem rgba(11, 30, 117, 0.18);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(0.75rem) scale(0.86);
+  animation: nexusIconIntro 520ms ease-out forwards,
+             nexusIconExit 480ms ease-in-out 1140ms forwards;
+}
+
+.nexus-loader-icon::after {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(from 45deg, rgba(247,181,0,.28), rgba(255,138,0,.25), rgba(108,61,255,.25), rgba(24,188,235,.22), rgba(36,176,90,.25), rgba(247,181,0,.28));
+  filter: blur(18px);
+  opacity: 0.75;
+  z-index: 0;
+}
+
+.nexus-loader-icon > span {
+  position: absolute;
+  z-index: 1;
+  display: block;
+  border-radius: 0.38rem;
+}
+
+.nexus-icon-left {
+  left: 1.02rem;
+  top: 0.82rem;
+  width: 0.72rem;
+  height: 3.4rem;
+  background: var(--nexus-navy);
+  border-radius: 999px !important;
+}
+
+.nexus-icon-diagonal {
+  left: 2.08rem;
+  top: 0.74rem;
+  width: 0.88rem;
+  height: 3.8rem;
+  background: var(--nexus-purple);
+  transform: rotate(-38deg);
+  transform-origin: center;
+  border-radius: 999px !important;
+}
+
+.nexus-icon-orange {
+  right: 0.88rem;
+  top: 0.72rem;
+  width: 1.06rem;
+  height: 1.78rem;
+  background: var(--nexus-orange);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.nexus-icon-green {
+  left: 1.7rem;
+  bottom: 0.74rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  background: var(--nexus-green);
+  clip-path: polygon(0 100%, 100% 100%, 0 0);
+}
+
+.nexus-loader-wordmark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08em;
+  font-family: Sora, Inter, system-ui, sans-serif;
+  font-size: clamp(3.2rem, 10vw, 5.8rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.nexus-loader-wordmark::after {
+  content: '';
+  position: absolute;
+  inset: -0.3em -0.2em;
+  transform: translateX(-120%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+  filter: blur(2px);
+  animation: nexusShimmer 680ms ease-in-out 1760ms forwards;
+  pointer-events: none;
+}
+
+.nexus-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.2em);
+  animation: nexusReveal 440ms ease-out forwards;
+}
+
+.nexus-letter-n { color: var(--nexus-navy); animation-delay: 860ms; }
+.nexus-letter-e { color: var(--nexus-gold); animation-delay: 1020ms; }
+.nexus-letter-u { color: var(--nexus-cyan); animation-delay: 1360ms; }
+.nexus-letter-s { color: var(--nexus-green); animation-delay: 1520ms; }
+
+.nexus-letter-x {
+  position: relative;
+  width: 0.82em;
+  height: 0.9em;
+  margin-inline: 0.02em 0.03em;
+  animation-delay: 1180ms;
+}
+
+.nexus-letter-x > span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  border-radius: 0.06em;
+  transform-origin: center;
+}
+
+.nexus-x-orange {
+  width: 0.18em;
+  height: 1.08em;
+  background: var(--nexus-orange);
+  transform: translate(-50%, -50%) rotate(-37deg) scaleY(0.2);
+  animation: nexusXOrange 620ms ease-in-out 1260ms forwards;
+}
+
+.nexus-x-purple-top,
+.nexus-x-purple-bottom {
+  width: 0.18em;
+  height: 0.48em;
+  background: var(--nexus-purple);
+  opacity: 0;
+}
+
+.nexus-x-purple-top {
+  transform: translate(0.02em, -0.52em) rotate(39deg);
+  animation: nexusXPurple 520ms ease-in-out 1400ms forwards;
+}
+
+.nexus-x-purple-bottom {
+  transform: translate(-0.18em, 0.05em) rotate(39deg);
+  animation: nexusXPurple 520ms ease-in-out 1520ms forwards;
+}
+
+.nexus-loader-dots {
+  display: flex;
+  gap: 0.55rem;
+  opacity: 0;
+  transform: translateY(-0.2rem);
+  animation: nexusDotsIn 320ms ease-out 2100ms forwards;
+}
+
+.nexus-loader-dots span {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: var(--nexus-navy);
+  opacity: 0.25;
+  animation: nexusDotPulse 720ms ease-in-out infinite;
+}
+
+.nexus-loader-dots span:nth-child(2) { animation-delay: 120ms; }
+.nexus-loader-dots span:nth-child(3) { animation-delay: 240ms; }
+
+@keyframes nexusIconIntro {
+  0% { opacity: 0; transform: translateY(0.75rem) scale(0.86); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes nexusIconExit {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-0.3rem) scale(0.72); }
+}
+
+@keyframes nexusReveal {
+  0% { opacity: 0; transform: translateY(0.2em); filter: blur(6px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes nexusXOrange {
+  0% { transform: translate(-50%, -50%) rotate(-37deg) scaleY(0.2); filter: blur(5px); }
+  65% { transform: translate(-50%, -50%) rotate(-37deg) scaleY(1.08); filter: blur(0); }
+  100% { transform: translate(-50%, -50%) rotate(-37deg) scaleY(1); filter: blur(0); }
+}
+
+@keyframes nexusXPurple {
+  0% { opacity: 0; filter: blur(6px); }
+  100% { opacity: 1; filter: blur(0); }
+}
+
+@keyframes nexusShimmer {
+  0% { transform: translateX(-120%); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+
+@keyframes nexusDotsIn {
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nexusDotPulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.9); }
+  45% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-loader-icon,
+  .nexus-letter,
+  .nexus-loader-wordmark::after,
+  .nexus-loader-dots,
+  .nexus-loader-dots span,
+  .nexus-x-orange,
+  .nexus-x-purple-top,
+  .nexus-x-purple-bottom {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .nexus-loader-icon {
+    display: none;
+  }
+}

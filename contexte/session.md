@@ -418,3 +418,102 @@ Ordre cible de construction:
   - gestion complete des profils
   - filtrage fin frontend selon les droits reels
   - creation / synchronisation des utilisateurs metier
+
+## 2026-04-29 - Integration du handoff de marque NEXUS premium
+
+- lecture et application du prompt de `identité visuelle\nexus_brand_handoff\PROMPT_A_DONNER_A_CODEX.md`
+- integration des tokens officiels dans le frontend:
+  - `NewNexus.Web/src/assets/brand/nexus/04_codex/design-tokens.css`
+  - `NewNexus.Web/src/assets/brand/nexus/04_codex/design-tokens.json`
+- branchement du point d'entree React sur les tokens de marque via `src/main.tsx`
+- mise a jour des points d'entree navigateur:
+  - favicon
+  - icones 16x16 / 32x32 / 180x180
+  - manifest web `manifest.webmanifest`
+- integration de l'animation post-authentification:
+  - composant `NexusPostAuthLoader`
+  - stylesheet `nexus-post-auth-loader.css`
+  - affichage une seule fois apres connexion reussie
+  - respect de `prefers-reduced-motion`
+- conservation de la logique metier:
+  - aucun changement sur les endpoints d'authentification
+  - aucun changement sur les routes fonctionnelles
+- documentation ajoutee:
+  - `docs\newnexus-brand-handoff-integration.md`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+- validation publiee:
+  - HTML `/newNexus` contient les liens favicon / manifest attendus
+  - `GET /newNexus/manifest.webmanifest` OK
+  - `POST /newNexus/api/auth/login` OK
+  - `GET /newNexus/api/auth/me` OK
+
+## 2026-04-29 - Reglage fin de l'animation post-authentification
+
+- correction du comportement de transition:
+  - suppression du flash du dashboard avant l'animation
+  - le loader devient un ecran exclusif pendant la transition
+- ajustement de duree:
+  - duree globale passee a environ 2,8 s
+  - timings internes allonges pour rendre visible la fin de la sequence
+- effet attendu apres correction:
+  - aucun affichage fugitif du dashboard
+  - animation complete visible avant l'arrivee sur l'ecran connecte
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+
+## 2026-04-29 - Gestion des profils et filtrage fin par droits
+
+- evolution backend securite:
+  - ajout de la gestion complete des profils
+  - endpoints admin:
+    - `GET /api/security/profiles`
+    - `POST /api/security/profiles`
+    - `PUT /api/security/profiles/{profileId}`
+    - `DELETE /api/security/profiles/{profileId}`
+  - regles de suppression:
+    - impossible de supprimer un profil systeme
+    - impossible de supprimer un profil encore affecte a un compte
+- evolution frontend:
+  - chargement admin des modules / profils / comptes reserve au profil `Informatique`
+  - filtrage de la navigation et du dashboard selon les droits reels du compte connecte
+  - ecran d'administration des profils:
+    - creation d'un profil
+    - edition du libelle
+    - activation / desactivation
+    - affectation des droits `Aucun / Lecture / Ecriture` par module
+  - ecran comptes conserve et aligne avec les profils editables
+- validation fonctionnelle:
+  - lecture profils publiee OK
+  - creation profil publiee OK
+  - mise a jour profil publiee OK
+  - suppression profil publiee OK
+- hygiene de recette:
+  - profil temporaire `TEST_TEMP` cree pour validation puis supprime
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+
+## 2026-04-29 - Correction creation profil et sortie du mode tout-dashboard
+
+- correction fonctionnelle profils:
+  - a la creation d'un profil, seul le libelle est saisi
+  - le code technique est maintenant genere automatiquement cote backend
+  - gestion des collisions de code ajoutee
+- correction ergonomique:
+  - abandon du mode "tout sur le dashboard"
+  - la navigation laterale pilote des vues distinctes:
+    - `Administration`
+    - `Exploitation`
+    - `Gestion administrative`
+  - l'administration profils/comptes reste concentree dans `Administration`
+  - les autres entrees affichent uniquement leur espace de travail
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK

@@ -39,6 +39,7 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
+
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -61,12 +62,14 @@ builder.Services
             return Task.CompletedTask;
         };
     });
+
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireInformatique", policy =>
         policy.RequireAuthenticatedUser()
             .RequireClaim("profile_code", "INFORMATIQUE"));
 });
+
 builder.Services.AddNewNexusPostgres(builder.Configuration);
 
 var app = builder.Build();
@@ -218,31 +221,211 @@ app.MapGet("/api/security/profiles", async (NewNexusDbContext dbContext) =>
 {
     var profiles = await dbContext.SecurityProfiles
         .AsNoTracking()
+        .Include(profile => profile.ModuleRights)
+            .ThenInclude(right => right.SecurityModule)
         .OrderBy(profile => profile.Label)
-        .Select(profile => new
-        {
-            profile.Id,
-            profile.Code,
-            profile.Label,
-            profile.IsSystemProfile,
-            profile.IsActive,
-            ModuleRights = profile.ModuleRights
-                .OrderBy(right => right.SecurityModule!.NavigationGroup)
-                .ThenBy(right => right.SecurityModule!.DisplayOrder)
-                .ThenBy(right => right.SecurityModule!.Label)
-                .Select(right => new
-                {
-                    right.SecurityModuleId,
-                    ModuleCode = right.SecurityModule!.Code,
-                    ModuleLabel = right.SecurityModule.Label,
-                    right.SecurityModule.NavigationGroup,
-                    AccessLevel = right.AccessLevel.ToString()
-                })
-                .ToList()
-        })
         .ToListAsync();
 
-    return Results.Ok(profiles);
+    return Results.Ok(profiles.Select(BuildProfileResponse));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/security/profiles", async (CreateSecurityProfileRequest request, NewNexusDbContext dbContext) =>
+{
+    var label = request.Label.Trim();
+    if (string.IsNullOrWhiteSpace(label))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["label"] = ["Le libellé profil est obligatoire."]
+        });
+    }
+
+    var existingCodes = await dbContext.SecurityProfiles
+        .AsNoTracking()
+        .Select(profile => profile.Code)
+        .ToListAsync();
+    var code = GenerateUniqueProfileCode(label, existingCodes);
+
+    var modules = await dbContext.SecurityModules
+        .AsNoTracking()
+        .OrderBy(module => module.NavigationGroup)
+        .ThenBy(module => module.DisplayOrder)
+        .ThenBy(module => module.Label)
+        .ToListAsync();
+
+    if (modules.Count == 0)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["modules"] = ["Aucun module n'est disponible pour le paramétrage."]
+        });
+    }
+
+    var rightsResult = TryBuildDesiredRights(request.ModuleRights, modules);
+    if (!rightsResult.IsValid)
+    {
+        return Results.ValidationProblem(rightsResult.Errors);
+    }
+
+    var profile = new SecurityProfile
+    {
+        Id = Guid.NewGuid(),
+        Code = code,
+        Label = label,
+        IsSystemProfile = false,
+        IsActive = request.IsActive
+    };
+
+    foreach (var module in modules)
+    {
+        profile.ModuleRights.Add(new SecurityProfileModuleRight
+        {
+            Id = Guid.NewGuid(),
+            SecurityProfileId = profile.Id,
+            SecurityModuleId = module.Id,
+            AccessLevel = rightsResult.RightsByModuleId[module.Id]
+        });
+    }
+
+    dbContext.SecurityProfiles.Add(profile);
+    await dbContext.SaveChangesAsync();
+
+    await dbContext.Entry(profile)
+        .Collection(item => item.ModuleRights)
+        .Query()
+        .Include(right => right.SecurityModule)
+        .LoadAsync();
+
+    return Results.Created($"/api/security/profiles/{profile.Id}", BuildProfileResponse(profile));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/security/profiles/{profileId:guid}", async (
+    Guid profileId,
+    UpdateSecurityProfileRequest request,
+    NewNexusDbContext dbContext) =>
+{
+    var profile = await dbContext.SecurityProfiles
+        .Include(item => item.ModuleRights)
+        .SingleOrDefaultAsync(item => item.Id == profileId);
+
+    if (profile is null)
+    {
+        return Results.NotFound();
+    }
+
+    var label = request.Label.Trim();
+    if (string.IsNullOrWhiteSpace(label))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["label"] = ["Le libellé profil est obligatoire."]
+        });
+    }
+
+    var modules = await dbContext.SecurityModules
+        .AsNoTracking()
+        .OrderBy(module => module.NavigationGroup)
+        .ThenBy(module => module.DisplayOrder)
+        .ThenBy(module => module.Label)
+        .ToListAsync();
+
+    var rightsResult = TryBuildDesiredRights(request.ModuleRights, modules);
+    if (!rightsResult.IsValid)
+    {
+        return Results.ValidationProblem(rightsResult.Errors);
+    }
+
+    if (string.Equals(profile.Code, "INFORMATIQUE", StringComparison.OrdinalIgnoreCase))
+    {
+        if (!request.IsActive)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["isActive"] = ["Le profil Informatique doit rester actif."]
+            });
+        }
+
+        var adminModuleId = modules
+            .Where(module => string.Equals(module.Code, "ADMINISTRATION", StringComparison.OrdinalIgnoreCase))
+            .Select(module => module.Id)
+            .Single();
+
+        if (rightsResult.RightsByModuleId.GetValueOrDefault(adminModuleId) != ModuleAccessLevel.Write)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["moduleRights"] = ["Le profil Informatique doit conserver le droit Écriture sur Administration."]
+            });
+        }
+    }
+
+    profile.Label = label;
+    profile.IsActive = request.IsActive;
+
+    foreach (var module in modules)
+    {
+        var existingRight = profile.ModuleRights.SingleOrDefault(right => right.SecurityModuleId == module.Id);
+        var accessLevel = rightsResult.RightsByModuleId[module.Id];
+
+        if (existingRight is null)
+        {
+            profile.ModuleRights.Add(new SecurityProfileModuleRight
+            {
+                Id = Guid.NewGuid(),
+                SecurityProfileId = profile.Id,
+                SecurityModuleId = module.Id,
+                AccessLevel = accessLevel
+            });
+            continue;
+        }
+
+        existingRight.AccessLevel = accessLevel;
+    }
+
+    await dbContext.SaveChangesAsync();
+
+    await dbContext.Entry(profile)
+        .Collection(item => item.ModuleRights)
+        .Query()
+        .Include(right => right.SecurityModule)
+        .LoadAsync();
+
+    return Results.Ok(BuildProfileResponse(profile));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapDelete("/api/security/profiles/{profileId:guid}", async (Guid profileId, NewNexusDbContext dbContext) =>
+{
+    var profile = await dbContext.SecurityProfiles
+        .Include(item => item.ModuleRights)
+        .SingleOrDefaultAsync(item => item.Id == profileId);
+
+    if (profile is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (profile.IsSystemProfile)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["profile"] = ["Un profil système ne peut pas être supprimé."]
+        });
+    }
+
+    var isAssigned = await dbContext.UserAccounts.AnyAsync(account => account.SecurityProfileId == profile.Id);
+    if (isAssigned)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["profile"] = ["Ce profil est encore affecté à au moins un compte."]
+        });
+    }
+
+    dbContext.SecurityProfileModuleRights.RemoveRange(profile.ModuleRights);
+    dbContext.SecurityProfiles.Remove(profile);
+    await dbContext.SaveChangesAsync();
+
+    return Results.NoContent();
 }).RequireAuthorization("RequireInformatique");
 
 app.MapGet("/api/security/accounts", async (NewNexusDbContext dbContext) =>
@@ -275,69 +458,6 @@ app.MapGet("/api/security/accounts", async (NewNexusDbContext dbContext) =>
         .ToListAsync();
 
     return Results.Ok(accounts);
-}).RequireAuthorization("RequireInformatique");
-
-app.MapGet("/api/security/bootstrap", async (NewNexusDbContext dbContext) =>
-{
-    var modules = await dbContext.SecurityModules
-        .AsNoTracking()
-        .OrderBy(module => module.NavigationGroup)
-        .ThenBy(module => module.DisplayOrder)
-        .ThenBy(module => module.Label)
-        .Select(module => new
-        {
-            module.Code,
-            module.Label,
-            module.NavigationGroup
-        })
-        .ToListAsync();
-
-    var profiles = await dbContext.SecurityProfiles
-        .AsNoTracking()
-        .OrderBy(profile => profile.Label)
-        .Select(profile => new
-        {
-            profile.Code,
-            profile.Label,
-            profile.IsSystemProfile,
-            Rights = profile.ModuleRights
-                .OrderBy(right => right.SecurityModule!.NavigationGroup)
-                .ThenBy(right => right.SecurityModule!.DisplayOrder)
-                .ThenBy(right => right.SecurityModule!.Label)
-                .Select(right => new
-                {
-                    ModuleCode = right.SecurityModule!.Code,
-                    ModuleLabel = right.SecurityModule.Label,
-                    right.SecurityModule.NavigationGroup,
-                    AccessLevel = right.AccessLevel.ToString()
-                })
-                .ToList()
-        })
-        .ToListAsync();
-
-    var rightsByLevel = profiles
-        .SelectMany(profile => profile.Rights)
-        .GroupBy(right => right.AccessLevel, StringComparer.OrdinalIgnoreCase)
-        .OrderBy(group => group.Key)
-        .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-
-    return Results.Ok(new
-    {
-        Version = "0.1.0",
-        Users = new
-        {
-            Total = await dbContext.UserAccounts.AsNoTracking().CountAsync(),
-            Active = await dbContext.UserAccounts.AsNoTracking().CountAsync(account => account.IsActive)
-        },
-        Modules = modules,
-        Profiles = profiles,
-        Summary = new
-        {
-            ModuleCount = modules.Count,
-            ProfileCount = profiles.Count,
-            RightsByLevel = rightsByLevel
-        }
-    });
 }).RequireAuthorization("RequireInformatique");
 
 app.MapPut("/api/security/accounts/{accountId:guid}/profile", async (
@@ -413,11 +533,15 @@ app.Run();
 static string NormalizeBasePath(string? value)
 {
     if (string.IsNullOrWhiteSpace(value))
+    {
         return string.Empty;
+    }
 
     var trimmed = value.Trim();
     if (!trimmed.StartsWith('/'))
+    {
         trimmed = "/" + trimmed;
+    }
 
     return trimmed.TrimEnd('/');
 }
@@ -426,6 +550,41 @@ static Guid? GetUserId(ClaimsPrincipal principal)
 {
     var rawValue = principal.FindFirstValue(ClaimTypes.NameIdentifier);
     return Guid.TryParse(rawValue, out var userId) ? userId : null;
+}
+
+static string NormalizeProfileCode(string rawValue)
+{
+    return string.Concat(
+            rawValue.Trim()
+                .ToUpperInvariant()
+                .Select(character => char.IsLetterOrDigit(character) ? character : '_'))
+        .Trim('_');
+}
+
+static string GenerateUniqueProfileCode(string label, IReadOnlyCollection<string> existingCodes)
+{
+    var baseCode = NormalizeProfileCode(label);
+    if (string.IsNullOrWhiteSpace(baseCode))
+    {
+        baseCode = "PROFIL";
+    }
+
+    if (!existingCodes.Contains(baseCode, StringComparer.OrdinalIgnoreCase))
+    {
+        return baseCode;
+    }
+
+    var index = 2;
+    while (true)
+    {
+        var candidate = $"{baseCode}_{index}";
+        if (!existingCodes.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+        {
+            return candidate;
+        }
+
+        index++;
+    }
 }
 
 static object BuildAuthenticatedUser(UserAccount account)
@@ -465,6 +624,65 @@ static object BuildAuthenticatedUser(UserAccount account)
     };
 }
 
+static object BuildProfileResponse(SecurityProfile profile)
+{
+    return new
+    {
+        profile.Id,
+        profile.Code,
+        profile.Label,
+        profile.IsSystemProfile,
+        profile.IsActive,
+        ModuleRights = profile.ModuleRights
+            .OrderBy(right => right.SecurityModule!.NavigationGroup)
+            .ThenBy(right => right.SecurityModule!.DisplayOrder)
+            .ThenBy(right => right.SecurityModule!.Label)
+            .Select(right => new
+            {
+                right.SecurityModuleId,
+                ModuleCode = right.SecurityModule!.Code,
+                ModuleLabel = right.SecurityModule.Label,
+                right.SecurityModule.NavigationGroup,
+                AccessLevel = right.AccessLevel.ToString()
+            })
+            .ToList()
+    };
+}
+
+static ProfileRightsBuildResult TryBuildDesiredRights(
+    IReadOnlyCollection<ProfileModuleRightRequest> requestedRights,
+    IReadOnlyCollection<SecurityModule> modules)
+{
+    var errors = new Dictionary<string, string[]>();
+    var moduleIds = modules.Select(module => module.Id).ToHashSet();
+    var rightsByModuleId = modules.ToDictionary(module => module.Id, _ => ModuleAccessLevel.None);
+
+    foreach (var right in requestedRights)
+    {
+        if (!moduleIds.Contains(right.SecurityModuleId))
+        {
+            errors["moduleRights"] = ["Un droit cible un module inconnu."];
+            continue;
+        }
+
+        if (!Enum.TryParse<ModuleAccessLevel>(right.AccessLevel, true, out var accessLevel))
+        {
+            errors["moduleRights"] = ["Le niveau de droit doit être None, Read ou Write."];
+            continue;
+        }
+
+        rightsByModuleId[right.SecurityModuleId] = accessLevel;
+    }
+
+    return errors.Count > 0
+        ? new ProfileRightsBuildResult(false, errors, rightsByModuleId)
+        : new ProfileRightsBuildResult(true, new Dictionary<string, string[]>(), rightsByModuleId);
+}
+
 internal sealed record LoginRequest(string Login, string Password);
 internal sealed record UpdateAccountProfileRequest(Guid? SecurityProfileId);
 internal sealed record UpdateAccountStatusRequest(bool IsActive);
+internal sealed record ProfileModuleRightRequest(Guid SecurityModuleId, string AccessLevel);
+internal sealed record CreateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
+internal sealed record UpdateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
+internal sealed record ProfileRightsBuildResult(bool IsValid, Dictionary<string, string[]> Errors, Dictionary<Guid, ModuleAccessLevel> RightsByModuleId);

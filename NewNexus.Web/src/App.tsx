@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
+import NexusPostAuthLoader from './assets/brand/nexus/05_loading_animation/NexusPostAuthLoader'
 
 type SystemInfo = {
   product: string
@@ -10,40 +11,11 @@ type SystemInfo = {
   serverTimeUtc: string
 }
 
-type BootstrapModule = {
-  code: string
-  label: string
-  navigationGroup: string
-}
-
 type ProfileRight = {
   moduleCode: string
   moduleLabel: string
   navigationGroup: string
   accessLevel: string
-}
-
-type BootstrapProfile = {
-  id?: string
-  code: string
-  label: string
-  isSystemProfile: boolean
-  rights: ProfileRight[]
-}
-
-type BootstrapPayload = {
-  version: string
-  users: {
-    total: number
-    active: number
-  }
-  modules: BootstrapModule[]
-  profiles: BootstrapProfile[]
-  summary: {
-    moduleCount: number
-    profileCount: number
-    rightsByLevel: Record<string, number>
-  }
 }
 
 type AuthenticatedUser = {
@@ -60,6 +32,30 @@ type AuthenticatedUser = {
     label: string
   } | null
   rights: ProfileRight[]
+}
+
+type SecurityModuleItem = {
+  id: string
+  code: string
+  label: string
+  navigationGroup: string
+  displayOrder: number
+  isActive: boolean
+}
+
+type SecurityProfileItem = {
+  id: string
+  code: string
+  label: string
+  isSystemProfile: boolean
+  isActive: boolean
+  moduleRights: Array<{
+    securityModuleId: string
+    moduleCode: string
+    moduleLabel: string
+    navigationGroup: string
+    accessLevel: string
+  }>
 }
 
 type AccountItem = {
@@ -87,7 +83,25 @@ type EditableAccountState = {
   error: string | null
 }
 
+type EditableProfileState = {
+  label: string
+  isActive: boolean
+  moduleRights: Record<string, string>
+  isSaving: boolean
+  error: string | null
+}
+
+type NewProfileState = {
+  label: string
+  isActive: boolean
+  moduleRights: Record<string, string>
+  isSaving: boolean
+  error: string | null
+}
+
 const navigationEntries = ['Administration', 'Exploitation', 'Gestion administrative']
+const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
+const accessLevels = ['None', 'Read', 'Write'] as const
 
 const profileAccentClass: Record<string, string> = {
   Administratif: 'accent-orange',
@@ -98,10 +112,21 @@ const profileAccentClass: Record<string, string> = {
 
 function App() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
-  const [bootstrap, setBootstrap] = useState<BootstrapPayload | null>(null)
+  const [modules, setModules] = useState<SecurityModuleItem[]>([])
+  const [profiles, setProfiles] = useState<SecurityProfileItem[]>([])
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
+  const [editableProfiles, setEditableProfiles] = useState<Record<string, EditableProfileState>>({})
+  const [newProfile, setNewProfile] = useState<NewProfileState>({
+    label: '',
+    isActive: true,
+    moduleRights: {},
+    isSaving: false,
+    error: null,
+  })
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
+  const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
+  const [selectedNavigation, setSelectedNavigation] = useState('Exploitation')
   const [error, setError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -111,9 +136,93 @@ function App() {
     password: 'NewNexus!2026',
   })
 
+  const isInformatique = currentUser?.profile?.code === 'INFORMATIQUE'
+
   useEffect(() => {
     void initialize()
   }, [])
+
+  const rightsByModuleCode = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const right of currentUser?.rights ?? []) {
+      map.set(right.moduleCode, right.accessLevel)
+    }
+    return map
+  }, [currentUser])
+
+  const visibleModules = useMemo(() => {
+    if (isInformatique && modules.length > 0) {
+      return modules.filter((module) => canAccessModule(rightsByModuleCode.get(module.code)))
+    }
+
+    return (currentUser?.rights ?? [])
+      .filter((right) => canAccessModule(right.accessLevel))
+      .map((right, index) => ({
+        id: `${right.moduleCode}-${index}`,
+        code: right.moduleCode,
+        label: right.moduleLabel,
+        navigationGroup: right.navigationGroup,
+        displayOrder: index,
+        isActive: true,
+      }))
+      .sort(compareModules)
+  }, [currentUser, isInformatique, modules, rightsByModuleCode])
+
+  const modulesByGroup = useMemo(() => {
+    return visibleModules.reduce<Record<string, SecurityModuleItem[]>>((groups, module) => {
+      groups[module.navigationGroup] ??= []
+      groups[module.navigationGroup].push(module)
+      return groups
+    }, {})
+  }, [visibleModules])
+
+  const visibleNavigationEntries = useMemo(
+    () => navigationEntries.filter((entry) => (modulesByGroup[entry] ?? []).length > 0),
+    [modulesByGroup],
+  )
+
+  useEffect(() => {
+    if (visibleNavigationEntries.length === 0) {
+      return
+    }
+
+    setSelectedNavigation((current) =>
+      visibleNavigationEntries.includes(current) ? current : visibleNavigationEntries[0],
+    )
+  }, [visibleNavigationEntries])
+
+  useEffect(() => {
+    if (modules.length === 0) {
+      return
+    }
+
+    setNewProfile((current) => ({
+      ...current,
+      moduleRights: buildDefaultRights(modules, current.moduleRights),
+    }))
+  }, [modules])
+
+  useEffect(() => {
+    if (profiles.length === 0 || modules.length === 0) {
+      setEditableProfiles({})
+      return
+    }
+
+    setEditableProfiles(
+      Object.fromEntries(
+        profiles.map((profile) => [
+          profile.id,
+          {
+            label: profile.label,
+            isActive: profile.isActive,
+            moduleRights: buildRightsFromProfile(profile, modules),
+            isSaving: false,
+            error: null,
+          },
+        ]),
+      ),
+    )
+  }, [profiles, modules])
 
   async function initialize() {
     setIsLoading(true)
@@ -125,15 +234,11 @@ function App() {
         throw new Error('Impossible de charger les informations système.')
       }
 
-      const systemPayload = (await systemResponse.json()) as SystemInfo
-      setSystemInfo(systemPayload)
+      setSystemInfo((await systemResponse.json()) as SystemInfo)
 
       const meResponse = await fetch('./api/auth/me')
       if (meResponse.status === 401) {
-        setCurrentUser(null)
-        setBootstrap(null)
-        setAccounts([])
-        setEditableAccounts({})
+        resetSessionState()
         return
       }
 
@@ -141,9 +246,9 @@ function App() {
         throw new Error('Impossible de récupérer le compte connecté.')
       }
 
-      const mePayload = (await meResponse.json()) as AuthenticatedUser
-      setCurrentUser(mePayload)
-      await loadSecuredData()
+      const user = (await meResponse.json()) as AuthenticatedUser
+      await hydrateAuthenticatedState(user)
+      setShowPostAuthLoader(sessionStorage.getItem(postAuthLoaderStorageKey) === 'pending')
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Erreur de chargement.')
     } finally {
@@ -151,26 +256,44 @@ function App() {
     }
   }
 
-  async function loadSecuredData() {
-    const [bootstrapResponse, accountsResponse] = await Promise.all([
-      fetch('./api/security/bootstrap'),
+  async function hydrateAuthenticatedState(user: AuthenticatedUser) {
+    setCurrentUser(user)
+
+    if (user.profile?.code === 'INFORMATIQUE') {
+      await loadAdminSecurityData()
+      return
+    }
+
+    setModules([])
+    setProfiles([])
+    setAccounts([])
+    setEditableAccounts({})
+    setEditableProfiles({})
+  }
+
+  async function loadAdminSecurityData() {
+    const [modulesResponse, profilesResponse, accountsResponse] = await Promise.all([
+      fetch('./api/security/modules'),
+      fetch('./api/security/profiles'),
       fetch('./api/security/accounts'),
     ])
 
-    if (!bootstrapResponse.ok || !accountsResponse.ok) {
-      throw new Error('Impossible de charger le socle sécurisé.')
+    if (!modulesResponse.ok || !profilesResponse.ok || !accountsResponse.ok) {
+      throw new Error('Impossible de charger l’administration de sécurité.')
     }
 
-    const [bootstrapPayload, accountPayload] = await Promise.all([
-      bootstrapResponse.json() as Promise<BootstrapPayload>,
+    const [modulesPayload, profilesPayload, accountsPayload] = await Promise.all([
+      modulesResponse.json() as Promise<SecurityModuleItem[]>,
+      profilesResponse.json() as Promise<SecurityProfileItem[]>,
       accountsResponse.json() as Promise<AccountItem[]>,
     ])
 
-    setBootstrap(bootstrapPayload)
-    setAccounts(accountPayload)
+    setModules(modulesPayload)
+    setProfiles(profilesPayload)
+    setAccounts(accountsPayload)
     setEditableAccounts(
       Object.fromEntries(
-        accountPayload.map((account) => [
+        accountsPayload.map((account) => [
           account.id,
           {
             profileId: account.profile?.id ?? '',
@@ -191,9 +314,7 @@ function App() {
     try {
       const response = await fetch('./api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
       })
 
@@ -207,8 +328,9 @@ function App() {
       }
 
       const user = (await response.json()) as AuthenticatedUser
-      setCurrentUser(user)
-      await loadSecuredData()
+      sessionStorage.setItem(postAuthLoaderStorageKey, 'pending')
+      setShowPostAuthLoader(true)
+      await hydrateAuthenticatedState(user)
     } catch (submitError) {
       setLoginError(submitError instanceof Error ? submitError.message : 'Erreur de connexion.')
     } finally {
@@ -218,10 +340,18 @@ function App() {
 
   async function handleLogout() {
     await fetch('./api/auth/logout', { method: 'POST' })
+    sessionStorage.removeItem(postAuthLoaderStorageKey)
+    setShowPostAuthLoader(false)
+    resetSessionState()
+  }
+
+  function resetSessionState() {
     setCurrentUser(null)
-    setBootstrap(null)
+    setModules([])
+    setProfiles([])
     setAccounts([])
     setEditableAccounts({})
+    setEditableProfiles({})
   }
 
   function updateEditableAccount(accountId: string, updater: (current: EditableAccountState) => EditableAccountState) {
@@ -239,10 +369,9 @@ function App() {
   }
 
   function handleProfileChange(accountId: string, event: ChangeEvent<HTMLSelectElement>) {
-    const nextValue = event.target.value
     updateEditableAccount(accountId, (current) => ({
       ...current,
-      profileId: nextValue,
+      profileId: event.target.value,
       error: null,
     }))
   }
@@ -267,21 +396,13 @@ function App() {
       const [profileResponse, statusResponse] = await Promise.all([
         fetch(`./api/security/accounts/${accountId}/profile`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            securityProfileId: editableAccount.profileId || null,
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ securityProfileId: editableAccount.profileId || null }),
         }),
         fetch(`./api/security/accounts/${accountId}/status`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            isActive: editableAccount.isActive,
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive: editableAccount.isActive }),
         }),
       ])
 
@@ -289,7 +410,7 @@ function App() {
         throw new Error('La mise à jour du compte a échoué.')
       }
 
-      await loadSecuredData()
+      await loadAdminSecurityData()
     } catch (saveError) {
       updateEditableAccount(accountId, (current) => ({
         ...current,
@@ -302,11 +423,157 @@ function App() {
     updateEditableAccount(accountId, (current) => ({ ...current, isSaving: false, error: null }))
   }
 
-  const modulesByGroup = bootstrap?.modules.reduce<Record<string, BootstrapModule[]>>((groups, module) => {
-    groups[module.navigationGroup] ??= []
-    groups[module.navigationGroup].push(module)
-    return groups
-  }, {})
+  function updateEditableProfile(profileId: string, updater: (current: EditableProfileState) => EditableProfileState) {
+    setEditableProfiles((current) => ({
+      ...current,
+      [profileId]: updater(
+        current[profileId] ?? {
+          label: '',
+          isActive: true,
+          moduleRights: buildDefaultRights(modules),
+          isSaving: false,
+          error: null,
+        },
+      ),
+    }))
+  }
+
+  function handleEditableProfileLabelChange(profileId: string, event: ChangeEvent<HTMLInputElement>) {
+    updateEditableProfile(profileId, (current) => ({
+      ...current,
+      label: event.target.value,
+      error: null,
+    }))
+  }
+
+  function handleEditableProfileStatusChange(profileId: string, event: ChangeEvent<HTMLInputElement>) {
+    updateEditableProfile(profileId, (current) => ({
+      ...current,
+      isActive: event.target.checked,
+      error: null,
+    }))
+  }
+
+  function handleEditableProfileRightChange(profileId: string, moduleId: string, event: ChangeEvent<HTMLSelectElement>) {
+    updateEditableProfile(profileId, (current) => ({
+      ...current,
+      moduleRights: {
+        ...current.moduleRights,
+        [moduleId]: event.target.value,
+      },
+      error: null,
+    }))
+  }
+
+  async function handleSaveProfile(profileId: string) {
+    const editableProfile = editableProfiles[profileId]
+    if (!editableProfile) {
+      return
+    }
+
+    updateEditableProfile(profileId, (current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(`./api/security/profiles/${profileId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: editableProfile.label,
+          isActive: editableProfile.isActive,
+          moduleRights: modules.map((module) => ({
+            securityModuleId: module.id,
+            accessLevel: editableProfile.moduleRights[module.id] ?? 'None',
+          })),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('La mise à jour du profil a échoué.')
+      }
+
+      await loadAdminSecurityData()
+    } catch (saveError) {
+      updateEditableProfile(profileId, (current) => ({
+        ...current,
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur de mise à jour.',
+      }))
+      return
+    }
+
+    updateEditableProfile(profileId, (current) => ({ ...current, isSaving: false, error: null }))
+  }
+
+  function handleNewProfileLabelChange(event: ChangeEvent<HTMLInputElement>) {
+    setNewProfile((current) => ({
+      ...current,
+      label: event.target.value,
+      error: null,
+    }))
+  }
+
+  function handleNewProfileStatusChange(event: ChangeEvent<HTMLInputElement>) {
+    setNewProfile((current) => ({
+      ...current,
+      isActive: event.target.checked,
+      error: null,
+    }))
+  }
+
+  function handleNewProfileRightChange(moduleId: string, event: ChangeEvent<HTMLSelectElement>) {
+    setNewProfile((current) => ({
+      ...current,
+      moduleRights: {
+        ...current.moduleRights,
+        [moduleId]: event.target.value,
+      },
+      error: null,
+    }))
+  }
+
+  async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setNewProfile((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch('./api/security/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: newProfile.label,
+          isActive: newProfile.isActive,
+          moduleRights: modules.map((module) => ({
+            securityModuleId: module.id,
+            accessLevel: newProfile.moduleRights[module.id] ?? 'None',
+          })),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('La création du profil a échoué.')
+      }
+
+      await loadAdminSecurityData()
+      setNewProfile({
+        label: '',
+        isActive: true,
+        moduleRights: buildDefaultRights(modules),
+        isSaving: false,
+        error: null,
+      })
+    } catch (createError) {
+      setNewProfile((current) => ({
+        ...current,
+        isSaving: false,
+        error: createError instanceof Error ? createError.message : 'Erreur de création.',
+      }))
+    }
+  }
+
+  function handlePostAuthLoaderComplete() {
+    sessionStorage.removeItem(postAuthLoaderStorageKey)
+    setShowPostAuthLoader(false)
+  }
 
   if (isLoading) {
     return (
@@ -382,7 +649,9 @@ function App() {
     )
   }
 
-  const profileOptions = bootstrap?.profiles ?? []
+  if (showPostAuthLoader) {
+    return <NexusPostAuthLoader onComplete={handlePostAuthLoaderComplete} />
+  }
 
   return (
     <div className="nexus-app-shell">
@@ -396,10 +665,15 @@ function App() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Navigation principale">
-          {navigationEntries.map((entry) => (
-            <a key={entry} className="sidebar-link" href={`#${entry.toLowerCase().replaceAll(' ', '-')}`}>
+          {visibleNavigationEntries.map((entry) => (
+            <button
+              key={entry}
+              className={`sidebar-link ${selectedNavigation === entry ? 'sidebar-link-active' : ''}`}
+              onClick={() => setSelectedNavigation(entry)}
+              type="button"
+            >
               {entry}
-            </a>
+            </button>
           ))}
         </nav>
 
@@ -416,14 +690,11 @@ function App() {
       <main className="nexus-main">
         <section className="hero-card">
           <div className="hero-copy">
-            <span className="eyebrow">Concept 4C appliqué</span>
-            <h1>NewNexus prend forme sur un socle sécurité, data et UI cohérent.</h1>
-            <p>
-              L’application reprend la direction visuelle validée, tout en exposant déjà les
-              premiers modules, profils, comptes et droits depuis PostgreSQL.
-            </p>
+            <span className="eyebrow">{selectedNavigation}</span>
+            <h1>{getWorkspaceTitle(selectedNavigation, isInformatique)}</h1>
+            <p>{getWorkspaceDescription(selectedNavigation, isInformatique)}</p>
             <div className="hero-actions">
-              <span className="primary-chip">Version {bootstrap?.version ?? systemInfo?.version ?? '0.1.0'}</span>
+              <span className="primary-chip">Version {systemInfo?.version ?? '0.1.0'}</span>
               <span className="secondary-chip">Base path {systemInfo?.basePath ?? '/newNexus'}</span>
             </div>
           </div>
@@ -435,16 +706,16 @@ function App() {
             </div>
             <dl className="hero-stats">
               <div>
-                <dt>Modules</dt>
-                <dd>{bootstrap?.summary.moduleCount ?? '...'}</dd>
+                <dt>Modules visibles</dt>
+                <dd>{visibleModules.length}</dd>
               </div>
               <div>
-                <dt>Profils</dt>
-                <dd>{bootstrap?.summary.profileCount ?? '...'}</dd>
+                <dt>Droits lecture</dt>
+                <dd>{currentUser.rights.filter((right) => right.accessLevel === 'Read').length}</dd>
               </div>
               <div>
-                <dt>Comptes</dt>
-                <dd>{accounts.length}</dd>
+                <dt>Droits écriture</dt>
+                <dd>{currentUser.rights.filter((right) => right.accessLevel === 'Write').length}</dd>
               </div>
               <div>
                 <dt>Environnement</dt>
@@ -457,9 +728,7 @@ function App() {
         {currentUser.mustChangePassword ? (
           <section className="status-banner status-banner-warning">
             <strong>Mot de passe provisoire.</strong>
-            <span>
-              Le compte bootstrap doit changer de mot de passe plus tard, quand la gestion complète des utilisateurs et droits sera en place.
-            </span>
+            <span>Le changement de mot de passe sera traité plus tard dans l’administration des utilisateurs.</span>
           </section>
         ) : null}
 
@@ -468,163 +737,350 @@ function App() {
             <strong>Chargement incomplet.</strong>
             <span>{error}</span>
           </section>
-        ) : (
-          <section className="status-banner">
-            <strong>Base PostgreSQL initialisée.</strong>
-            <span>
-              Schémas <code>infra</code> et <code>security</code> actifs, lecture du socle disponible.
-            </span>
+        ) : null}
+
+        {!error && visibleModules.length === 0 ? (
+          <section className="status-banner status-banner-warning">
+            <strong>Aucun accès métier disponible.</strong>
+            <span>Ce compte existe, mais aucun droit lecture/écriture n’est encore attribué.</span>
           </section>
-        )}
+        ) : null}
 
-        <section className="metrics-grid">
-          <article className="metric-card metric-card-navy">
-            <span className="metric-label">Droits lecture</span>
-            <strong>{bootstrap?.summary.rightsByLevel.Read ?? 0}</strong>
-          </article>
-          <article className="metric-card metric-card-purple">
-            <span className="metric-label">Droits écriture</span>
-            <strong>{bootstrap?.summary.rightsByLevel.Write ?? 0}</strong>
-          </article>
-          <article className="metric-card metric-card-gold">
-            <span className="metric-label">Utilisateurs actifs</span>
-            <strong>{bootstrap?.users.active ?? 0}</strong>
-          </article>
-          <article className="metric-card metric-card-cyan">
-            <span className="metric-label">Serveur UTC</span>
-            <strong>{systemInfo ? new Date(systemInfo.serverTimeUtc).toLocaleTimeString() : '--:--:--'}</strong>
-          </article>
-        </section>
-
-        <section className="workspace-grid">
-          <article className="panel-card" id="administration">
-            <div className="panel-heading">
-              <span className="eyebrow">Navigation</span>
-              <h2>Modules V1 ordonnés par entrée</h2>
-            </div>
-            <div className="group-stack">
-              {navigationEntries.map((entry) => (
-                <section key={entry} className="group-card" id={entry.toLowerCase().replaceAll(' ', '-')}>
+        {selectedNavigation === 'Exploitation' ? (
+          <section className="workspace-grid">
+            <article className="panel-card panel-card-wide">
+              <div className="panel-heading">
+                <span className="eyebrow">Exploitation</span>
+                <h2>Modules de travail</h2>
+              </div>
+              <div className="group-stack">
+                <section className="group-card">
                   <header>
-                    <h3>{entry}</h3>
-                    <span>{modulesByGroup?.[entry]?.length ?? 0} module(s)</span>
+                    <h3>Exploitation</h3>
+                    <span>{modulesByGroup.Exploitation?.length ?? 0} module(s)</span>
                   </header>
                   <ul className="module-list">
-                    {(modulesByGroup?.[entry] ?? []).map((module) => (
+                    {(modulesByGroup.Exploitation ?? []).map((module) => (
                       <li key={module.code}>
                         <span>{module.label}</span>
-                        <code>{module.code}</code>
+                        <code>{translateAccessLevel(rightsByModuleCode.get(module.code) ?? 'None')}</code>
                       </li>
                     ))}
                   </ul>
                 </section>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel-card" id="exploitation">
-            <div className="panel-heading">
-              <span className="eyebrow">Profils</span>
-              <h2>Droits V1 par profil</h2>
-            </div>
-            <div className="profile-grid">
-              {(bootstrap?.profiles ?? []).map((profile) => (
-                <section
-                  key={profile.code}
-                  className={`profile-card ${profileAccentClass[profile.label] ?? 'accent-navy'}`}
-                >
-                  <header>
-                    <div>
-                      <h3>{profile.label}</h3>
-                      <p>{profile.code}</p>
-                    </div>
-                    <span className="profile-badge">
-                      {profile.isSystemProfile ? 'Système' : 'Custom'}
-                    </span>
-                  </header>
-                  <ul className="rights-list">
-                    {profile.rights.map((right) => (
-                      <li key={`${profile.code}-${right.moduleCode}`}>
-                        <span>{right.moduleLabel}</span>
-                        <strong>{right.accessLevel}</strong>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel-card panel-card-wide" id="gestion-administrative">
-            <div className="panel-heading">
-              <span className="eyebrow">Comptes</span>
-              <h2>Administration des accès</h2>
-            </div>
-            <div className="accounts-table">
-              <div className="accounts-table-head">
-                <span>Utilisateur</span>
-                <span>Profil</span>
-                <span>Statut</span>
-                <span>Dernière connexion</span>
-                <span>Actions</span>
               </div>
-              {accounts.map((account) => {
-                const editableAccount = editableAccounts[account.id]
+            </article>
+          </section>
+        ) : null}
 
-                return (
-                  <div key={account.id} className="accounts-table-row">
-                    <span>
-                      <strong>{account.displayName}</strong>
-                      <small>{account.login}</small>
-                    </span>
+        {selectedNavigation === 'Gestion administrative' ? (
+          <section className="workspace-grid">
+            <article className="panel-card panel-card-wide">
+              <div className="panel-heading">
+                <span className="eyebrow">Gestion administrative</span>
+                <h2>Modules de travail</h2>
+              </div>
+              <div className="group-stack">
+                <section className="group-card">
+                  <header>
+                    <h3>Gestion administrative</h3>
+                    <span>{modulesByGroup['Gestion administrative']?.length ?? 0} module(s)</span>
+                  </header>
+                  <ul className="module-list">
+                    {(modulesByGroup['Gestion administrative'] ?? []).map((module) => (
+                      <li key={module.code}>
+                        <span>{module.label}</span>
+                        <code>{translateAccessLevel(rightsByModuleCode.get(module.code) ?? 'None')}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </div>
+            </article>
+          </section>
+        ) : null}
 
-                    <span className="account-edit-cell">
+        {selectedNavigation === 'Administration' && isInformatique ? (
+          <section className="workspace-grid">
+            <article className="panel-card">
+              <div className="panel-heading">
+                <span className="eyebrow">Mon profil</span>
+                <h2>Droits de l’utilisateur connecté</h2>
+              </div>
+              <section className={`profile-card ${profileAccentClass[currentUser.profile?.label ?? ''] ?? 'accent-navy'}`}>
+                <header>
+                  <div>
+                    <h3>{currentUser.profile?.label ?? 'Sans profil'}</h3>
+                    <p>{currentUser.profile?.code ?? 'AUCUN_PROFIL'}</p>
+                  </div>
+                  <span className="profile-badge">Administration</span>
+                </header>
+                <ul className="rights-list">
+                  {currentUser.rights.map((right) => (
+                    <li key={`${right.moduleCode}-${right.accessLevel}`}>
+                      <span>{right.moduleLabel}</span>
+                      <strong>{translateAccessLevel(right.accessLevel)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </article>
+
+            <article className="panel-card">
+              <div className="panel-heading">
+                <span className="eyebrow">Création</span>
+                <h2>Nouveau profil</h2>
+              </div>
+
+              <form className="profile-creation-card" onSubmit={handleCreateProfile}>
+                <div className="profile-form-grid profile-form-grid-2">
+                  <label>
+                    <span>Libellé profil</span>
+                    <input value={newProfile.label} onChange={handleNewProfileLabelChange} />
+                  </label>
+                  <label className="toggle-label profile-toggle">
+                    <input checked={newProfile.isActive} onChange={handleNewProfileStatusChange} type="checkbox" />
+                    <span>Profil actif</span>
+                  </label>
+                </div>
+
+                <div className="profile-form-note">
+                  Le code technique du profil est généré automatiquement à partir du libellé.
+                </div>
+
+                <div className="rights-editor-grid">
+                  {modules.map((module) => (
+                    <label key={`new-${module.id}`} className="rights-editor-row">
+                      <span>{module.label}</span>
                       <select
-                        value={editableAccount?.profileId ?? ''}
-                        onChange={(event) => handleProfileChange(account.id, event)}
+                        value={newProfile.moduleRights[module.id] ?? 'None'}
+                        onChange={(event) => handleNewProfileRightChange(module.id, event)}
                       >
-                        <option value="">Sans profil</option>
-                        {profileOptions.map((profile) => (
-                          <option key={profile.id ?? profile.code} value={profile.id ?? ''}>
-                            {profile.label}
+                        {accessLevels.map((accessLevel) => (
+                          <option key={accessLevel} value={accessLevel}>
+                            {translateAccessLevel(accessLevel)}
                           </option>
                         ))}
                       </select>
-                    </span>
+                    </label>
+                  ))}
+                </div>
 
-                    <span className="account-edit-cell">
-                      <label className="toggle-label">
-                        <input
-                          checked={editableAccount?.isActive ?? account.isActive}
-                          onChange={(event) => handleActiveChange(account.id, event)}
-                          type="checkbox"
-                        />
-                        <span>{editableAccount?.isActive ?? account.isActive ? 'Actif' : 'Inactif'}</span>
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={newProfile.isSaving} type="submit">
+                    {newProfile.isSaving ? 'Création…' : 'Créer le profil'}
+                  </button>
+                  {newProfile.error ? <small className="account-error">{newProfile.error}</small> : null}
+                </div>
+              </form>
+            </article>
+
+            <article className="panel-card panel-card-wide">
+              <div className="panel-heading">
+                <span className="eyebrow">Profils</span>
+                <h2>Administration des profils</h2>
+              </div>
+              <div className="profile-editor-stack">
+                {profiles.map((profile) => {
+                  const editableProfile = editableProfiles[profile.id]
+                  if (!editableProfile) {
+                    return null
+                  }
+
+                  return (
+                    <section key={profile.id} className={`profile-editor-card ${profileAccentClass[profile.label] ?? 'accent-navy'}`}>
+                      <header className="profile-editor-header">
+                        <div>
+                          <h3>{profile.label}</h3>
+                          <p>{profile.code}</p>
+                        </div>
+                        <label className="toggle-label profile-toggle">
+                          <input
+                            checked={editableProfile.isActive}
+                            onChange={(event) => handleEditableProfileStatusChange(profile.id, event)}
+                            type="checkbox"
+                          />
+                          <span>{editableProfile.isActive ? 'Actif' : 'Inactif'}</span>
+                        </label>
+                      </header>
+
+                      <label className="profile-label-field">
+                        <span>Libellé</span>
+                        <input value={editableProfile.label} onChange={(event) => handleEditableProfileLabelChange(profile.id, event)} />
                       </label>
-                    </span>
 
-                    <span>{account.lastLoginAtUtc ? new Date(account.lastLoginAtUtc).toLocaleString() : 'Jamais'}</span>
+                      <div className="rights-editor-grid">
+                        {modules.map((module) => (
+                          <label key={`${profile.id}-${module.id}`} className="rights-editor-row">
+                            <span>{module.label}</span>
+                            <select
+                              value={editableProfile.moduleRights[module.id] ?? 'None'}
+                              onChange={(event) => handleEditableProfileRightChange(profile.id, module.id, event)}
+                            >
+                              {accessLevels.map((accessLevel) => (
+                                <option key={accessLevel} value={accessLevel}>
+                                  {translateAccessLevel(accessLevel)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
 
-                    <span className="account-edit-cell">
-                      <button
-                        className="secondary-button"
-                        disabled={editableAccount?.isSaving}
-                        onClick={() => void handleSaveAccount(account.id)}
-                        type="button"
-                      >
-                        {editableAccount?.isSaving ? 'Enregistrement…' : 'Enregistrer'}
-                      </button>
-                      {editableAccount?.error ? <small className="account-error">{editableAccount.error}</small> : null}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </article>
-        </section>
+                      <div className="profile-action-row">
+                        <button
+                          className="secondary-button"
+                          disabled={editableProfile.isSaving}
+                          onClick={() => void handleSaveProfile(profile.id)}
+                          type="button"
+                        >
+                          {editableProfile.isSaving ? 'Enregistrement…' : 'Enregistrer le profil'}
+                        </button>
+                        {editableProfile.error ? <small className="account-error">{editableProfile.error}</small> : null}
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
+            </article>
+
+            <article className="panel-card panel-card-wide">
+              <div className="panel-heading">
+                <span className="eyebrow">Comptes</span>
+                <h2>Administration des accès utilisateurs</h2>
+              </div>
+              <div className="accounts-table">
+                <div className="accounts-table-head">
+                  <span>Utilisateur</span>
+                  <span>Profil</span>
+                  <span>Statut</span>
+                  <span>Dernière connexion</span>
+                  <span>Actions</span>
+                </div>
+                {accounts.map((account) => {
+                  const editableAccount = editableAccounts[account.id]
+                  return (
+                    <div key={account.id} className="accounts-table-row">
+                      <span>
+                        <strong>{account.displayName}</strong>
+                        <small>{account.login}</small>
+                      </span>
+
+                      <span className="account-edit-cell">
+                        <select value={editableAccount?.profileId ?? ''} onChange={(event) => handleProfileChange(account.id, event)}>
+                          <option value="">Sans profil</option>
+                          {profiles.map((profile) => (
+                            <option key={profile.id} value={profile.id}>
+                              {profile.label}
+                            </option>
+                          ))}
+                        </select>
+                      </span>
+
+                      <span className="account-edit-cell">
+                        <label className="toggle-label">
+                          <input
+                            checked={editableAccount?.isActive ?? account.isActive}
+                            onChange={(event) => handleActiveChange(account.id, event)}
+                            type="checkbox"
+                          />
+                          <span>{editableAccount?.isActive ?? account.isActive ? 'Actif' : 'Inactif'}</span>
+                        </label>
+                      </span>
+
+                      <span>{account.lastLoginAtUtc ? new Date(account.lastLoginAtUtc).toLocaleString() : 'Jamais'}</span>
+
+                      <span className="account-edit-cell">
+                        <button
+                          className="secondary-button"
+                          disabled={editableAccount?.isSaving}
+                          onClick={() => void handleSaveAccount(account.id)}
+                          type="button"
+                        >
+                          {editableAccount?.isSaving ? 'Enregistrement…' : 'Enregistrer'}
+                        </button>
+                        {editableAccount?.error ? <small className="account-error">{editableAccount.error}</small> : null}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </article>
+          </section>
+        ) : null}
       </main>
     </div>
   )
+}
+
+function canAccessModule(accessLevel: string | undefined) {
+  return accessLevel === 'Read' || accessLevel === 'Write'
+}
+
+function compareModules(left: SecurityModuleItem, right: SecurityModuleItem) {
+  const leftGroupIndex = navigationEntries.indexOf(left.navigationGroup)
+  const rightGroupIndex = navigationEntries.indexOf(right.navigationGroup)
+  if (leftGroupIndex !== rightGroupIndex) {
+    return leftGroupIndex - rightGroupIndex
+  }
+
+  if (left.displayOrder !== right.displayOrder) {
+    return left.displayOrder - right.displayOrder
+  }
+
+  return left.label.localeCompare(right.label, 'fr')
+}
+
+function buildDefaultRights(modules: SecurityModuleItem[], current?: Record<string, string>) {
+  return Object.fromEntries(modules.map((module) => [module.id, current?.[module.id] ?? 'None']))
+}
+
+function buildRightsFromProfile(profile: SecurityProfileItem, modules: SecurityModuleItem[]) {
+  return Object.fromEntries(
+    modules.map((module) => [
+      module.id,
+      profile.moduleRights.find((right) => right.securityModuleId === module.id)?.accessLevel ?? 'None',
+    ]),
+  )
+}
+
+function translateAccessLevel(accessLevel: string) {
+  switch (accessLevel) {
+    case 'Read':
+      return 'Lecture'
+    case 'Write':
+      return 'Écriture'
+    default:
+      return 'Aucun'
+  }
+}
+
+function getWorkspaceTitle(selectedNavigation: string, isInformatique: boolean) {
+  if (selectedNavigation === 'Administration') {
+    return isInformatique
+      ? 'Administration des profils et des accès.'
+      : 'Administration.'
+  }
+
+  if (selectedNavigation === 'Gestion administrative') {
+    return 'Accès aux modules de gestion administrative.'
+  }
+
+  return 'Accès aux modules d’exploitation.'
+}
+
+function getWorkspaceDescription(selectedNavigation: string, isInformatique: boolean) {
+  if (selectedNavigation === 'Administration') {
+    return isInformatique
+      ? 'Cette vue regroupe la création des profils, la gestion fine des droits par module et l’affectation des comptes.'
+      : 'Cette entrée est réservée à l’administration.'
+  }
+
+  if (selectedNavigation === 'Gestion administrative') {
+    return 'Cette vue présente uniquement les modules réellement accessibles dans le périmètre administratif.'
+  }
+
+  return 'Cette vue présente uniquement les modules réellement accessibles dans le périmètre exploitation.'
 }
 
 export default App

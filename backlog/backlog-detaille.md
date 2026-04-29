@@ -31,10 +31,13 @@ Derniere mise a jour: 2026-04-29
 |---|---|---|---|
 | UX | Cadrage UX V1 | TERMINE | Document redige |
 | UX | Wireframes V1 | TERMINE | Document redige |
-| UX | Dashboard par profil | EN_COURS | Dashboard connecte disponible, personnalisation par profil a poursuivre |
+| UX | Dashboard par profil | EN_COURS | Remplace progressivement par des vues de travail par entree, personnalisation a poursuivre |
 | UX | Coque frontend premium initiale | TERMINE | Shell Nexus 4C integre et branche au socle |
 | UX | Integration identite visuelle Nexus | TERMINE | Assets, palette, typo et favicon appliques |
-| UX | Qualite accents et libelles UTF-8 | EN_COURS | Vigilance explicite, ecrans d'authentification et d'administration comptes corriges |
+| UX | Qualite accents et libelles UTF-8 | EN_COURS | Vigilance explicite, handoff de marque et ecrans critiques verifies |
+| UX | Tokens officiels du handoff | TERMINE | `design-tokens.css` et `design-tokens.json` integres au frontend |
+| UX | Animation post-authentification | TERMINE | `NexusPostAuthLoader` integre, sans flash dashboard, sequence allongee et visible |
+| UX | Favicon et identite navigateur | TERMINE | Icônes 16/32/180/192/512 et manifest publies |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
 | UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |
 
@@ -48,16 +51,21 @@ Derniere mise a jour: 2026-04-29
 | Securite | Entites domaine securite | TERMINE | `SecurityModule`, `SecurityProfile`, `SecurityProfileModuleRight`, `UserAccount` crees |
 | Securite | Authentification applicative | TERMINE | Login/logout/me par cookie operationnels |
 | Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
-| Securite | Gestion des profils | EN_COURS | Modele et graines V1 en place, lecture disponible, edition complete a faire |
+| Securite | Gestion des profils | EN_COURS | Creation, edition et suppression backend en place, finalisation UI a poursuivre |
 | Securite | Gestion des comptes | EN_COURS | Lecture, affectation profil et activation disponibles |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
 | Securite | Changement de mot de passe | A_DEVELOPPER | Necessaire pour sortir du bootstrap |
 | Securite | Controle d'autorisation backend | EN_COURS | Policy `RequireInformatique` en place sur les endpoints securite |
-| Securite | Protection frontend par droits | EN_COURS | Flux connecte et administration Informatique en place, filtrage fin a faire |
+| Securite | Protection frontend par droits | TERMINE | Navigation et dashboard filtres selon les droits reels |
 | Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
 | Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
 | Securite | Ecran administration des comptes | EN_COURS | Edition du profil et du statut disponible, creation et recherche a faire |
+| Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
+| Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
+| Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
+| Securite | Ecran administration des profils | EN_COURS | Creation sans code manuel et edition disponibles, suppression UI a ajouter |
+| UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes |
 
 ## 4. Transverse
 
@@ -116,6 +124,7 @@ Derniere mise a jour: 2026-04-29
 | Technique | Dashboard frontend branche a l'API socle | TERMINE | Lecture `system/info` et `security/bootstrap` |
 | Technique | Script de publication IIS NewNexus | TERMINE | Script `publish_newnexus_iis.ps1` en place |
 | Technique | Migration authentification | TERMINE | `AuthenticationBootstrap` generee et appliquee |
+| Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 
 ## 9. Hebergement et acces
 

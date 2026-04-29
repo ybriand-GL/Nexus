@@ -1,0 +1,22 @@
+{
+  "name": "NewNexus",
+  "short_name": "Nexus",
+  "description": "NewNexus, socle métier premium du Groupe Laure.",
+  "theme_color": "#0B1E75",
+  "background_color": "#F7F9FC",
+  "display": "standalone",
+  "start_url": "/newNexus/",
+  "scope": "/newNexus/",
+  "icons": [
+    {
+      "src": "./nexus-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./nexus-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

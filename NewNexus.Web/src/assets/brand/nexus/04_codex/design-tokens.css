@@ -1,0 +1,66 @@
+:root {
+  --nexus-navy: #0B1E75;
+  --nexus-gold: #F7B500;
+  --nexus-orange: #FF8A00;
+  --nexus-purple: #6C3DFF;
+  --nexus-cyan: #18BCEB;
+  --nexus-green: #24B05A;
+
+  --nexus-bg: #F7F9FC;
+  --nexus-surface: #FFFFFF;
+  --nexus-border: #E5EAF3;
+  --nexus-text: #0B1E75;
+  --nexus-muted: #62708A;
+
+  --nexus-radius-sm: 8px;
+  --nexus-radius-md: 12px;
+  --nexus-radius-lg: 16px;
+  --nexus-radius-xl: 24px;
+
+  --nexus-shadow-card: 0 10px 30px rgba(11, 30, 117, 0.08);
+  --nexus-shadow-icon: 0 14px 35px rgba(11, 30, 117, 0.16);
+
+  --nexus-font-heading: "Sora", "Inter", system-ui, sans-serif;
+  --nexus-font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.nexus-app {
+  font-family: var(--nexus-font-body);
+  color: var(--nexus-text);
+  background: var(--nexus-bg);
+}
+
+.nexus-sidebar {
+  background: linear-gradient(180deg, #08185F 0%, var(--nexus-navy) 100%);
+  color: white;
+}
+
+.nexus-card {
+  background: var(--nexus-surface);
+  border: 1px solid var(--nexus-border);
+  border-radius: var(--nexus-radius-lg);
+  box-shadow: var(--nexus-shadow-card);
+}
+
+.nexus-button-primary {
+  background: linear-gradient(135deg, var(--nexus-purple), #4F2AEF);
+  color: white;
+  border: 0;
+  border-radius: var(--nexus-radius-md);
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+}
+
+.nexus-button-secondary {
+  background: white;
+  color: var(--nexus-purple);
+  border: 1px solid var(--nexus-purple);
+  border-radius: var(--nexus-radius-md);
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+}
+
+.nexus-badge-success { background: #E8F7EE; color: #127A3A; }
+.nexus-badge-info { background: #E7F8FE; color: #057DA6; }
+.nexus-badge-warning { background: #FFF3E0; color: #C65A00; }
+.nexus-badge-purple { background: #EEE9FF; color: var(--nexus-purple); }

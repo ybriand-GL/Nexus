@@ -1,0 +1,324 @@
+.brand-transition-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(108, 61, 255, 0.08), transparent 24rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
+}
+
+.brand-transition-card {
+  position: relative;
+  width: min(1100px, calc(100vw - 48px));
+  min-height: 320px;
+  border-radius: 34px;
+  border: 1px solid rgba(11, 30, 117, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 28px 80px rgba(11, 30, 117, 0.08);
+  overflow: hidden;
+}
+
+.brand-transition-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.brand-transition-stage-auth {
+  opacity: 0;
+  animation: laureAuthIn 380ms ease-in-out forwards;
+}
+
+.brand-transition-stage-merge {
+  opacity: 0;
+  animation: laureMergeIn 420ms ease-in-out 340ms forwards;
+}
+
+.brand-transition-stage-final {
+  opacity: 0;
+  animation: laureFinalIn 320ms ease-in-out 1240ms forwards;
+}
+
+.brand-transition-laure-solo {
+  width: min(430px, 62vw);
+  filter: drop-shadow(0 24px 48px rgba(11, 30, 117, 0.12));
+  transform: scale(0.92);
+  animation: laureFocus 620ms ease-in-out 120ms forwards;
+}
+
+.brand-transition-halo {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(247, 181, 0, 0.22), rgba(255, 138, 0, 0.08), transparent 72%);
+  filter: blur(10px);
+  opacity: 0;
+  animation: laureHalo 540ms ease-in-out 140ms forwards;
+}
+
+.brand-transition-laure-inline {
+  width: min(320px, 34vw);
+  transform: translateX(44px);
+  opacity: 0;
+  animation: laureSlideLeft 560ms ease-in-out 520ms forwards;
+}
+
+.brand-transition-separator {
+  font-family: var(--nexus-font-heading);
+  font-size: clamp(2rem, 3vw, 3rem);
+  color: rgba(11, 30, 117, 0.76);
+  opacity: 0;
+  transform: scale(0.9);
+  animation: laureSeparatorIn 360ms ease-in-out 720ms forwards;
+}
+
+.brand-transition-nexus-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  opacity: 0;
+  transform: translateX(-18px);
+  animation: laureNexusIn 520ms ease-in-out 720ms forwards;
+}
+
+.brand-transition-nexus-icon,
+.brand-transition-final-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  box-shadow: 0 18px 36px rgba(11, 30, 117, 0.12);
+}
+
+.brand-transition-nexus-wordmark,
+.brand-transition-final-wordmark {
+  width: min(320px, 30vw);
+}
+
+.brand-transition-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.brand-transition-particles span {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  opacity: 0;
+}
+
+.brand-transition-particles span:nth-child(1) {
+  left: 46%;
+  top: 36%;
+  background: var(--nexus-gold);
+  animation: laureParticle 560ms ease-in-out 840ms forwards;
+}
+
+.brand-transition-particles span:nth-child(2) {
+  left: 52%;
+  top: 62%;
+  background: var(--nexus-purple);
+  animation: laureParticle 620ms ease-in-out 880ms forwards;
+}
+
+.brand-transition-particles span:nth-child(3) {
+  left: 58%;
+  top: 40%;
+  background: var(--nexus-cyan);
+  animation: laureParticle 660ms ease-in-out 920ms forwards;
+}
+
+.brand-transition-particles span:nth-child(4) {
+  left: 62%;
+  top: 56%;
+  background: var(--nexus-green);
+  animation: laureParticle 700ms ease-in-out 960ms forwards;
+}
+
+.brand-transition-stage-final {
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+}
+
+.brand-transition-laure-mini {
+  width: min(170px, 22vw);
+  opacity: 0;
+  animation: laureMiniIn 320ms ease-in-out 1320ms forwards;
+}
+
+.brand-transition-line {
+  width: 1px;
+  height: 58px;
+  background: linear-gradient(180deg, rgba(11, 30, 117, 0.16), rgba(11, 30, 117, 0.56), rgba(11, 30, 117, 0.16));
+  opacity: 0;
+  animation: laureLineIn 260ms ease-in-out 1380ms forwards;
+}
+
+.brand-transition-final-nexus {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  opacity: 0;
+  animation: laureFinalNexusIn 360ms ease-in-out 1420ms forwards;
+}
+
+.brand-transition-final-icon {
+  animation: laureXPulse 720ms ease-in-out 1500ms forwards;
+}
+
+.brand-transition-shimmer {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  width: min(360px, 40vw);
+  height: 3px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(24, 188, 235, 0.72), transparent);
+  opacity: 0;
+  animation: laureShimmer 540ms ease-in-out 1680ms forwards;
+}
+
+.brand-transition-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  display: flex;
+  gap: 14px;
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: laureDotsIn 260ms ease-in-out 1820ms forwards;
+}
+
+.brand-transition-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(11, 30, 117, 0.25);
+  animation: laureDotPulse 680ms ease-in-out infinite;
+}
+
+.brand-transition-dots span:nth-child(2) {
+  background: rgba(11, 30, 117, 0.9);
+  animation-delay: 120ms;
+}
+
+.brand-transition-dots span:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+@keyframes laureAuthIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes laureFocus {
+  from { transform: scale(0.92); filter: blur(4px) drop-shadow(0 24px 48px rgba(11, 30, 117, 0.12)); }
+  to { transform: scale(1); filter: blur(0) drop-shadow(0 24px 48px rgba(11, 30, 117, 0.12)); }
+}
+
+@keyframes laureHalo {
+  from { opacity: 0; transform: scale(0.72); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes laureMergeIn {
+  0%, 14% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes laureSlideLeft {
+  from { transform: translateX(44px); opacity: 0; }
+  to { transform: translateX(-12px); opacity: 1; }
+}
+
+@keyframes laureSeparatorIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes laureNexusIn {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes laureParticle {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-26px) scale(1); }
+}
+
+@keyframes laureFinalIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes laureMiniIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes laureLineIn {
+  from { opacity: 0; transform: scaleY(0.65); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+
+@keyframes laureFinalNexusIn {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes laureXPulse {
+  0%, 100% { box-shadow: 0 18px 36px rgba(11, 30, 117, 0.12); }
+  50% { box-shadow: 0 18px 40px rgba(108, 61, 255, 0.24); }
+}
+
+@keyframes laureShimmer {
+  0% { opacity: 0; transform: translateX(-50%) scaleX(0.35); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) scaleX(1.05); }
+}
+
+@keyframes laureDotsIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes laureDotPulse {
+  0%, 100% { transform: scale(0.92); opacity: 0.4; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-transition-stage,
+  .brand-transition-laure-solo,
+  .brand-transition-laure-inline,
+  .brand-transition-separator,
+  .brand-transition-nexus-wrap,
+  .brand-transition-particles span,
+  .brand-transition-laure-mini,
+  .brand-transition-line,
+  .brand-transition-final-nexus,
+  .brand-transition-shimmer,
+  .brand-transition-dots,
+  .brand-transition-dots span,
+  .brand-transition-halo {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .brand-transition-card {
+    min-height: 240px;
+  }
+}

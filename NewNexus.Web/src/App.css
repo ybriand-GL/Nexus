@@ -37,6 +37,31 @@
     linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
 }
 
+.auth-brand-lockup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.8fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.auth-groupe-laure-logo {
+  width: min(100%, 360px);
+  border-radius: 18px;
+  box-shadow: 0 20px 48px rgba(11, 30, 117, 0.1);
+}
+
+.auth-brand-divider {
+  font-family: var(--nexus-font-heading);
+  font-size: clamp(2rem, 3vw, 3rem);
+  color: rgba(11, 30, 117, 0.72);
+}
+
+.auth-nexus-brand {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
 .auth-brand-panel h1,
 .auth-card h2,
 .hero-copy h1,
@@ -728,6 +753,15 @@
   .rights-editor-grid,
   .profile-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .auth-brand-lockup {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .auth-brand-divider {
+    display: none;
   }
 }
 

@@ -517,3 +517,26 @@ Ordre cible de construction:
   - `npm run build` OK
   - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
   - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+
+## 2026-04-29 - Integration Groupe Laure × Nexus
+
+- lecture et application du prompt de `identité visuelle\nexus_groupe_laure_handoff\03_prompt\PROMPT_A_DONNER_A_CODEX.md`
+- nouvelle transition post-authentification:
+  - remplacement de `NexusPostAuthLoader`
+  - ajout du composant `PostLoginBrandTransition`
+  - séquence premium `Groupe Laure × Nexus`
+  - affichage unique après login conservé
+- evolution de la page d'authentification:
+  - intégration du logo Groupe Laure
+  - lockup premium `Groupe Laure × Nexus`
+  - message d'entrée retravaillé
+- hygiene frontend:
+  - ancien loader supprimé
+  - pas de commentaires inutiles laissés dans les fichiers frontend concernés
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+- validation fonctionnelle:
+  - `POST /newNexus/api/auth/login` OK
+  - `GET /newNexus/api/auth/me` OK

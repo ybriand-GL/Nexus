@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
-import NexusPostAuthLoader from './assets/brand/nexus/05_loading_animation/NexusPostAuthLoader'
+import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
 
 type SystemInfo = {
   product: string
@@ -591,18 +591,24 @@ function App() {
     return (
       <div className="auth-shell">
         <section className="auth-brand-panel">
-          <img className="brand-icon" src="./nexus-app-icon.svg" alt="NewNexus" />
-          <img className="brand-wordmark auth-wordmark" src="./nexus-wordmark-simplified.png" alt="Nexus" />
+          <div className="auth-brand-lockup">
+            <img className="auth-groupe-laure-logo" src="./groupe-laure-logo.jpg" alt="Groupe Laure" />
+            <div className="auth-brand-divider" aria-hidden="true">×</div>
+            <div className="auth-nexus-brand">
+              <img className="brand-icon" src="./nexus-app-icon.svg" alt="Nexus" />
+              <img className="brand-wordmark auth-wordmark" src="./nexus-wordmark-simplified.png" alt="Nexus" />
+            </div>
+          </div>
           <span className="eyebrow">Authentification</span>
-          <h1>Connexion à NewNexus</h1>
+          <h1>Connexion à la plateforme Nexus</h1>
           <p>
-            L’accès au socle d’administration, aux profils et aux modules passe désormais par une
-            authentification applicative réelle.
+            L’accès sécurisé aux espaces Groupe Laure et Nexus repose sur une authentification
+            applicative claire, rapide et plus premium.
           </p>
           <ul className="auth-points">
             <li>Accès publié sous <code>/newNexus</code>.</li>
-            <li>Base PostgreSQL initialisée et sécurisée.</li>
-            <li>Compte bootstrap prêt pour le démarrage du chantier.</li>
+            <li>Socle PostgreSQL et sécurité applicative actifs.</li>
+            <li>Transition post-authentification Groupe Laure × Nexus intégrée.</li>
           </ul>
         </section>
 
@@ -650,7 +656,7 @@ function App() {
   }
 
   if (showPostAuthLoader) {
-    return <NexusPostAuthLoader onComplete={handlePostAuthLoaderComplete} />
+    return <PostLoginBrandTransition onComplete={handlePostAuthLoaderComplete} />
   }
 
   return (

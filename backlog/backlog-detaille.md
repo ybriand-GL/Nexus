@@ -36,8 +36,9 @@ Derniere mise a jour: 2026-04-29
 | UX | Integration identite visuelle Nexus | TERMINE | Assets, palette, typo et favicon appliques |
 | UX | Qualite accents et libelles UTF-8 | EN_COURS | Vigilance explicite, handoff de marque et ecrans critiques verifies |
 | UX | Tokens officiels du handoff | TERMINE | `design-tokens.css` et `design-tokens.json` integres au frontend |
-| UX | Animation post-authentification | TERMINE | `NexusPostAuthLoader` integre, sans flash dashboard, sequence allongee et visible |
+| UX | Animation post-authentification | TERMINE | Transition `Groupe Laure × Nexus` integree, affichage unique après login |
 | UX | Favicon et identite navigateur | TERMINE | Icônes 16/32/180/192/512 et manifest publies |
+| UX | Page d'authentification premium | EN_COURS | Lockup Groupe Laure × Nexus intégré, finitions à confirmer |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
 | UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |
 

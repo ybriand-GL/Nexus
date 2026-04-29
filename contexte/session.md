@@ -185,3 +185,15 @@ Ordre cible de construction:
 - build frontend OK: `npm run build`
 - version de depart retenue pour le socle: `0.1.0`
 - prochaine etape: remplacer les squelettes generiques par la structure socle NewNexus et brancher PostgreSQL / EF Core
+
+## 2026-04-29 - Initialisation Git du chantier
+
+- commit initial cree sur `socle`: `dd64997`
+- branches creees:
+  - `socle`
+  - `transverse`
+  - `module-contraventions`
+  - `module-carte-chargement-dechargement`
+  - `module-indicateurs-conducteurs`
+  - `module-indicateurs-tracteurs`
+- depot de depart propre pour lancer maintenant la vraie implementation du socle applicatif

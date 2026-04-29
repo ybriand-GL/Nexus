@@ -545,7 +545,7 @@
 .accounts-table-head,
 .accounts-table-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 0.7fr 1fr;
+  grid-template-columns: 1.4fr 1fr 0.7fr 1fr 1fr;
   gap: 16px;
   align-items: center;
   padding: 14px 18px;
@@ -572,6 +572,62 @@
 .accounts-table-row small {
   margin-top: 4px;
   color: var(--nexus-muted);
+}
+
+.account-edit-cell {
+  display: grid;
+  gap: 8px;
+}
+
+.account-edit-cell select {
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid var(--nexus-border);
+  background: white;
+  color: var(--nexus-text);
+  font: inherit;
+}
+
+.account-edit-cell select:focus {
+  outline: 2px solid rgba(108, 61, 255, 0.18);
+  border-color: var(--nexus-purple);
+}
+
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--nexus-text);
+}
+
+.toggle-label input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--nexus-purple);
+}
+
+.secondary-button {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(108, 61, 255, 0.24);
+  background: rgba(108, 61, 255, 0.08);
+  color: var(--nexus-purple);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.account-error {
+  color: #c2410c;
+  font-weight: 600;
 }
 
 @media (max-width: 1180px) {

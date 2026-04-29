@@ -380,3 +380,41 @@ Ordre cible de construction:
   - ecran de changement de mot de passe
   - regles de droits plus fines par endpoint
   - premiers ecrans d'administration comptes / profils
+
+## 2026-04-29 - Administration initiale des comptes et des droits
+
+- renforcement du controle d'autorisation backend:
+  - policy `RequireInformatique`
+  - endpoints de securite reserves au profil `Informatique`
+- ajout des premiers endpoints d'administration des comptes:
+  - `PUT /api/security/accounts/{accountId}/profile`
+  - `PUT /api/security/accounts/{accountId}/status`
+- regles de securite deja actives:
+  - impossible de desactiver son propre compte
+  - impossible de retirer son propre profil d'administration
+- evolution de l'interface frontend:
+  - tableau d'administration des comptes enrichi
+  - selection du profil par compte
+  - activation / desactivation d'un compte
+  - action d'enregistrement par ligne
+- vigilance accents confirmee:
+  - textes frontend verifies en UTF-8
+  - titre publie `NewNexus` controle
+  - libelles avec accents presents dans l'ecran connecte
+- finition visuelle:
+  - wordmark PNG conserve pour eviter le defaut visuel sur le `X`
+  - styles completes pour la gestion des comptes
+- validation technique:
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+  - `npm run build` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+- validation fonctionnelle publiee:
+  - `POST /newNexus/api/auth/login` OK
+  - `GET /newNexus/api/auth/me` OK
+  - `GET /newNexus/api/security/accounts` OK
+  - `PUT /newNexus/api/security/accounts/{id}/profile` OK
+  - `PUT /newNexus/api/security/accounts/{id}/status` OK
+- prochaine etape:
+  - gestion complete des profils
+  - filtrage fin frontend selon les droits reels
+  - creation / synchronisation des utilisateurs metier

@@ -34,7 +34,7 @@ Derniere mise a jour: 2026-04-29
 | UX | Dashboard par profil | EN_COURS | Dashboard connecte disponible, personnalisation par profil a poursuivre |
 | UX | Coque frontend premium initiale | TERMINE | Shell Nexus 4C integre et branche au socle |
 | UX | Integration identite visuelle Nexus | TERMINE | Assets, palette, typo et favicon appliques |
-| UX | Qualite accents et libelles UTF-8 | EN_COURS | Vigilance explicite, page d'authentification corrigee |
+| UX | Qualite accents et libelles UTF-8 | EN_COURS | Vigilance explicite, ecrans d'authentification et d'administration comptes corriges |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
 | UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |
 
@@ -48,13 +48,16 @@ Derniere mise a jour: 2026-04-29
 | Securite | Entites domaine securite | TERMINE | `SecurityModule`, `SecurityProfile`, `SecurityProfileModuleRight`, `UserAccount` crees |
 | Securite | Authentification applicative | TERMINE | Login/logout/me par cookie operationnels |
 | Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
-| Securite | Gestion des profils | A_DEVELOPPER | Modele et graines V1 en place, API/UI a faire |
-| Securite | Gestion des comptes | EN_COURS | Lecture des comptes et compte bootstrap admin en place |
+| Securite | Gestion des profils | EN_COURS | Modele et graines V1 en place, lecture disponible, edition complete a faire |
+| Securite | Gestion des comptes | EN_COURS | Lecture, affectation profil et activation disponibles |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
 | Securite | Changement de mot de passe | A_DEVELOPPER | Necessaire pour sortir du bootstrap |
-| Securite | Controle d'autorisation backend | A_DEVELOPPER | A implementer dans `socle` |
-| Securite | Protection frontend par droits | EN_COURS | Flux connecte en place, filtrage fin a faire |
+| Securite | Controle d'autorisation backend | EN_COURS | Policy `RequireInformatique` en place sur les endpoints securite |
+| Securite | Protection frontend par droits | EN_COURS | Flux connecte et administration Informatique en place, filtrage fin a faire |
+| Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
+| Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
+| Securite | Ecran administration des comptes | EN_COURS | Edition du profil et du statut disponible, creation et recherche a faire |
 
 ## 4. Transverse
 

@@ -61,7 +61,12 @@ builder.Services
             return Task.CompletedTask;
         };
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RequireInformatique", policy =>
+        policy.RequireAuthenticatedUser()
+            .RequireClaim("profile_code", "INFORMATIQUE"));
+});
 builder.Services.AddNewNexusPostgres(builder.Configuration);
 
 var app = builder.Build();
@@ -207,7 +212,7 @@ app.MapGet("/api/security/modules", async (NewNexusDbContext dbContext) =>
         .ToListAsync();
 
     return Results.Ok(modules);
-}).RequireAuthorization();
+}).RequireAuthorization("RequireInformatique");
 
 app.MapGet("/api/security/profiles", async (NewNexusDbContext dbContext) =>
 {
@@ -238,7 +243,7 @@ app.MapGet("/api/security/profiles", async (NewNexusDbContext dbContext) =>
         .ToListAsync();
 
     return Results.Ok(profiles);
-}).RequireAuthorization();
+}).RequireAuthorization("RequireInformatique");
 
 app.MapGet("/api/security/accounts", async (NewNexusDbContext dbContext) =>
 {
@@ -270,7 +275,7 @@ app.MapGet("/api/security/accounts", async (NewNexusDbContext dbContext) =>
         .ToListAsync();
 
     return Results.Ok(accounts);
-}).RequireAuthorization();
+}).RequireAuthorization("RequireInformatique");
 
 app.MapGet("/api/security/bootstrap", async (NewNexusDbContext dbContext) =>
 {
@@ -333,7 +338,73 @@ app.MapGet("/api/security/bootstrap", async (NewNexusDbContext dbContext) =>
             RightsByLevel = rightsByLevel
         }
     });
-}).RequireAuthorization();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/security/accounts/{accountId:guid}/profile", async (
+    Guid accountId,
+    UpdateAccountProfileRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    var currentUserId = GetUserId(principal);
+    var account = await dbContext.UserAccounts.SingleOrDefaultAsync(userAccount => userAccount.Id == accountId);
+    if (account is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (request.SecurityProfileId is not null)
+    {
+        var profileExists = await dbContext.SecurityProfiles.AnyAsync(profile => profile.Id == request.SecurityProfileId.Value && profile.IsActive);
+        if (!profileExists)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["securityProfileId"] = ["Le profil sélectionné est introuvable ou inactif."]
+            });
+        }
+    }
+
+    if (currentUserId == account.Id && request.SecurityProfileId is null)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["securityProfileId"] = ["Vous ne pouvez pas retirer votre propre profil d'administration."]
+        });
+    }
+
+    account.SecurityProfileId = request.SecurityProfileId;
+    await dbContext.SaveChangesAsync();
+
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/security/accounts/{accountId:guid}/status", async (
+    Guid accountId,
+    UpdateAccountStatusRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    var currentUserId = GetUserId(principal);
+    var account = await dbContext.UserAccounts.SingleOrDefaultAsync(userAccount => userAccount.Id == accountId);
+    if (account is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (currentUserId == account.Id && !request.IsActive)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["isActive"] = ["Vous ne pouvez pas désactiver votre propre compte."]
+        });
+    }
+
+    account.IsActive = request.IsActive;
+    await dbContext.SaveChangesAsync();
+
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
 
 app.MapFallbackToFile("index.html");
 
@@ -395,3 +466,5 @@ static object BuildAuthenticatedUser(UserAccount account)
 }
 
 internal sealed record LoginRequest(string Login, string Password);
+internal sealed record UpdateAccountProfileRequest(Guid? SecurityProfileId);
+internal sealed record UpdateAccountStatusRequest(bool IsActive);

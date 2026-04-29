@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 
 type SystemInfo = {
@@ -24,6 +24,7 @@ type ProfileRight = {
 }
 
 type BootstrapProfile = {
+  id?: string
   code: string
   label: string
   isSystemProfile: boolean
@@ -79,6 +80,13 @@ type AccountItem = {
   } | null
 }
 
+type EditableAccountState = {
+  profileId: string
+  isActive: boolean
+  isSaving: boolean
+  error: string | null
+}
+
 const navigationEntries = ['Administration', 'Exploitation', 'Gestion administrative']
 
 const profileAccentClass: Record<string, string> = {
@@ -92,6 +100,7 @@ function App() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
   const [bootstrap, setBootstrap] = useState<BootstrapPayload | null>(null)
   const [accounts, setAccounts] = useState<AccountItem[]>([])
+  const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
@@ -124,6 +133,7 @@ function App() {
         setCurrentUser(null)
         setBootstrap(null)
         setAccounts([])
+        setEditableAccounts({})
         return
       }
 
@@ -158,6 +168,19 @@ function App() {
 
     setBootstrap(bootstrapPayload)
     setAccounts(accountPayload)
+    setEditableAccounts(
+      Object.fromEntries(
+        accountPayload.map((account) => [
+          account.id,
+          {
+            profileId: account.profile?.id ?? '',
+            isActive: account.isActive,
+            isSaving: false,
+            error: null,
+          },
+        ]),
+      ),
+    )
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -198,6 +221,85 @@ function App() {
     setCurrentUser(null)
     setBootstrap(null)
     setAccounts([])
+    setEditableAccounts({})
+  }
+
+  function updateEditableAccount(accountId: string, updater: (current: EditableAccountState) => EditableAccountState) {
+    setEditableAccounts((current) => ({
+      ...current,
+      [accountId]: updater(
+        current[accountId] ?? {
+          profileId: '',
+          isActive: true,
+          isSaving: false,
+          error: null,
+        },
+      ),
+    }))
+  }
+
+  function handleProfileChange(accountId: string, event: ChangeEvent<HTMLSelectElement>) {
+    const nextValue = event.target.value
+    updateEditableAccount(accountId, (current) => ({
+      ...current,
+      profileId: nextValue,
+      error: null,
+    }))
+  }
+
+  function handleActiveChange(accountId: string, event: ChangeEvent<HTMLInputElement>) {
+    updateEditableAccount(accountId, (current) => ({
+      ...current,
+      isActive: event.target.checked,
+      error: null,
+    }))
+  }
+
+  async function handleSaveAccount(accountId: string) {
+    const editableAccount = editableAccounts[accountId]
+    if (!editableAccount) {
+      return
+    }
+
+    updateEditableAccount(accountId, (current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const [profileResponse, statusResponse] = await Promise.all([
+        fetch(`./api/security/accounts/${accountId}/profile`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            securityProfileId: editableAccount.profileId || null,
+          }),
+        }),
+        fetch(`./api/security/accounts/${accountId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            isActive: editableAccount.isActive,
+          }),
+        }),
+      ])
+
+      if (!profileResponse.ok || !statusResponse.ok) {
+        throw new Error('La mise à jour du compte a échoué.')
+      }
+
+      await loadSecuredData()
+    } catch (saveError) {
+      updateEditableAccount(accountId, (current) => ({
+        ...current,
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur de mise à jour.',
+      }))
+      return
+    }
+
+    updateEditableAccount(accountId, (current) => ({ ...current, isSaving: false, error: null }))
   }
 
   const modulesByGroup = bootstrap?.modules.reduce<Record<string, BootstrapModule[]>>((groups, module) => {
@@ -273,12 +375,14 @@ function App() {
             <strong>Compte bootstrap</strong>
             <span>Login : <code>admin</code></span>
             <span>Mot de passe : <code>NewNexus!2026</code></span>
-            <span>Ce mot de passe est provisoire et devra être changé ensuite.</span>
+            <span>Ce mot de passe est provisoire. Le changement sera géré plus tard dans l’administration.</span>
           </div>
         </section>
       </div>
     )
   }
+
+  const profileOptions = bootstrap?.profiles ?? []
 
   return (
     <div className="nexus-app-shell">
@@ -353,7 +457,9 @@ function App() {
         {currentUser.mustChangePassword ? (
           <section className="status-banner status-banner-warning">
             <strong>Mot de passe provisoire.</strong>
-            <span>Le compte bootstrap doit changer de mot de passe dès que l’écran d’administration sera disponible.</span>
+            <span>
+              Le compte bootstrap doit changer de mot de passe plus tard, quand la gestion complète des utilisateurs et droits sera en place.
+            </span>
           </section>
         ) : null}
 
@@ -460,18 +566,59 @@ function App() {
                 <span>Profil</span>
                 <span>Statut</span>
                 <span>Dernière connexion</span>
+                <span>Actions</span>
               </div>
-              {accounts.map((account) => (
-                <div key={account.id} className="accounts-table-row">
-                  <span>
-                    <strong>{account.displayName}</strong>
-                    <small>{account.login}</small>
-                  </span>
-                  <span>{account.profile?.label ?? 'Sans profil'}</span>
-                  <span>{account.isActive ? 'Actif' : 'Inactif'}</span>
-                  <span>{account.lastLoginAtUtc ? new Date(account.lastLoginAtUtc).toLocaleString() : 'Jamais'}</span>
-                </div>
-              ))}
+              {accounts.map((account) => {
+                const editableAccount = editableAccounts[account.id]
+
+                return (
+                  <div key={account.id} className="accounts-table-row">
+                    <span>
+                      <strong>{account.displayName}</strong>
+                      <small>{account.login}</small>
+                    </span>
+
+                    <span className="account-edit-cell">
+                      <select
+                        value={editableAccount?.profileId ?? ''}
+                        onChange={(event) => handleProfileChange(account.id, event)}
+                      >
+                        <option value="">Sans profil</option>
+                        {profileOptions.map((profile) => (
+                          <option key={profile.id ?? profile.code} value={profile.id ?? ''}>
+                            {profile.label}
+                          </option>
+                        ))}
+                      </select>
+                    </span>
+
+                    <span className="account-edit-cell">
+                      <label className="toggle-label">
+                        <input
+                          checked={editableAccount?.isActive ?? account.isActive}
+                          onChange={(event) => handleActiveChange(account.id, event)}
+                          type="checkbox"
+                        />
+                        <span>{editableAccount?.isActive ?? account.isActive ? 'Actif' : 'Inactif'}</span>
+                      </label>
+                    </span>
+
+                    <span>{account.lastLoginAtUtc ? new Date(account.lastLoginAtUtc).toLocaleString() : 'Jamais'}</span>
+
+                    <span className="account-edit-cell">
+                      <button
+                        className="secondary-button"
+                        disabled={editableAccount?.isSaving}
+                        onClick={() => void handleSaveAccount(account.id)}
+                        type="button"
+                      >
+                        {editableAccount?.isSaving ? 'Enregistrement…' : 'Enregistrer'}
+                      </button>
+                      {editableAccount?.error ? <small className="account-error">{editableAccount.error}</small> : null}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </article>
         </section>

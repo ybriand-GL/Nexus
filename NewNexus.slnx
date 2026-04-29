@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="NewNexus.Api/NewNexus.Api.csproj" />
+  <Project Path="NewNexus.Data.Postgres/NewNexus.Data.Postgres.csproj" />
+  <Project Path="NewNexus.Domain/NewNexus.Domain.csproj" />
+  <Project Path="NewNexus.Integrations/NewNexus.Integrations.csproj" />
+</Solution>

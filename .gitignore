@@ -1,0 +1,12 @@
+﻿.dotnet_home/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+.vs/
+.idea/
+*.user
+*.suo
+*.log
+.env
+.env.*

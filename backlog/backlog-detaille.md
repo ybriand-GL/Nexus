@@ -23,6 +23,7 @@ Derniere mise a jour: 2026-04-29
 | Gouvernance | Strategie de branches socle/transverse/modules | TERMINE | Definie dans le contexte |
 | Architecture | Architecture cible solution | CADRE | Projets cibles identifies |
 | Architecture | Scaffold solution technique | TERMINE | Depot Git, solution .NET et frontend crees |
+| Architecture | Compatibilite hebergement `/newNexus` | SCAFFOLDE | Base path backend/frontend deja prepare |
 
 ## 2. UX et produit
 
@@ -30,7 +31,10 @@ Derniere mise a jour: 2026-04-29
 |---|---|---|---|
 | UX | Cadrage UX V1 | TERMINE | Document redige |
 | UX | Wireframes V1 | TERMINE | Document redige |
-| UX | Dashboard par profil | CADRE | Inclus dans le perimetre V1 |
+| UX | Dashboard par profil | EN_COURS | Dashboard connecte disponible, personnalisation par profil a poursuivre |
+| UX | Coque frontend premium initiale | TERMINE | Shell Nexus 4C integre et branche au socle |
+| UX | Integration identite visuelle Nexus | TERMINE | Assets, palette, typo et favicon appliques |
+| UX | Qualite accents et libelles UTF-8 | EN_COURS | Vigilance explicite, page d'authentification corrigee |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
 | UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |
 
@@ -40,13 +44,17 @@ Derniere mise a jour: 2026-04-29
 |---|---|---|---|
 | Securite | Modele de droits V1 par module | TERMINE | Document redige |
 | Securite | Profils V1 | TERMINE | Informatique, Direction, Exploitation, Administratif |
-| Securite | Tables PostgreSQL securite | CADRE | Decrites dans le schema V1 |
-| Securite | Authentification applicative | A_DEVELOPPER | A implementer dans `socle` |
-| Securite | Gestion des sessions | A_DEVELOPPER | A implementer dans `socle` |
-| Securite | Gestion des profils | A_DEVELOPPER | A implementer dans `socle` |
-| Securite | Gestion des comptes | A_DEVELOPPER | A implementer dans `socle` |
+| Securite | Tables PostgreSQL securite | TERMINE | Migration `InitialSecuritySocle` generee |
+| Securite | Entites domaine securite | TERMINE | `SecurityModule`, `SecurityProfile`, `SecurityProfileModuleRight`, `UserAccount` crees |
+| Securite | Authentification applicative | TERMINE | Login/logout/me par cookie operationnels |
+| Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
+| Securite | Gestion des profils | A_DEVELOPPER | Modele et graines V1 en place, API/UI a faire |
+| Securite | Gestion des comptes | EN_COURS | Lecture des comptes et compte bootstrap admin en place |
+| Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
+| Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
+| Securite | Changement de mot de passe | A_DEVELOPPER | Necessaire pour sortir du bootstrap |
 | Securite | Controle d'autorisation backend | A_DEVELOPPER | A implementer dans `socle` |
-| Securite | Protection frontend par droits | A_DEVELOPPER | A implementer dans `socle` |
+| Securite | Protection frontend par droits | EN_COURS | Flux connecte en place, filtrage fin a faire |
 
 ## 4. Transverse
 
@@ -95,8 +103,37 @@ Derniere mise a jour: 2026-04-29
 | Technique | Projet `NewNexus.Data.Postgres` | TERMINE | Projet scaffoldé |
 | Technique | Projet `NewNexus.Integrations` | TERMINE | Projet scaffoldé |
 | Technique | Projet `NewNexus.Web` | TERMINE | Projet Vite React TS scaffoldé |
-| Technique | EF Core PostgreSQL | A_FAIRE | A brancher apres scaffold |
-| Technique | Premiere migration | A_FAIRE | Apres modelisation |
+| Technique | Socle HTTP backend minimal | TERMINE | Endpoints racine, system/info et health en place |
+| Technique | Configuration frontend/backend `/newNexus` | TERMINE | `PathBase` backend et `base` Vite configures |
+| Technique | Configuration CORS initiale | TERMINE | Hotes cibles et locaux prepares |
+| Technique | EF Core PostgreSQL | TERMINE | Branche dans `NewNexus.Data.Postgres` et `NewNexus.Api` |
+| Technique | DbContext PostgreSQL | TERMINE | `NewNexusDbContext` cree |
+| Technique | Premiere migration | TERMINE | `InitialSecuritySocle` generee |
+| Technique | Application migration sur base locale | TERMINE | Base `NewNexus` creee et migree localement |
+| Technique | Dashboard frontend branche a l'API socle | TERMINE | Lecture `system/info` et `security/bootstrap` |
+| Technique | Script de publication IIS NewNexus | TERMINE | Script `publish_newnexus_iis.ps1` en place |
+| Technique | Migration authentification | TERMINE | `AuthenticationBootstrap` generee et appliquee |
+
+## 9. Hebergement et acces
+
+| Domaine | Fonctionnalite | Statut | Commentaire |
+|---|---|---|---|
+| Hebergement | URL cible `http://192.168.60.158/newNexus` | CADRE | URL a supporter lors de la publication IIS |
+| Hebergement | URL cible `http://192.168.50.102/newNexus` | CADRE | URL a supporter lors de la publication IIS |
+| Hebergement | Publication sous repertoire virtuel `/newNexus` | SCAFFOLDE | Application configuree pour fonctionner sous ce chemin |
+| Hebergement | Compatibilite acces HTTP cible | TERMINE | Redirection HTTPS forcee retiree du socle API |
+| Hebergement | Publication IIS effective `Localaure/newNexus` | TERMINE | Application publiee et testee en HTTP |
+| Hebergement | Exclusion rewrite parent pour `/newNexus` | TERMINE | Regle ajoutee dans `C:\inetpub\locatif\web.config` |
+
+## 10. Base de donnees locale
+
+| Domaine | Fonctionnalite | Statut | Commentaire |
+|---|---|---|---|
+| PostgreSQL | Service moteur local | TERMINE | Service `postgresql-x64-18` detecte en etat `Running` |
+| PostgreSQL | Client `psql` disponible dans le PATH | BLOQUE | Non detecte dans l'environnement courant |
+| PostgreSQL | Base `NewNexus` locale | TERMINE | Base creee et objets `infra`/`security` verifies |
+| PostgreSQL | Compte de travail valide | TERMINE | `postgres / legri00` fonctionne, `admin / legri00` echoue |
+| PostgreSQL | Compte bootstrap applicatif | TERMINE | `admin` seedé avec profil `Informatique` |
 
 ## 8. Points ouverts
 

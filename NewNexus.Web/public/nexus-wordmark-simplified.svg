@@ -1,0 +1,12 @@
+<svg width="1200" height="240" viewBox="0 0 1200 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nexus logo">
+  <style>
+    text { font-family: Sora, Inter, Arial, sans-serif; font-size: 170px; font-weight: 800; letter-spacing: -10px; dominant-baseline: middle; }
+  </style>
+  <text x="30" y="126" fill="#0B1E75">n</text>
+  <text x="215" y="126" fill="#F7B500">e</text>
+  <text x="390" y="126" fill="#FF8A00">x</text>
+  <text x="560" y="126" fill="#18BCEB">u</text>
+  <text x="745" y="126" fill="#24B05A">s</text>
+  <path d="M445 56L515 56L460 112L390 112Z" fill="#6C3DFF" opacity="0.96"/>
+  <path d="M405 140L475 140L420 196L350 196Z" fill="#6C3DFF" opacity="0.96"/>
+</svg>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nexus UI Preview</title>
+  <link rel="icon" href="../03_assets/png/favicon.ico" />
+  <link rel="stylesheet" href="design-tokens.css" />
+  <style>
+    body { margin:0; font-family: var(--nexus-font-body); background: var(--nexus-bg); color: var(--nexus-text); }
+    .layout { display:flex; min-height:100vh; }
+    aside { width:260px; padding:28px 20px; }
+    main { flex:1; padding:32px; }
+    .logo { display:flex; align-items:center; gap:12px; margin-bottom:32px; }
+    .logo img { width:54px; height:54px; }
+    .nav { display:grid; gap:10px; }
+    .nav a { color:white; text-decoration:none; padding:12px 14px; border-radius:12px; opacity:.82; }
+    .nav a.active { background:rgba(255,255,255,.12); opacity:1; }
+    .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
+    h1 { font-family:var(--nexus-font-heading); margin:0; }
+    .grid { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:18px; }
+    .card { padding:20px; }
+    .card strong { font-size:28px; display:block; margin-top:8px; }
+    .accent-gold { border-left:4px solid var(--nexus-gold); }
+    .accent-orange { border-left:4px solid var(--nexus-orange); }
+    .accent-cyan { border-left:4px solid var(--nexus-cyan); }
+    .accent-green { border-left:4px solid var(--nexus-green); }
+    .panel { margin-top:18px; padding:24px; }
+    .buttons { display:flex; gap:12px; margin-top:20px; align-items:center; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:999px; font-size:13px; font-weight:700; }
+  </style>
+</head>
+<body class="nexus-app">
+  <div class="layout">
+    <aside class="nexus-sidebar">
+      <div class="logo"><img src="../03_assets/png/nexus-icon-128.png" alt="Nexus" /><strong>NEXUS</strong></div>
+      <nav class="nav">
+        <a class="active" href="#">Dashboard</a>
+        <a href="#">Commandes</a>
+        <a href="#">Analytique</a>
+        <a href="#">Clients</a>
+        <a href="#">Paramètres</a>
+      </nav>
+    </aside>
+    <main>
+      <div class="top">
+        <h1>Dashboard</h1>
+        <button class="nexus-button-primary">Nouvelle action</button>
+      </div>
+      <section class="grid">
+        <div class="nexus-card card accent-gold">Commandes<strong>1 248</strong></div>
+        <div class="nexus-card card accent-orange">Chiffre d'affaires<strong>342 680 €</strong></div>
+        <div class="nexus-card card accent-cyan">Clients actifs<strong>2 856</strong></div>
+        <div class="nexus-card card accent-green">Conversion<strong>4,68 %</strong></div>
+      </section>
+      <section class="nexus-card panel">
+        <h2>Composants</h2>
+        <div class="buttons">
+          <button class="nexus-button-primary">Bouton primaire</button>
+          <button class="nexus-button-secondary">Bouton secondaire</button>
+          <span class="badge nexus-badge-success">Terminé</span>
+          <span class="badge nexus-badge-info">En cours</span>
+          <span class="badge nexus-badge-warning">En attente</span>
+          <span class="badge nexus-badge-purple">Expédié</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

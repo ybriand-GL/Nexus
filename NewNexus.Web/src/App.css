@@ -318,6 +318,12 @@
     linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
 }
 
+.hero-card-compact {
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.5fr);
+  gap: 18px;
+  padding: 24px 28px;
+}
+
 .hero-copy {
   display: grid;
   align-content: start;
@@ -330,6 +336,15 @@
   line-height: 0.96;
   max-width: 12ch;
   letter-spacing: -0.04em;
+}
+
+.hero-card-compact .hero-copy h1 {
+  font-size: clamp(2rem, 3vw, 3rem);
+  max-width: none;
+}
+
+.hero-card-compact .hero-copy p {
+  max-width: 44ch;
 }
 
 .hero-copy p {
@@ -699,18 +714,12 @@
   border: 1px solid var(--nexus-border);
   background: linear-gradient(180deg, rgba(247, 249, 252, 0.88), #fff);
   box-shadow: 0 12px 28px rgba(11, 30, 117, 0.06);
-  cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .profile-summary-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 36px rgba(11, 30, 117, 0.1);
-}
-
-.profile-summary-card.is-selected {
-  border-color: rgba(108, 61, 255, 0.42);
-  box-shadow: 0 18px 38px rgba(108, 61, 255, 0.14);
 }
 
 .profile-summary-header,
@@ -744,6 +753,11 @@
   padding: 12px 14px;
   border-radius: 16px;
   background: rgba(11, 30, 117, 0.04);
+}
+
+.profile-summary-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .profile-status-badge,

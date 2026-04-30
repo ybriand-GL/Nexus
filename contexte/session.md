@@ -571,3 +571,17 @@ Ordre cible de construction:
   - `npm run build` OK
   - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release` OK
   - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+
+## 2026-04-30 - Edition directe des profils
+
+- evolution ergonomique:
+  - la modification d'un profil ne passe plus par une selection puis une zone de configuration en bas de page
+  - chaque carte profil propose maintenant une action directe `Configurer le profil`
+  - l'edition complete du profil s'ouvre dans une modale dediee
+- simplification de l'ecran:
+  - suppression du panneau de configuration inline dans `Administration > Profils`
+  - conservation de la synthese des droits par module directement sur les cartes
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK

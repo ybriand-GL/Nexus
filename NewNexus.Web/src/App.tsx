@@ -128,7 +128,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
   const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false)
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [selectedNavigation, setSelectedNavigation] = useState('Exploitation')
   const [selectedAdministrationSection, setSelectedAdministrationSection] =
     useState<(typeof administrationSubmenuEntries)[number]>('Profils')
@@ -228,17 +228,6 @@ function App() {
       ),
     )
   }, [profiles, modules])
-
-  useEffect(() => {
-    if (profiles.length === 0) {
-      setSelectedProfileId(null)
-      return
-    }
-
-    setSelectedProfileId((current) =>
-      current && profiles.some((profile) => profile.id === current) ? current : profiles[0].id,
-    )
-  }, [profiles])
 
   useEffect(() => {
     if (selectedNavigation !== 'Administration' || !isInformatique) {
@@ -518,6 +507,7 @@ function App() {
       }
 
       await loadAdminSecurityData()
+      setEditingProfileId(null)
     } catch (saveError) {
       updateEditableProfile(profileId, (current) => ({
         ...current,
@@ -580,6 +570,19 @@ function App() {
     }))
   }
 
+  function openEditProfileModal(profileId: string) {
+    setEditingProfileId(profileId)
+  }
+
+  function closeEditProfileModal() {
+    const editableProfile = editingProfileId ? editableProfiles[editingProfileId] : null
+    if (editableProfile?.isSaving) {
+      return
+    }
+
+    setEditingProfileId(null)
+  }
+
   async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setNewProfile((current) => ({ ...current, isSaving: true, error: null }))
@@ -625,8 +628,8 @@ function App() {
     setShowPostAuthLoader(false)
   }
 
-  const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? null
-  const selectedEditableProfile = selectedProfile ? editableProfiles[selectedProfile.id] ?? null : null
+  const editingProfile = profiles.find((profile) => profile.id === editingProfileId) ?? null
+  const editingEditableProfile = editingProfile ? editableProfiles[editingProfile.id] ?? null : null
 
   if (isLoading) {
     return (
@@ -739,14 +742,13 @@ function App() {
       </aside>
 
       <main className="nexus-main">
-        <section className="hero-card">
+        <section className={`hero-card ${selectedNavigation === 'Administration' ? 'hero-card-compact' : ''}`}>
           <div className="hero-copy">
             <span className="eyebrow">{selectedNavigation}</span>
-            <h1>{getWorkspaceTitle(selectedNavigation, isInformatique)}</h1>
+            <h1>{getWorkspaceTitle(selectedNavigation)}</h1>
             <p>{getWorkspaceDescription(selectedNavigation, isInformatique)}</p>
             <div className="hero-actions">
               <span className="primary-chip">Version {systemInfo?.version ?? '0.1.0'}</span>
-              <span className="secondary-chip">Base path {systemInfo?.basePath ?? '/newNexus'}</span>
             </div>
           </div>
 
@@ -788,13 +790,6 @@ function App() {
                 {entry}
               </button>
             ))}
-          </section>
-        ) : null}
-
-        {currentUser.mustChangePassword ? (
-          <section className="status-banner status-banner-warning">
-            <strong>Mot de passe provisoire.</strong>
-            <span>Le changement de mot de passe sera traité plus tard dans l’administration des utilisateurs.</span>
           </section>
         ) : null}
 
@@ -899,7 +894,7 @@ function App() {
               </div>
               <div className="profiles-toolbar">
                 <p className="profiles-toolbar-copy">
-                  Chaque profil affiche ses droits par module. Sélectionnez un profil pour le configurer.
+                  Chaque profil affiche ses droits par module. Ouvrez directement la configuration depuis la carte du profil.
                 </p>
                 <button className="primary-button" onClick={openCreateProfileModal} type="button">
                   Ajouter un profil
@@ -920,12 +915,7 @@ function App() {
                   }
 
                   return (
-                    <button
-                      key={profile.id}
-                      className={`profile-summary-card ${profileAccentClass[profile.label] ?? 'accent-navy'} ${selectedProfileId === profile.id ? 'is-selected' : ''}`}
-                      onClick={() => setSelectedProfileId(profile.id)}
-                      type="button"
-                    >
+                    <article key={profile.id} className={`profile-summary-card ${profileAccentClass[profile.label] ?? 'accent-navy'}`}>
                       <header className="profile-summary-header">
                         <div>
                           <h3>{profile.label}</h3>
@@ -945,74 +935,16 @@ function App() {
                           </div>
                         ))}
                       </div>
-                    </button>
+                      <div className="profile-summary-actions">
+                        <button className="secondary-button" onClick={() => openEditProfileModal(profile.id)} type="button">
+                          Configurer le profil
+                        </button>
+                      </div>
+                    </article>
                   )
                 })}
               </div>
             </article>
-
-            {selectedProfile && selectedEditableProfile ? (
-              <article className="panel-card panel-card-wide">
-                <div className="panel-heading">
-                  <span className="eyebrow">Configuration</span>
-                  <h2>{selectedProfile.label}</h2>
-                </div>
-                <section className={`profile-editor-card ${profileAccentClass[selectedProfile.label] ?? 'accent-navy'}`}>
-                  <header className="profile-editor-header">
-                    <div>
-                      <h3>{selectedProfile.label}</h3>
-                      <p>{selectedProfile.code}</p>
-                    </div>
-                    <label className="toggle-label profile-toggle">
-                      <input
-                        checked={selectedEditableProfile.isActive}
-                        onChange={(event) => handleEditableProfileStatusChange(selectedProfile.id, event)}
-                        type="checkbox"
-                      />
-                      <span>{selectedEditableProfile.isActive ? 'Actif' : 'Inactif'}</span>
-                    </label>
-                  </header>
-
-                  <label className="profile-label-field">
-                    <span>Libellé</span>
-                    <input
-                      value={selectedEditableProfile.label}
-                      onChange={(event) => handleEditableProfileLabelChange(selectedProfile.id, event)}
-                    />
-                  </label>
-
-                  <div className="rights-editor-grid">
-                    {modules.map((module) => (
-                      <label key={`${selectedProfile.id}-${module.id}`} className="rights-editor-row">
-                        <span>{module.label}</span>
-                        <select
-                          value={selectedEditableProfile.moduleRights[module.id] ?? 'None'}
-                          onChange={(event) => handleEditableProfileRightChange(selectedProfile.id, module.id, event)}
-                        >
-                          {accessLevels.map((accessLevel) => (
-                            <option key={accessLevel} value={accessLevel}>
-                              {translateAccessLevel(accessLevel)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="profile-action-row">
-                    <button
-                      className="secondary-button"
-                      disabled={selectedEditableProfile.isSaving}
-                      onClick={() => void handleSaveProfile(selectedProfile.id)}
-                      type="button"
-                    >
-                      {selectedEditableProfile.isSaving ? 'Enregistrement…' : 'Enregistrer le profil'}
-                    </button>
-                    {selectedEditableProfile.error ? <small className="account-error">{selectedEditableProfile.error}</small> : null}
-                  </div>
-                </section>
-              </article>
-            ) : null}
           </section>
         ) : null}
 
@@ -1176,6 +1108,83 @@ function App() {
             </section>
           </div>
         ) : null}
+
+        {editingProfile && editingEditableProfile ? (
+          <div className="modal-overlay" onClick={closeEditProfileModal} role="presentation">
+            <section
+              aria-labelledby="edit-profile-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">Configuration</span>
+                  <h2 id="edit-profile-title">{editingProfile.label}</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeEditProfileModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <section className={`profile-editor-card ${profileAccentClass[editingProfile.label] ?? 'accent-navy'}`}>
+                <header className="profile-editor-header">
+                  <div>
+                    <h3>{editingProfile.label}</h3>
+                    <p>{editingProfile.code}</p>
+                  </div>
+                  <label className="toggle-label profile-toggle">
+                    <input
+                      checked={editingEditableProfile.isActive}
+                      onChange={(event) => handleEditableProfileStatusChange(editingProfile.id, event)}
+                      type="checkbox"
+                    />
+                    <span>{editingEditableProfile.isActive ? 'Actif' : 'Inactif'}</span>
+                  </label>
+                </header>
+
+                <label className="profile-label-field">
+                  <span>Libellé</span>
+                  <input
+                    value={editingEditableProfile.label}
+                    onChange={(event) => handleEditableProfileLabelChange(editingProfile.id, event)}
+                  />
+                </label>
+
+                <div className="rights-editor-grid">
+                  {modules.map((module) => (
+                    <label key={`${editingProfile.id}-${module.id}`} className="rights-editor-row">
+                      <span>{module.label}</span>
+                      <select
+                        value={editingEditableProfile.moduleRights[module.id] ?? 'None'}
+                        onChange={(event) => handleEditableProfileRightChange(editingProfile.id, module.id, event)}
+                      >
+                        {accessLevels.map((accessLevel) => (
+                          <option key={accessLevel} value={accessLevel}>
+                            {translateAccessLevel(accessLevel)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="profile-action-row">
+                  <button
+                    className="secondary-button"
+                    disabled={editingEditableProfile.isSaving}
+                    onClick={() => void handleSaveProfile(editingProfile.id)}
+                    type="button"
+                  >
+                    {editingEditableProfile.isSaving ? 'Enregistrement…' : 'Enregistrer le profil'}
+                  </button>
+                  {editingEditableProfile.error ? <small className="account-error">{editingEditableProfile.error}</small> : null}
+                </div>
+              </section>
+            </section>
+          </div>
+        ) : null}
       </main>
     </div>
   )
@@ -1223,11 +1232,9 @@ function translateAccessLevel(accessLevel: string) {
   }
 }
 
-function getWorkspaceTitle(selectedNavigation: string, isInformatique: boolean) {
+function getWorkspaceTitle(selectedNavigation: string) {
   if (selectedNavigation === 'Administration') {
-    return isInformatique
-      ? 'Administration des profils et des accès.'
-      : 'Administration.'
+    return 'Administration'
   }
 
   if (selectedNavigation === 'Gestion administrative') {
@@ -1240,7 +1247,7 @@ function getWorkspaceTitle(selectedNavigation: string, isInformatique: boolean) 
 function getWorkspaceDescription(selectedNavigation: string, isInformatique: boolean) {
   if (selectedNavigation === 'Administration') {
     return isInformatique
-      ? 'Cette vue regroupe la création des profils, la gestion fine des droits par module et l’affectation des comptes.'
+      ? 'Profils, comptes utilisateurs, paramètres et outils d’administration.'
       : 'Cette entrée est réservée à l’administration.'
   }
 

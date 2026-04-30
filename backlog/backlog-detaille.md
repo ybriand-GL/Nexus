@@ -65,7 +65,7 @@ Derniere mise a jour: 2026-04-29
 | Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
-| Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, configuration ciblee, creation via modale et sous-menu `Profils` en place |
+| Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, creation via modale et edition directe depuis chaque carte en place |
 | Securite | Ecran administration des parametres | CADRE | Sous-menu `Parametres` pose, contenu a implementer |
 | Securite | Ecran administration des outils | CADRE | Sous-menu `Outils` pose, contenu a implementer |
 | UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes, administration decoupee en sous-menus dedies |

@@ -1,4 +1,4 @@
-﻿# Backlog detaille NewNexus
+# Backlog detaille NewNexus
 Derniere mise a jour: 2026-04-29
 
 ## Legende des statuts
@@ -65,8 +65,8 @@ Derniere mise a jour: 2026-04-29
 | Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
-| Securite | Ecran administration des profils | EN_COURS | Creation sans code manuel et edition disponibles, suppression UI a ajouter |
-| UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes |
+| Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, configuration ciblee et creation via modale en place; sous-menu administration a finaliser |
+| UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes, administration en clarification progressive |
 
 ## 4. Transverse
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
@@ -126,6 +126,8 @@ function App() {
   })
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
+  const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false)
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const [selectedNavigation, setSelectedNavigation] = useState('Exploitation')
   const [error, setError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
@@ -223,6 +225,17 @@ function App() {
       ),
     )
   }, [profiles, modules])
+
+  useEffect(() => {
+    if (profiles.length === 0) {
+      setSelectedProfileId(null)
+      return
+    }
+
+    setSelectedProfileId((current) =>
+      current && profiles.some((profile) => profile.id === current) ? current : profiles[0].id,
+    )
+  }, [profiles])
 
   async function initialize() {
     setIsLoading(true)
@@ -531,6 +544,29 @@ function App() {
     }))
   }
 
+  function openCreateProfileModal() {
+    setNewProfile({
+      label: '',
+      isActive: true,
+      moduleRights: buildDefaultRights(modules),
+      isSaving: false,
+      error: null,
+    })
+    setIsCreateProfileModalOpen(true)
+  }
+
+  function closeCreateProfileModal() {
+    if (newProfile.isSaving) {
+      return
+    }
+
+    setIsCreateProfileModalOpen(false)
+    setNewProfile((current) => ({
+      ...current,
+      error: null,
+    }))
+  }
+
   async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setNewProfile((current) => ({ ...current, isSaving: true, error: null }))
@@ -561,6 +597,7 @@ function App() {
         isSaving: false,
         error: null,
       })
+      setIsCreateProfileModalOpen(false)
     } catch (createError) {
       setNewProfile((current) => ({
         ...current,
@@ -574,6 +611,9 @@ function App() {
     sessionStorage.removeItem(postAuthLoaderStorageKey)
     setShowPostAuthLoader(false)
   }
+
+  const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? null
+  const selectedEditableProfile = selectedProfile ? editableProfiles[selectedProfile.id] ?? null : null
 
   if (isLoading) {
     return (
@@ -591,6 +631,7 @@ function App() {
     return (
       <div className="auth-shell">
         <section className="auth-brand-panel">
+          <div className="auth-brand-halo" aria-hidden="true" />
           <div className="auth-brand-lockup">
             <img className="auth-groupe-laure-logo" src="./groupe-laure-logo.jpg" alt="Groupe Laure" />
             <div className="auth-brand-divider" aria-hidden="true">×</div>
@@ -599,17 +640,9 @@ function App() {
               <img className="brand-wordmark auth-wordmark" src="./nexus-wordmark-simplified.png" alt="Nexus" />
             </div>
           </div>
-          <span className="eyebrow">Authentification</span>
-          <h1>Connexion à la plateforme Nexus</h1>
-          <p>
-            L’accès sécurisé aux espaces Groupe Laure et Nexus repose sur une authentification
-            applicative claire, rapide et plus premium.
-          </p>
-          <ul className="auth-points">
-            <li>Accès publié sous <code>/newNexus</code>.</li>
-            <li>Socle PostgreSQL et sécurité applicative actifs.</li>
-            <li>Transition post-authentification Groupe Laure × Nexus intégrée.</li>
-          </ul>
+          <span className="eyebrow">Groupe Laure × Nexus</span>
+          <h1>Connexion sécurisée</h1>
+          <p>Plateforme interne Groupe Laure.</p>
         </section>
 
         <section className="auth-card">
@@ -648,7 +681,6 @@ function App() {
             <strong>Compte bootstrap</strong>
             <span>Login : <code>admin</code></span>
             <span>Mot de passe : <code>NewNexus!2026</code></span>
-            <span>Ce mot de passe est provisoire. Le changement sera géré plus tard dans l’administration.</span>
           </div>
         </section>
       </div>
@@ -834,59 +866,25 @@ function App() {
 
             <article className="panel-card">
               <div className="panel-heading">
-                <span className="eyebrow">Création</span>
-                <h2>Nouveau profil</h2>
+                <span className="eyebrow">Synthèse</span>
+                <h2>Profils et droits</h2>
               </div>
-
-              <form className="profile-creation-card" onSubmit={handleCreateProfile}>
-                <div className="profile-form-grid profile-form-grid-2">
-                  <label>
-                    <span>Libellé profil</span>
-                    <input value={newProfile.label} onChange={handleNewProfileLabelChange} />
-                  </label>
-                  <label className="toggle-label profile-toggle">
-                    <input checked={newProfile.isActive} onChange={handleNewProfileStatusChange} type="checkbox" />
-                    <span>Profil actif</span>
-                  </label>
-                </div>
-
-                <div className="profile-form-note">
-                  Le code technique du profil est généré automatiquement à partir du libellé.
-                </div>
-
-                <div className="rights-editor-grid">
-                  {modules.map((module) => (
-                    <label key={`new-${module.id}`} className="rights-editor-row">
-                      <span>{module.label}</span>
-                      <select
-                        value={newProfile.moduleRights[module.id] ?? 'None'}
-                        onChange={(event) => handleNewProfileRightChange(module.id, event)}
-                      >
-                        {accessLevels.map((accessLevel) => (
-                          <option key={accessLevel} value={accessLevel}>
-                            {translateAccessLevel(accessLevel)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ))}
-                </div>
-
-                <div className="profile-action-row">
-                  <button className="primary-button" disabled={newProfile.isSaving} type="submit">
-                    {newProfile.isSaving ? 'Création…' : 'Créer le profil'}
-                  </button>
-                  {newProfile.error ? <small className="account-error">{newProfile.error}</small> : null}
-                </div>
-              </form>
+              <div className="profiles-toolbar">
+                <p className="profiles-toolbar-copy">
+                  Chaque profil affiche ses droits par module. Sélectionnez un profil pour le configurer.
+                </p>
+                <button className="primary-button" onClick={openCreateProfileModal} type="button">
+                  Ajouter un profil
+                </button>
+              </div>
             </article>
 
             <article className="panel-card panel-card-wide">
               <div className="panel-heading">
                 <span className="eyebrow">Profils</span>
-                <h2>Administration des profils</h2>
+                <h2>Vue d'ensemble des profils</h2>
               </div>
-              <div className="profile-editor-stack">
+              <div className="profiles-overview-grid">
                 {profiles.map((profile) => {
                   const editableProfile = editableProfiles[profile.id]
                   if (!editableProfile) {
@@ -894,61 +892,99 @@ function App() {
                   }
 
                   return (
-                    <section key={profile.id} className={`profile-editor-card ${profileAccentClass[profile.label] ?? 'accent-navy'}`}>
-                      <header className="profile-editor-header">
+                    <button
+                      key={profile.id}
+                      className={`profile-summary-card ${profileAccentClass[profile.label] ?? 'accent-navy'} ${selectedProfileId === profile.id ? 'is-selected' : ''}`}
+                      onClick={() => setSelectedProfileId(profile.id)}
+                      type="button"
+                    >
+                      <header className="profile-summary-header">
                         <div>
                           <h3>{profile.label}</h3>
                           <p>{profile.code}</p>
                         </div>
-                        <label className="toggle-label profile-toggle">
-                          <input
-                            checked={editableProfile.isActive}
-                            onChange={(event) => handleEditableProfileStatusChange(profile.id, event)}
-                            type="checkbox"
-                          />
-                          <span>{editableProfile.isActive ? 'Actif' : 'Inactif'}</span>
-                        </label>
+                        <span className={`profile-status-badge ${editableProfile.isActive ? 'is-active' : 'is-inactive'}`}>
+                          {editableProfile.isActive ? 'Actif' : 'Inactif'}
+                        </span>
                       </header>
-
-                      <label className="profile-label-field">
-                        <span>Libellé</span>
-                        <input value={editableProfile.label} onChange={(event) => handleEditableProfileLabelChange(profile.id, event)} />
-                      </label>
-
-                      <div className="rights-editor-grid">
+                      <div className="profile-summary-rights">
                         {modules.map((module) => (
-                          <label key={`${profile.id}-${module.id}`} className="rights-editor-row">
+                          <div key={`${profile.id}-${module.id}`} className="profile-summary-right">
                             <span>{module.label}</span>
-                            <select
-                              value={editableProfile.moduleRights[module.id] ?? 'None'}
-                              onChange={(event) => handleEditableProfileRightChange(profile.id, module.id, event)}
-                            >
-                              {accessLevels.map((accessLevel) => (
-                                <option key={accessLevel} value={accessLevel}>
-                                  {translateAccessLevel(accessLevel)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
+                            <strong className={`access-pill access-${(editableProfile.moduleRights[module.id] ?? 'None').toLowerCase()}`}>
+                              {translateAccessLevel(editableProfile.moduleRights[module.id] ?? 'None')}
+                            </strong>
+                          </div>
                         ))}
                       </div>
-
-                      <div className="profile-action-row">
-                        <button
-                          className="secondary-button"
-                          disabled={editableProfile.isSaving}
-                          onClick={() => void handleSaveProfile(profile.id)}
-                          type="button"
-                        >
-                          {editableProfile.isSaving ? 'Enregistrement…' : 'Enregistrer le profil'}
-                        </button>
-                        {editableProfile.error ? <small className="account-error">{editableProfile.error}</small> : null}
-                      </div>
-                    </section>
+                    </button>
                   )
                 })}
               </div>
             </article>
+
+            {selectedProfile && selectedEditableProfile ? (
+              <article className="panel-card panel-card-wide">
+                <div className="panel-heading">
+                  <span className="eyebrow">Configuration</span>
+                  <h2>{selectedProfile.label}</h2>
+                </div>
+                <section className={`profile-editor-card ${profileAccentClass[selectedProfile.label] ?? 'accent-navy'}`}>
+                  <header className="profile-editor-header">
+                    <div>
+                      <h3>{selectedProfile.label}</h3>
+                      <p>{selectedProfile.code}</p>
+                    </div>
+                    <label className="toggle-label profile-toggle">
+                      <input
+                        checked={selectedEditableProfile.isActive}
+                        onChange={(event) => handleEditableProfileStatusChange(selectedProfile.id, event)}
+                        type="checkbox"
+                      />
+                      <span>{selectedEditableProfile.isActive ? 'Actif' : 'Inactif'}</span>
+                    </label>
+                  </header>
+
+                  <label className="profile-label-field">
+                    <span>Libelléé</span>
+                    <input
+                      value={selectedEditableProfile.label}
+                      onChange={(event) => handleEditableProfileLabelChange(selectedProfile.id, event)}
+                    />
+                  </label>
+
+                  <div className="rights-editor-grid">
+                    {modules.map((module) => (
+                      <label key={`${selectedProfile.id}-${module.id}`} className="rights-editor-row">
+                        <span>{module.label}</span>
+                        <select
+                          value={selectedEditableProfile.moduleRights[module.id] ?? 'None'}
+                          onChange={(event) => handleEditableProfileRightChange(selectedProfile.id, module.id, event)}
+                        >
+                          {accessLevels.map((accessLevel) => (
+                            <option key={accessLevel} value={accessLevel}>
+                              {translateAccessLevel(accessLevel)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="profile-action-row">
+                    <button
+                      className="secondary-button"
+                      disabled={selectedEditableProfile.isSaving}
+                      onClick={() => void handleSaveProfile(selectedProfile.id)}
+                      type="button"
+                    >
+                      {selectedEditableProfile.isSaving ? 'Enregistrement…' : 'Enregistrer le profil'}
+                    </button>
+                    {selectedEditableProfile.error ? <small className="account-error">{selectedEditableProfile.error}</small> : null}
+                  </div>
+                </section>
+              </article>
+            ) : null}
 
             <article className="panel-card panel-card-wide">
               <div className="panel-heading">
@@ -1013,6 +1049,69 @@ function App() {
               </div>
             </article>
           </section>
+        ) : null}
+        {isCreateProfileModalOpen ? (
+          <div className="modal-overlay" onClick={closeCreateProfileModal} role="presentation">
+            <section
+              aria-labelledby="create-profile-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">Création</span>
+                  <h2 id="create-profile-title">Ajouter un profil</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeCreateProfileModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="profile-creation-card" onSubmit={handleCreateProfile}>
+                <div className="profile-form-grid profile-form-grid-2">
+                  <label>
+                    <span>Libellé profil</span>
+                    <input value={newProfile.label} onChange={handleNewProfileLabelChange} />
+                  </label>
+                  <label className="toggle-label profile-toggle">
+                    <input checked={newProfile.isActive} onChange={handleNewProfileStatusChange} type="checkbox" />
+                    <span>Profil actif</span>
+                  </label>
+                </div>
+
+                <div className="profile-form-note">
+                  Le code technique du profil est généré automatiquement à partir du libellé.
+                </div>
+
+                <div className="rights-editor-grid">
+                  {modules.map((module) => (
+                    <label key={`new-${module.id}`} className="rights-editor-row">
+                      <span>{module.label}</span>
+                      <select
+                        value={newProfile.moduleRights[module.id] ?? 'None'}
+                        onChange={(event) => handleNewProfileRightChange(module.id, event)}
+                      >
+                        {accessLevels.map((accessLevel) => (
+                          <option key={accessLevel} value={accessLevel}>
+                            {translateAccessLevel(accessLevel)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={newProfile.isSaving} type="submit">
+                    {newProfile.isSaving ? 'Création…' : 'Créer le profil'}
+                  </button>
+                  {newProfile.error ? <small className="account-error">{newProfile.error}</small> : null}
+                </div>
+              </form>
+            </section>
+          </div>
         ) : null}
       </main>
     </div>
@@ -1090,3 +1189,5 @@ function getWorkspaceDescription(selectedNavigation: string, isInformatique: boo
 }
 
 export default App
+
+

@@ -540,3 +540,16 @@ Ordre cible de construction:
 - validation fonctionnelle:
   - `POST /newNexus/api/auth/login` OK
   - `GET /newNexus/api/auth/me` OK
+
+## 2026-04-30 - Refonte lisibilite administration
+
+- evolution ergonomique:
+  - suppression de la creation inline de profil
+  - ajout d'une synthese lisible des profils et de leurs droits par module
+  - ajout d'une configuration ciblee sur le profil selectionne
+  - ajout d'un bouton `Ajouter un profil` ouvrant une modale de configuration
+- correction qualite:
+  - correction des libelles FR endommages dans la vue Administration
+- validation technique:
+  - `npm run build` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK

@@ -13,49 +13,51 @@ export function PostLoginBrandTransition({
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       onComplete?.()
-    }, 2200)
+    }, 5000)
 
     return () => window.clearTimeout(timeout)
   }, [onComplete])
 
   return (
     <div className="brand-transition-screen" role="status" aria-live="polite" aria-label={label}>
-      <div className="brand-transition-card">
-        <div className="brand-transition-stage brand-transition-stage-auth">
-          <img className="brand-transition-laure-solo" src="./groupe-laure-logo.jpg" alt="Groupe Laure" />
-          <div className="brand-transition-halo" />
-        </div>
+      <main className="preview-stage">
+        <div className="preview-content">
+          <div className="preview-brand-row">
+            <div className="preview-energy" />
 
-        <div className="brand-transition-stage brand-transition-stage-merge" aria-hidden="true">
-          <img className="brand-transition-laure-inline" src="./groupe-laure-logo.jpg" alt="" />
-          <span className="brand-transition-separator">×</span>
-          <div className="brand-transition-nexus-wrap">
-            <img className="brand-transition-nexus-icon" src="./nexus-app-icon.svg" alt="" />
-            <img className="brand-transition-nexus-wordmark" src="./nexus-wordmark-simplified.png" alt="" />
-          </div>
-          <div className="brand-transition-particles">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-        </div>
+            <div className="preview-laure-card">
+              <img src="./groupe-laure-logo.jpg" alt="Groupe Laure Transports & Logistique" />
+            </div>
 
-        <div className="brand-transition-stage brand-transition-stage-final" aria-hidden="true">
-          <img className="brand-transition-laure-mini" src="./groupe-laure-logo.jpg" alt="" />
-          <span className="brand-transition-line" />
-          <div className="brand-transition-final-nexus">
-            <img className="brand-transition-final-icon" src="./nexus-app-icon.svg" alt="" />
-            <img className="brand-transition-final-wordmark" src="./nexus-wordmark-simplified.png" alt="" />
+            <div className="preview-separator" aria-hidden="true" />
+
+            <div className="preview-nexus-wrap">
+              <div className="preview-nexus-icon" aria-hidden="true">
+                <div className="preview-corner-orange" />
+                <div className="preview-corner-green" />
+              </div>
+
+              <div className="preview-nexus-word" aria-label="nexus">
+                <span>n</span>
+                <span>e</span>
+                <span>x</span>
+                <span>u</span>
+                <span>s</span>
+              </div>
+            </div>
+
+            <div className="preview-shimmer" />
           </div>
-          <div className="brand-transition-shimmer" />
-          <div className="brand-transition-dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
+
+          <div className="preview-loader" aria-hidden="true">
+            <i />
+            <i />
+            <i />
           </div>
+
+          <div className="preview-status">Redirection vers le tableau de bord…</div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

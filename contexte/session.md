@@ -553,3 +553,21 @@ Ordre cible de construction:
 - validation technique:
   - `npm run build` OK
   - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+
+## 2026-04-30 - Sous-menu administration
+
+- evolution ergonomique:
+  - le menu `Administration` est decoupe en sous-menu:
+    - `Comptes utilisateurs`
+    - `Profils`
+    - `Parametres`
+    - `Outils`
+  - la vue `Profils` conserve la synthese des droits par module, la selection d'un profil et la modale `Ajouter un profil`
+  - la vue `Comptes utilisateurs` isole maintenant clairement l'affectation des profils et l'activation des comptes
+  - les vues `Parametres` et `Outils` sont posees comme emplacements dedies pour les prochains lots
+- correction qualite:
+  - correction du libelle `Libelle` dans l'editeur de profil
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK

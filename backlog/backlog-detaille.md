@@ -61,12 +61,14 @@ Derniere mise a jour: 2026-04-29
 | Securite | Protection frontend par droits | TERMINE | Navigation et dashboard filtres selon les droits reels |
 | Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
 | Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
-| Securite | Ecran administration des comptes | EN_COURS | Edition du profil et du statut disponible, creation et recherche a faire |
+| Securite | Ecran administration des comptes | EN_COURS | Vue dediee `Comptes utilisateurs` en place pour edition du profil et du statut; creation et recherche a faire |
 | Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
-| Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, configuration ciblee et creation via modale en place; sous-menu administration a finaliser |
-| UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes, administration en clarification progressive |
+| Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, configuration ciblee, creation via modale et sous-menu `Profils` en place |
+| Securite | Ecran administration des parametres | CADRE | Sous-menu `Parametres` pose, contenu a implementer |
+| Securite | Ecran administration des outils | CADRE | Sous-menu `Outils` pose, contenu a implementer |
+| UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes, administration decoupee en sous-menus dedies |
 
 ## 4. Transverse
 

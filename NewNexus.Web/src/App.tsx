@@ -100,6 +100,7 @@ type NewProfileState = {
 }
 
 const navigationEntries = ['Administration', 'Exploitation', 'Gestion administrative']
+const administrationSubmenuEntries = ['Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
 
@@ -129,6 +130,8 @@ function App() {
   const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false)
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const [selectedNavigation, setSelectedNavigation] = useState('Exploitation')
+  const [selectedAdministrationSection, setSelectedAdministrationSection] =
+    useState<(typeof administrationSubmenuEntries)[number]>('Profils')
   const [error, setError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -236,6 +239,16 @@ function App() {
       current && profiles.some((profile) => profile.id === current) ? current : profiles[0].id,
     )
   }, [profiles])
+
+  useEffect(() => {
+    if (selectedNavigation !== 'Administration' || !isInformatique) {
+      return
+    }
+
+    setSelectedAdministrationSection((current) =>
+      administrationSubmenuEntries.includes(current) ? current : 'Profils',
+    )
+  }, [isInformatique, selectedNavigation])
 
   async function initialize() {
     setIsLoading(true)
@@ -763,6 +776,21 @@ function App() {
           </div>
         </section>
 
+        {selectedNavigation === 'Administration' && isInformatique ? (
+          <section className="admin-subnav" aria-label="Sous-menu administration">
+            {administrationSubmenuEntries.map((entry) => (
+              <button
+                key={entry}
+                className={`admin-subnav-link ${selectedAdministrationSection === entry ? 'admin-subnav-link-active' : ''}`}
+                onClick={() => setSelectedAdministrationSection(entry)}
+                type="button"
+              >
+                {entry}
+              </button>
+            ))}
+          </section>
+        ) : null}
+
         {currentUser.mustChangePassword ? (
           <section className="status-banner status-banner-warning">
             <strong>Mot de passe provisoire.</strong>
@@ -838,7 +866,7 @@ function App() {
           </section>
         ) : null}
 
-        {selectedNavigation === 'Administration' && isInformatique ? (
+        {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Profils' ? (
           <section className="workspace-grid">
             <article className="panel-card">
               <div className="panel-heading">
@@ -946,7 +974,7 @@ function App() {
                   </header>
 
                   <label className="profile-label-field">
-                    <span>Libelléé</span>
+                    <span>Libellé</span>
                     <input
                       value={selectedEditableProfile.label}
                       onChange={(event) => handleEditableProfileLabelChange(selectedProfile.id, event)}
@@ -985,7 +1013,11 @@ function App() {
                 </section>
               </article>
             ) : null}
+          </section>
+        ) : null}
 
+        {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Comptes utilisateurs' ? (
+          <section className="workspace-grid">
             <article className="panel-card panel-card-wide">
               <div className="panel-heading">
                 <span className="eyebrow">Comptes</span>
@@ -1050,6 +1082,37 @@ function App() {
             </article>
           </section>
         ) : null}
+
+        {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Paramètres' ? (
+          <section className="workspace-grid">
+            <article className="panel-card panel-card-wide">
+              <div className="panel-heading">
+                <span className="eyebrow">Paramètres</span>
+                <h2>Socle de paramétrage</h2>
+              </div>
+              <p>
+                Cette section accueillera les paramètres transverses de NewNexus. Le cadrage fonctionnel reste à finaliser
+                avant implémentation.
+              </p>
+            </article>
+          </section>
+        ) : null}
+
+        {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Outils' ? (
+          <section className="workspace-grid">
+            <article className="panel-card panel-card-wide">
+              <div className="panel-heading">
+                <span className="eyebrow">Outils</span>
+                <h2>Outils d’administration</h2>
+              </div>
+              <p>
+                Cette section accueillera les outils d’exploitation technique et de maintenance. Le contenu sera ajouté avec
+                le lot d’outillage.
+              </p>
+            </article>
+          </section>
+        ) : null}
+
         {isCreateProfileModalOpen ? (
           <div className="modal-overlay" onClick={closeCreateProfileModal} role="presentation">
             <section

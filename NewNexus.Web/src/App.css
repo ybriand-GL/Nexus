@@ -474,6 +474,39 @@
   gap: 18px;
 }
 
+.admin-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-subnav-link {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1px solid var(--nexus-border);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--nexus-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.admin-subnav-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(108, 61, 255, 0.28);
+}
+
+.admin-subnav-link-active {
+  border-color: rgba(108, 61, 255, 0.42);
+  color: var(--nexus-purple);
+  box-shadow: 0 16px 30px rgba(108, 61, 255, 0.12);
+}
+
 .panel-card {
   padding: 24px;
   border-radius: 28px;

@@ -585,3 +585,20 @@ Ordre cible de construction:
   - `npm run build` OK
   - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release` OK
   - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+
+## 2026-04-30 - Accueil et synthese administration
+
+- evolution navigation:
+  - `Tableau de bord` est renomme en `Accueil`
+  - `Accueil` devient l'entree de tete et la page d'arrivee apres connexion
+- evolution administration:
+  - suppression de la pastille `Mon profil` dans `Administration > Profils`
+  - transformation de `Synthese` en bandeau horizontal premium pleine largeur
+  - ajout d'une liste cliquable des profils configures pour defiler directement vers la vignette correspondante
+  - suppression du doublon visuel dans les vignettes profil
+- validation metier:
+  - version validee par l'utilisateur
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK

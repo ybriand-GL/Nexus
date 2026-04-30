@@ -99,7 +99,7 @@ type NewProfileState = {
   error: string | null
 }
 
-const navigationEntries = ['Administration', 'Exploitation', 'Gestion administrative']
+const navigationEntries = ['Accueil', 'Administration', 'Exploitation', 'Gestion administrative']
 const administrationSubmenuEntries = ['Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
@@ -129,7 +129,7 @@ function App() {
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
   const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
-  const [selectedNavigation, setSelectedNavigation] = useState('Exploitation')
+  const [selectedNavigation, setSelectedNavigation] = useState('Accueil')
   const [selectedAdministrationSection, setSelectedAdministrationSection] =
     useState<(typeof administrationSubmenuEntries)[number]>('Profils')
   const [error, setError] = useState<string | null>(null)
@@ -182,7 +182,10 @@ function App() {
   }, [visibleModules])
 
   const visibleNavigationEntries = useMemo(
-    () => navigationEntries.filter((entry) => (modulesByGroup[entry] ?? []).length > 0),
+    () =>
+      navigationEntries.filter(
+        (entry) => entry === 'Accueil' || (modulesByGroup[entry] ?? []).length > 0,
+      ),
     [modulesByGroup],
   )
 
@@ -583,6 +586,11 @@ function App() {
     setEditingProfileId(null)
   }
 
+  function focusProfileCard(profileId: string) {
+    const profileCard = document.getElementById(`profile-card-${profileId}`)
+    profileCard?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setNewProfile((current) => ({ ...current, isSaving: true, error: null }))
@@ -807,6 +815,79 @@ function App() {
           </section>
         ) : null}
 
+        {selectedNavigation === 'Accueil' ? (
+          <section className="dashboard-stack">
+            <section className="metrics-grid">
+              <article className="metric-card metric-card-navy">
+                <span className="metric-label">Modules visibles</span>
+                <strong>{visibleModules.length}</strong>
+              </article>
+              <article className="metric-card metric-card-purple">
+                <span className="metric-label">Profils actifs</span>
+                <strong>{profiles.filter((profile) => profile.isActive).length}</strong>
+              </article>
+              <article className="metric-card metric-card-gold">
+                <span className="metric-label">Comptes actifs</span>
+                <strong>{accounts.filter((account) => account.isActive).length}</strong>
+              </article>
+              <article className="metric-card metric-card-cyan">
+                <span className="metric-label">Rôle courant</span>
+                <strong>{currentUser.profile?.label ?? 'Sans profil'}</strong>
+              </article>
+            </section>
+
+            <section className="workspace-grid">
+              <article className="panel-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Accès rapides</span>
+                  <h2>Espaces disponibles</h2>
+                </div>
+                <div className="dashboard-actions">
+                  {visibleNavigationEntries
+                    .filter((entry) => entry !== 'Accueil')
+                    .map((entry) => (
+                      <button
+                        key={entry}
+                        className="dashboard-action-card"
+                        onClick={() => setSelectedNavigation(entry)}
+                        type="button"
+                      >
+                        <span className="eyebrow">{entry}</span>
+                        <strong>{getWorkspaceTitle(entry)}</strong>
+                        <p>{getWorkspaceDescription(entry, isInformatique)}</p>
+                      </button>
+                    ))}
+                </div>
+              </article>
+
+              <article className="panel-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Synthèse</span>
+                  <h2>Lecture de votre session</h2>
+                </div>
+                <ul className="rights-list">
+                  <li>
+                    <span>Utilisateur connecté</span>
+                    <strong>{currentUser.displayName}</strong>
+                  </li>
+                  <li>
+                    <span>Profil actif</span>
+                    <strong>{currentUser.profile?.label ?? 'Sans profil'}</strong>
+                  </li>
+                  <li>
+                    <span>Droits en lecture</span>
+                    <strong>{currentUser.rights.filter((right) => right.accessLevel === 'Read').length}</strong>
+                  </li>
+                  <li>
+                    <span>Droits en écriture</span>
+                    <strong>{currentUser.rights.filter((right) => right.accessLevel === 'Write').length}</strong>
+                  </li>
+                </ul>
+              </article>
+            </section>
+          </section>
+        ) : null}
+
         {selectedNavigation === 'Exploitation' ? (
           <section className="workspace-grid">
             <article className="panel-card panel-card-wide">
@@ -863,42 +944,35 @@ function App() {
 
         {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Profils' ? (
           <section className="workspace-grid">
-            <article className="panel-card">
-              <div className="panel-heading">
-                <span className="eyebrow">Mon profil</span>
-                <h2>Droits de l’utilisateur connecté</h2>
-              </div>
-              <section className={`profile-card ${profileAccentClass[currentUser.profile?.label ?? ''] ?? 'accent-navy'}`}>
-                <header>
-                  <div>
-                    <h3>{currentUser.profile?.label ?? 'Sans profil'}</h3>
-                    <p>{currentUser.profile?.code ?? 'AUCUN_PROFIL'}</p>
-                  </div>
-                  <span className="profile-badge">Administration</span>
-                </header>
-                <ul className="rights-list">
-                  {currentUser.rights.map((right) => (
-                    <li key={`${right.moduleCode}-${right.accessLevel}`}>
-                      <span>{right.moduleLabel}</span>
-                      <strong>{translateAccessLevel(right.accessLevel)}</strong>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </article>
-
-            <article className="panel-card">
+            <article className="panel-card panel-card-wide administration-synthesis-card">
               <div className="panel-heading">
                 <span className="eyebrow">Synthèse</span>
                 <h2>Profils et droits</h2>
               </div>
-              <div className="profiles-toolbar">
-                <p className="profiles-toolbar-copy">
-                  Chaque profil affiche ses droits par module. Ouvrez directement la configuration depuis la carte du profil.
-                </p>
-                <button className="primary-button" onClick={openCreateProfileModal} type="button">
-                  Ajouter un profil
-                </button>
+              <div className="administration-synthesis-layout">
+                <div className="administration-synthesis-copy">
+                  <p className="profiles-toolbar-copy">
+                    Chaque profil affiche ses droits par module. Cliquez sur un nom pour atteindre la vignette correspondante,
+                    puis ouvrez directement sa configuration.
+                  </p>
+                  <div className="profiles-quick-links" aria-label="Liste des profils configurés">
+                    {profiles.map((profile) => (
+                      <button
+                        key={`link-${profile.id}`}
+                        className="profile-link-chip"
+                        onClick={() => focusProfileCard(profile.id)}
+                        type="button"
+                      >
+                        {profile.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="administration-synthesis-actions">
+                  <button className="primary-button" onClick={openCreateProfileModal} type="button">
+                    Ajouter un profil
+                  </button>
+                </div>
               </div>
             </article>
 
@@ -915,11 +989,14 @@ function App() {
                   }
 
                   return (
-                    <article key={profile.id} className={`profile-summary-card ${profileAccentClass[profile.label] ?? 'accent-navy'}`}>
+                    <article
+                      id={`profile-card-${profile.id}`}
+                      key={profile.id}
+                      className={`profile-summary-card ${profileAccentClass[profile.label] ?? 'accent-navy'}`}
+                    >
                       <header className="profile-summary-header">
                         <div>
                           <h3>{profile.label}</h3>
-                          <p>{profile.code}</p>
                         </div>
                         <span className={`profile-status-badge ${editableProfile.isActive ? 'is-active' : 'is-inactive'}`}>
                           {editableProfile.isActive ? 'Actif' : 'Inactif'}
@@ -1121,7 +1198,7 @@ function App() {
               <div className="modal-header">
                 <div>
                   <span className="eyebrow">Configuration</span>
-                  <h2 id="edit-profile-title">{editingProfile.label}</h2>
+                  <h2 id="edit-profile-title">Configurer le profil</h2>
                 </div>
                 <button className="modal-close-button" onClick={closeEditProfileModal} type="button">
                   Fermer
@@ -1233,6 +1310,10 @@ function translateAccessLevel(accessLevel: string) {
 }
 
 function getWorkspaceTitle(selectedNavigation: string) {
+  if (selectedNavigation === 'Accueil') {
+    return 'Accueil'
+  }
+
   if (selectedNavigation === 'Administration') {
     return 'Administration'
   }
@@ -1245,6 +1326,10 @@ function getWorkspaceTitle(selectedNavigation: string) {
 }
 
 function getWorkspaceDescription(selectedNavigation: string, isInformatique: boolean) {
+  if (selectedNavigation === 'Accueil') {
+    return 'Vue d’ensemble personnalisée après connexion, avec accès directs vers vos espaces de travail.'
+  }
+
   if (selectedNavigation === 'Administration') {
     return isInformatique
       ? 'Profils, comptes utilisateurs, paramètres et outils d’administration.'

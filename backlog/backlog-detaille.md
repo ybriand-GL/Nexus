@@ -69,6 +69,8 @@ Derniere mise a jour: 2026-04-29
 | Securite | Ecran administration des parametres | CADRE | Sous-menu `Parametres` pose, contenu a implementer |
 | Securite | Ecran administration des outils | CADRE | Sous-menu `Outils` pose, contenu a implementer |
 | UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes, administration decoupee en sous-menus dedies |
+| UX | Accueil par profil | EN_COURS | Entree `Accueil` retablie comme page d'arrivee; personnalisation par profil a approfondir |
+| UX | Responsive tablette / smartphone / PC | A_PLANIFIER | Base responsive presente, passe de finition multi-format a planifier avant finalisation des modules |
 
 ## 4. Transverse
 

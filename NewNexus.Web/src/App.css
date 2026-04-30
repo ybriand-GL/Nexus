@@ -457,6 +457,11 @@
   gap: 16px;
 }
 
+.dashboard-stack {
+  display: grid;
+  gap: 18px;
+}
+
 .metric-card {
   display: grid;
   gap: 8px;
@@ -487,6 +492,38 @@
   display: grid;
   grid-template-columns: 1.1fr 1fr;
   gap: 18px;
+}
+
+.dashboard-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-action-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--nexus-border);
+  background: linear-gradient(180deg, rgba(247, 249, 252, 0.88), #fff);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.dashboard-action-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(108, 61, 255, 0.3);
+  box-shadow: 0 18px 36px rgba(11, 30, 117, 0.1);
+}
+
+.dashboard-action-card strong,
+.dashboard-action-card p {
+  margin: 0;
 }
 
 .admin-subnav {
@@ -697,6 +734,60 @@
 .profiles-toolbar-copy {
   margin: 0;
   max-width: 56ch;
+}
+
+.administration-synthesis-card {
+  background:
+    radial-gradient(circle at top left, rgba(247, 181, 0, 0.18), transparent 24%),
+    radial-gradient(circle at 82% 20%, rgba(24, 188, 235, 0.14), transparent 18%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
+  border: 1px solid rgba(108, 61, 255, 0.12);
+  box-shadow: 0 20px 44px rgba(11, 30, 117, 0.08);
+}
+
+.administration-synthesis-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: start;
+}
+
+.administration-synthesis-copy {
+  display: grid;
+  gap: 16px;
+}
+
+.administration-synthesis-actions {
+  display: flex;
+  align-items: start;
+}
+
+.profiles-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.profile-link-chip {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(108, 61, 255, 0.18);
+  background: rgba(108, 61, 255, 0.06);
+  color: var(--nexus-purple);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.profile-link-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(108, 61, 255, 0.32);
+  background: rgba(108, 61, 255, 0.1);
 }
 
 .profiles-overview-grid {

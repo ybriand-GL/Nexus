@@ -1802,11 +1802,15 @@ function App() {
             <span className="eyebrow">{selectedNavigation}</span>
             <h1>{getWorkspaceTitle(selectedNavigation)}</h1>
             <p>{getWorkspaceDescription(selectedNavigation, isInformatique)}</p>
-            {selectedNavigation === 'Administration' ? (
-              <div className="hero-actions">
+            <div className={`hero-actions ${selectedNavigation !== 'Administration' ? 'hero-actions-placeholder' : ''}`}>
+              {selectedNavigation === 'Administration' ? (
                 <span className="primary-chip">Version {systemInfo?.version ?? '0.1.0'}</span>
-              </div>
-            ) : null}
+              ) : (
+                <span className="primary-chip" aria-hidden="true">
+                  Version
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="hero-highlight">

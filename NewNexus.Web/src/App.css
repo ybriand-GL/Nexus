@@ -2904,20 +2904,45 @@
 
 .nexus-main .hero-card {
   grid-template-columns: minmax(0, 1.5fr) minmax(260px, .5fr);
-  min-height: 220px;
+  height: 220px;
   padding: 24px 28px;
+  align-items: stretch;
 }
 
 .nexus-main .hero-card-compact {
   grid-template-columns: minmax(0, 1.5fr) minmax(260px, .5fr);
-  min-height: 220px;
+  height: 220px;
   padding: 24px 28px;
 }
 
+.nexus-main .hero-copy {
+  align-content: stretch;
+  grid-template-rows: 16px 1fr 48px 44px;
+  gap: 12px;
+  min-height: 172px;
+}
+
+.nexus-main .hero-copy > .eyebrow {
+  min-height: 16px;
+  line-height: 16px;
+}
+
 .nexus-main .hero-copy h1 {
+  display: flex;
+  align-items: flex-start;
   max-width: none;
   font-size: clamp(2rem, 3vw, 3rem);
   line-height: 1;
+}
+
+.nexus-main .hero-copy p {
+  display: -webkit-box;
+  min-height: 48px;
+  max-width: 58ch;
+  overflow: hidden;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .nexus-main .hero-copy h1,
@@ -2929,6 +2954,15 @@
 .nexus-main .panel-heading h2 {
   font-size: clamp(2rem, 3vw, 3rem);
   line-height: 1;
+}
+
+.nexus-main .hero-actions {
+  min-height: 44px;
+}
+
+.nexus-main .hero-actions-placeholder {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .nexus-main .group-card span,

@@ -1095,3 +1095,19 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-DynGBz90.css` et `index-9EcdUzqn.js`
+
+## 2026-05-04 - Verrouillage des bandeaux titres
+
+- correction application:
+  - bandeau `hero-card` force a une hauteur fixe de `220px` sur desktop
+  - grille interne du bloc titre normalisee en quatre lignes: rubrique, titre, description, action
+  - ligne d'action reservee sur toutes les pages pour eviter le decalage cause par la version affichee uniquement dans Administration
+  - descriptions limitees a deux lignes afin de stabiliser la hauteur au changement de menu
+- validation technique:
+  - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-D9t2l4BH.css` et `index-BvMN5wF-.js`

@@ -1,5 +1,5 @@
 # Backlog detaille NewNexus
-Derniere mise a jour: 2026-04-29
+Derniere mise a jour: 2026-05-04
 
 ## Legende des statuts
 
@@ -53,22 +53,23 @@ Derniere mise a jour: 2026-04-29
 | Securite | Authentification applicative | TERMINE | Login/logout/me par cookie operationnels |
 | Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
 | Securite | Gestion des profils | EN_COURS | Creation, edition et suppression backend en place, finalisation UI a poursuivre |
-| Securite | Gestion des comptes | EN_COURS | Lecture, affectation profil et activation disponibles |
+| Securite | Gestion des comptes | EN_COURS | Lecture, creation et edition complete disponibles; changement de mot de passe utilisateur a finaliser cote parcours utilisateur |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
+| Securite | Endpoints creation / edition comptes | TERMINE | `POST /api/security/accounts` et `PUT /api/security/accounts/{id}` exposes |
 | Securite | Changement de mot de passe | A_DEVELOPPER | Necessaire pour sortir du bootstrap |
 | Securite | Controle d'autorisation backend | EN_COURS | Policy `RequireInformatique` en place sur les endpoints securite |
 | Securite | Protection frontend par droits | TERMINE | Navigation et dashboard filtres selon les droits reels |
 | Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
 | Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
-| Securite | Ecran administration des comptes | EN_COURS | Vue dediee `Comptes utilisateurs` en place pour edition du profil et du statut; creation et recherche a faire |
+| Securite | Ecran administration des comptes | EN_COURS | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: liste de cartes, bouton `Configurer le compte`, creation via `Ajouter un compte` et modales de saisie corrigees |
 | Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
 | Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, creation via modale et edition directe depuis chaque carte en place |
-| Securite | Ecran administration des parametres | CADRE | Sous-menu `Parametres` pose, contenu a implementer |
+| Securite | Ecran administration des parametres | EN_COURS | Mini-accueil Parametres et entrees separees `Societes`, `Analytiques`, `Exploitations`; branchement SIRENE reel a faire |
 | Securite | Ecran administration des outils | CADRE | Sous-menu `Outils` pose, contenu a implementer |
-| UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes, administration decoupee en sous-menus dedies |
+| UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes; Administration et Parametres disposent maintenant d'accueils de choix |
 | UX | Accueil par profil | EN_COURS | Entree `Accueil` retablie comme page d'arrivee; personnalisation par profil a approfondir |
 | UX | Responsive tablette / smartphone / PC | A_PLANIFIER | Base responsive presente, passe de finition multi-format a planifier avant finalisation des modules |
 
@@ -77,9 +78,9 @@ Derniere mise a jour: 2026-04-29
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Transverse | Schema transverse V1 | TERMINE | Document redige |
-| Transverse | Societes Groupe Laure | CADRE | Creation via SIRENE uniquement |
-| Transverse | Analytiques | CADRE | Code 4 caracteres, 1 societe |
-| Transverse | Exploitations | CADRE | Code + libelle + societe |
+| Transverse | Societes Groupe Laure | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place; branchement SIRENE reel a faire |
+| Transverse | Analytiques | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place |
+| Transverse | Exploitations | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place |
 | Transverse | Salaries | CADRE | Source unique LUCCA |
 | Transverse | Distinction conducteurs | CADRE | A porter dans le modele local |
 | Transverse | Creation auto des comptes depuis salaries | CADRE | Compte sans droit a l'import |
@@ -129,6 +130,7 @@ Derniere mise a jour: 2026-04-29
 | Technique | Dashboard frontend branche a l'API socle | TERMINE | Lecture `system/info` et `security/bootstrap` |
 | Technique | Script de publication IIS NewNexus | TERMINE | Script `publish_newnexus_iis.ps1` en place |
 | Technique | Migration authentification | TERMINE | `AuthenticationBootstrap` generee et appliquee |
+| Technique | Migration transverse Parametres | TERMINE | `TransverseSettingsSocle` generee et appliquee |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 
 ## 9. Hebergement et acces
@@ -139,6 +141,7 @@ Derniere mise a jour: 2026-04-29
 | Hebergement | URL cible `http://192.168.50.102/newNexus` | CADRE | URL a supporter lors de la publication IIS |
 | Hebergement | Publication sous repertoire virtuel `/newNexus` | SCAFFOLDE | Application configuree pour fonctionner sous ce chemin |
 | Hebergement | Compatibilite acces HTTP cible | TERMINE | Redirection HTTPS forcee retiree du socle API |
+| Hebergement | Compatibilite URL `/newNexus` sans slash final | TERMINE | Appels API frontend construits avec le base path Vite absolu pour eviter les retours HTML du site parent |
 | Hebergement | Publication IIS effective `Localaure/newNexus` | TERMINE | Application publiee et testee en HTTP |
 | Hebergement | Exclusion rewrite parent pour `/newNexus` | TERMINE | Regle ajoutee dans `C:\inetpub\locatif\web.config` |
 

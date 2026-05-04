@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
@@ -76,9 +76,48 @@ type AccountItem = {
   } | null
 }
 
+type CompanyItem = {
+  id: string
+  siren: string
+  displayName: string
+  legalName: string
+  isActive: boolean
+  createdAtUtc: string
+}
+
+type AnalyticItem = {
+  id: string
+  code: string
+  label: string
+  isActive: boolean
+  company: {
+    id: string
+    siren: string
+    displayName: string
+  }
+}
+
+type ExploitationItem = {
+  id: string
+  code: string
+  label: string
+  isActive: boolean
+  company: {
+    id: string
+    siren: string
+    displayName: string
+  }
+}
+
 type EditableAccountState = {
+  login: string
+  displayName: string
+  email: string
+  employeeNumber: string
+  password: string
   profileId: string
   isActive: boolean
+  mustChangePassword: boolean
   isSaving: boolean
   error: string | null
 }
@@ -99,10 +138,30 @@ type NewProfileState = {
   error: string | null
 }
 
+type SettingsReferenceFormState = {
+  code: string
+  label: string
+  companyId: string
+  isActive: boolean
+  isSaving: boolean
+  error: string | null
+}
+
+type CompanyFormState = {
+  siren: string
+  displayName: string
+  legalName: string
+  isActive: boolean
+  isSaving: boolean
+  error: string | null
+}
+
 const navigationEntries = ['Accueil', 'Administration', 'Exploitation', 'Gestion administrative']
-const administrationSubmenuEntries = ['Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
+const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
+const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
+const apiBasePath = import.meta.env.BASE_URL || '/'
 
 const profileAccentClass: Record<string, string> = {
   Administratif: 'accent-orange',
@@ -116,8 +175,15 @@ function App() {
   const [modules, setModules] = useState<SecurityModuleItem[]>([])
   const [profiles, setProfiles] = useState<SecurityProfileItem[]>([])
   const [accounts, setAccounts] = useState<AccountItem[]>([])
+  const [companies, setCompanies] = useState<CompanyItem[]>([])
+  const [analytics, setAnalytics] = useState<AnalyticItem[]>([])
+  const [exploitations, setExploitations] = useState<ExploitationItem[]>([])
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
   const [editableProfiles, setEditableProfiles] = useState<Record<string, EditableProfileState>>({})
+  const [editableCompanies, setEditableCompanies] = useState<Record<string, CompanyFormState>>({})
+  const [editableAnalytics, setEditableAnalytics] = useState<Record<string, SettingsReferenceFormState>>({})
+  const [editableExploitations, setEditableExploitations] = useState<Record<string, SettingsReferenceFormState>>({})
+  const [newAccount, setNewAccount] = useState<EditableAccountState>(createEmptyAccountForm())
   const [newProfile, setNewProfile] = useState<NewProfileState>({
     label: '',
     isActive: true,
@@ -125,13 +191,20 @@ function App() {
     isSaving: false,
     error: null,
   })
+  const [newCompany, setNewCompany] = useState<CompanyFormState>(createEmptyCompanyForm())
+  const [newAnalytic, setNewAnalytic] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
+  const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false)
   const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false)
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [selectedNavigation, setSelectedNavigation] = useState('Accueil')
   const [selectedAdministrationSection, setSelectedAdministrationSection] =
-    useState<(typeof administrationSubmenuEntries)[number]>('Profils')
+    useState<(typeof administrationSubmenuEntries)[number]>('Accueil')
+  const [selectedSettingsSection, setSelectedSettingsSection] =
+    useState<(typeof settingsSubmenuEntries)[number]>('Accueil')
   const [error, setError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -233,12 +306,96 @@ function App() {
   }, [profiles, modules])
 
   useEffect(() => {
+    setEditableAccounts(
+      Object.fromEntries(
+        accounts.map((account) => [
+          account.id,
+          {
+            login: account.login,
+            displayName: account.displayName,
+            email: account.email ?? '',
+            employeeNumber: account.employeeNumber ?? '',
+            password: '',
+            profileId: account.profile?.id ?? '',
+            isActive: account.isActive,
+            mustChangePassword: account.mustChangePassword,
+            isSaving: false,
+            error: null,
+          },
+        ]),
+      ),
+    )
+  }, [accounts])
+
+  useEffect(() => {
+    setEditableCompanies(
+      Object.fromEntries(
+        companies.map((company) => [
+          company.id,
+          {
+            siren: company.siren,
+            displayName: company.displayName,
+            legalName: company.legalName,
+            isActive: company.isActive,
+            isSaving: false,
+            error: null,
+          },
+        ]),
+      ),
+    )
+    setNewAnalytic((current) => ({
+      ...current,
+      companyId: current.companyId || companies[0]?.id || '',
+    }))
+    setNewExploitation((current) => ({
+      ...current,
+      companyId: current.companyId || companies[0]?.id || '',
+    }))
+  }, [companies])
+
+  useEffect(() => {
+    setEditableAnalytics(
+      Object.fromEntries(
+        analytics.map((analytic) => [
+          analytic.id,
+          {
+            code: analytic.code,
+            label: analytic.label,
+            companyId: analytic.company.id,
+            isActive: analytic.isActive,
+            isSaving: false,
+            error: null,
+          },
+        ]),
+      ),
+    )
+  }, [analytics])
+
+  useEffect(() => {
+    setEditableExploitations(
+      Object.fromEntries(
+        exploitations.map((exploitation) => [
+          exploitation.id,
+          {
+            code: exploitation.code,
+            label: exploitation.label,
+            companyId: exploitation.company.id,
+            isActive: exploitation.isActive,
+            isSaving: false,
+            error: null,
+          },
+        ]),
+      ),
+    )
+  }, [exploitations])
+
+  useEffect(() => {
     if (selectedNavigation !== 'Administration' || !isInformatique) {
       return
     }
 
     setSelectedAdministrationSection((current) =>
-      administrationSubmenuEntries.includes(current) ? current : 'Profils',
+      administrationSubmenuEntries.includes(current) ? current : 'Accueil',
     )
   }, [isInformatique, selectedNavigation])
 
@@ -247,14 +404,14 @@ function App() {
     setError(null)
 
     try {
-      const systemResponse = await fetch('./api/system/info')
+      const systemResponse = await fetch(apiPath('api/system/info'))
       if (!systemResponse.ok) {
         throw new Error('Impossible de charger les informations système.')
       }
 
       setSystemInfo((await systemResponse.json()) as SystemInfo)
 
-      const meResponse = await fetch('./api/auth/me')
+      const meResponse = await fetch(apiPath('api/auth/me'))
       if (meResponse.status === 401) {
         resetSessionState()
         return
@@ -285,43 +442,45 @@ function App() {
     setModules([])
     setProfiles([])
     setAccounts([])
+    setCompanies([])
+    setAnalytics([])
+    setExploitations([])
     setEditableAccounts({})
     setEditableProfiles({})
+    setEditableCompanies({})
+    setEditableAnalytics({})
+    setEditableExploitations({})
   }
 
   async function loadAdminSecurityData() {
-    const [modulesResponse, profilesResponse, accountsResponse] = await Promise.all([
-      fetch('./api/security/modules'),
-      fetch('./api/security/profiles'),
-      fetch('./api/security/accounts'),
+    const [modulesResponse, profilesResponse, accountsResponse, settingsResponse] = await Promise.all([
+      fetch(apiPath('api/security/modules')),
+      fetch(apiPath('api/security/profiles')),
+      fetch(apiPath('api/security/accounts')),
+      fetch(apiPath('api/settings/bootstrap')),
     ])
 
-    if (!modulesResponse.ok || !profilesResponse.ok || !accountsResponse.ok) {
+    if (!modulesResponse.ok || !profilesResponse.ok || !accountsResponse.ok || !settingsResponse.ok) {
       throw new Error('Impossible de charger l’administration de sécurité.')
     }
 
-    const [modulesPayload, profilesPayload, accountsPayload] = await Promise.all([
+    const [modulesPayload, profilesPayload, accountsPayload, settingsPayload] = await Promise.all([
       modulesResponse.json() as Promise<SecurityModuleItem[]>,
       profilesResponse.json() as Promise<SecurityProfileItem[]>,
       accountsResponse.json() as Promise<AccountItem[]>,
+      settingsResponse.json() as Promise<{
+        companies: CompanyItem[]
+        analytics: AnalyticItem[]
+        exploitations: ExploitationItem[]
+      }>,
     ])
 
     setModules(modulesPayload)
     setProfiles(profilesPayload)
     setAccounts(accountsPayload)
-    setEditableAccounts(
-      Object.fromEntries(
-        accountsPayload.map((account) => [
-          account.id,
-          {
-            profileId: account.profile?.id ?? '',
-            isActive: account.isActive,
-            isSaving: false,
-            error: null,
-          },
-        ]),
-      ),
-    )
+    setCompanies(settingsPayload.companies)
+    setAnalytics(settingsPayload.analytics)
+    setExploitations(settingsPayload.exploitations)
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -330,7 +489,7 @@ function App() {
     setLoginError(null)
 
     try {
-      const response = await fetch('./api/auth/login', {
+      const response = await fetch(apiPath('api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
@@ -357,7 +516,7 @@ function App() {
   }
 
   async function handleLogout() {
-    await fetch('./api/auth/logout', { method: 'POST' })
+    await fetch(apiPath('api/auth/logout'), { method: 'POST' })
     sessionStorage.removeItem(postAuthLoaderStorageKey)
     setShowPostAuthLoader(false)
     resetSessionState()
@@ -368,38 +527,118 @@ function App() {
     setModules([])
     setProfiles([])
     setAccounts([])
+    setCompanies([])
+    setAnalytics([])
+    setExploitations([])
     setEditableAccounts({})
     setEditableProfiles({})
+    setEditableCompanies({})
+    setEditableAnalytics({})
+    setEditableExploitations({})
   }
 
   function updateEditableAccount(accountId: string, updater: (current: EditableAccountState) => EditableAccountState) {
     setEditableAccounts((current) => ({
       ...current,
-      [accountId]: updater(
-        current[accountId] ?? {
-          profileId: '',
-          isActive: true,
-          isSaving: false,
-          error: null,
-        },
-      ),
+      [accountId]: updater(current[accountId] ?? createEmptyAccountForm()),
     }))
   }
 
-  function handleProfileChange(accountId: string, event: ChangeEvent<HTMLSelectElement>) {
+  function handleEditableAccountFieldChange(
+    accountId: string,
+    field: 'login' | 'displayName' | 'email' | 'employeeNumber' | 'password' | 'profileId',
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
     updateEditableAccount(accountId, (current) => ({
       ...current,
-      profileId: event.target.value,
+      [field]: event.target.value,
       error: null,
     }))
   }
 
-  function handleActiveChange(accountId: string, event: ChangeEvent<HTMLInputElement>) {
+  function handleEditableAccountBooleanChange(
+    accountId: string,
+    field: 'isActive' | 'mustChangePassword',
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
     updateEditableAccount(accountId, (current) => ({
       ...current,
-      isActive: event.target.checked,
+      [field]: event.target.checked,
       error: null,
     }))
+  }
+
+  function handleNewAccountFieldChange(
+    field: 'login' | 'displayName' | 'email' | 'employeeNumber' | 'password' | 'profileId',
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    setNewAccount((current) => ({
+      ...current,
+      [field]: event.target.value,
+      error: null,
+    }))
+  }
+
+  function handleNewAccountBooleanChange(field: 'isActive' | 'mustChangePassword', event: ChangeEvent<HTMLInputElement>) {
+    setNewAccount((current) => ({
+      ...current,
+      [field]: event.target.checked,
+      error: null,
+    }))
+  }
+
+  function openCreateAccountModal() {
+    setNewAccount(createEmptyAccountForm())
+    setIsCreateAccountModalOpen(true)
+  }
+
+  function closeCreateAccountModal() {
+    if (newAccount.isSaving) {
+      return
+    }
+
+    setIsCreateAccountModalOpen(false)
+    setNewAccount((current) => ({ ...current, error: null }))
+  }
+
+  function openEditAccountModal(accountId: string) {
+    setEditingAccountId(accountId)
+  }
+
+  function closeEditAccountModal() {
+    const editableAccount = editingAccountId ? editableAccounts[editingAccountId] : null
+    if (editableAccount?.isSaving) {
+      return
+    }
+
+    setEditingAccountId(null)
+  }
+
+  async function handleCreateAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setNewAccount((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/security/accounts'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildAccountPayload(newAccount, true)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La creation du compte a echoue.'))
+      }
+
+      await loadAdminSecurityData()
+      setNewAccount(createEmptyAccountForm())
+      setIsCreateAccountModalOpen(false)
+    } catch (createError) {
+      setNewAccount((current) => ({
+        ...current,
+        isSaving: false,
+        error: createError instanceof Error ? createError.message : 'Erreur de creation.',
+      }))
+    }
   }
 
   async function handleSaveAccount(accountId: string) {
@@ -411,21 +650,14 @@ function App() {
     updateEditableAccount(accountId, (current) => ({ ...current, isSaving: true, error: null }))
 
     try {
-      const [profileResponse, statusResponse] = await Promise.all([
-        fetch(`./api/security/accounts/${accountId}/profile`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ securityProfileId: editableAccount.profileId || null }),
-        }),
-        fetch(`./api/security/accounts/${accountId}/status`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isActive: editableAccount.isActive }),
-        }),
-      ])
+      const response = await fetch(apiPath(`api/security/accounts/${accountId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildAccountPayload(editableAccount, false)),
+      })
 
-      if (!profileResponse.ok || !statusResponse.ok) {
-        throw new Error('La mise à jour du compte a échoué.')
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La mise a jour du compte a echoue.'))
       }
 
       await loadAdminSecurityData()
@@ -433,12 +665,13 @@ function App() {
       updateEditableAccount(accountId, (current) => ({
         ...current,
         isSaving: false,
-        error: saveError instanceof Error ? saveError.message : 'Erreur de mise à jour.',
+        error: saveError instanceof Error ? saveError.message : 'Erreur de mise a jour.',
       }))
       return
     }
 
     updateEditableAccount(accountId, (current) => ({ ...current, isSaving: false, error: null }))
+    setEditingAccountId(null)
   }
 
   function updateEditableProfile(profileId: string, updater: (current: EditableProfileState) => EditableProfileState) {
@@ -492,7 +725,7 @@ function App() {
     updateEditableProfile(profileId, (current) => ({ ...current, isSaving: true, error: null }))
 
     try {
-      const response = await fetch(`./api/security/profiles/${profileId}`, {
+      const response = await fetch(apiPath(`api/security/profiles/${profileId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -596,7 +829,7 @@ function App() {
     setNewProfile((current) => ({ ...current, isSaving: true, error: null }))
 
     try {
-      const response = await fetch('./api/security/profiles', {
+      const response = await fetch(apiPath('api/security/profiles'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -631,6 +864,324 @@ function App() {
     }
   }
 
+  function handleNewCompanyFieldChange(
+    field: 'siren' | 'displayName' | 'legalName',
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    setNewCompany((current) => ({
+      ...current,
+      [field]: field === 'siren' ? event.target.value.replace(/\D/g, '').slice(0, 9) : event.target.value,
+      error: null,
+    }))
+  }
+
+  function handleNewCompanyStatusChange(event: ChangeEvent<HTMLInputElement>) {
+    setNewCompany((current) => ({
+      ...current,
+      isActive: event.target.checked,
+      error: null,
+    }))
+  }
+
+  function handleEditableCompanyFieldChange(
+    companyId: string,
+    field: 'siren' | 'displayName' | 'legalName',
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    setEditableCompanies((current) => ({
+      ...current,
+      [companyId]: {
+        ...(current[companyId] ?? createEmptyCompanyForm()),
+        [field]: field === 'siren' ? event.target.value.replace(/\D/g, '').slice(0, 9) : event.target.value,
+        error: null,
+      },
+    }))
+  }
+
+  function handleEditableCompanyStatusChange(companyId: string, event: ChangeEvent<HTMLInputElement>) {
+    setEditableCompanies((current) => ({
+      ...current,
+      [companyId]: {
+        ...(current[companyId] ?? createEmptyCompanyForm()),
+        isActive: event.target.checked,
+        error: null,
+      },
+    }))
+  }
+
+  async function handleCreateCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setNewCompany((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/settings/companies'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildCompanyPayload(newCompany)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La création de la société a échoué.'))
+      }
+
+      await loadAdminSecurityData()
+      setNewCompany(createEmptyCompanyForm())
+    } catch (createError) {
+      setNewCompany((current) => ({
+        ...current,
+        isSaving: false,
+        error: createError instanceof Error ? createError.message : 'Erreur de création.',
+      }))
+    }
+  }
+
+  async function handleSaveCompany(companyId: string) {
+    const editableCompany = editableCompanies[companyId]
+    if (!editableCompany) {
+      return
+    }
+
+    setEditableCompanies((current) => ({
+      ...current,
+      [companyId]: { ...editableCompany, isSaving: true, error: null },
+    }))
+
+    try {
+      const response = await fetch(apiPath(`api/settings/companies/${companyId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildCompanyPayload(editableCompany)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La mise à jour de la société a échoué.'))
+      }
+
+      await loadAdminSecurityData()
+    } catch (saveError) {
+      setEditableCompanies((current) => ({
+        ...current,
+        [companyId]: {
+          ...(current[companyId] ?? editableCompany),
+          isSaving: false,
+          error: saveError instanceof Error ? saveError.message : 'Erreur de mise à jour.',
+        },
+      }))
+    }
+  }
+
+  function handleNewAnalyticFieldChange(
+    field: 'code' | 'label' | 'companyId',
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    setNewAnalytic((current) => ({
+      ...current,
+      [field]: field === 'code' ? event.target.value.toUpperCase() : event.target.value,
+      error: null,
+    }))
+  }
+
+  function handleNewAnalyticStatusChange(event: ChangeEvent<HTMLInputElement>) {
+    setNewAnalytic((current) => ({
+      ...current,
+      isActive: event.target.checked,
+      error: null,
+    }))
+  }
+
+  function handleEditableAnalyticFieldChange(
+    analyticId: string,
+    field: 'code' | 'label' | 'companyId',
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    setEditableAnalytics((current) => ({
+      ...current,
+      [analyticId]: {
+        ...(current[analyticId] ?? createEmptySettingsReferenceForm(companies[0]?.id ?? '')),
+        [field]: field === 'code' ? event.target.value.toUpperCase() : event.target.value,
+        error: null,
+      },
+    }))
+  }
+
+  function handleEditableAnalyticStatusChange(analyticId: string, event: ChangeEvent<HTMLInputElement>) {
+    setEditableAnalytics((current) => ({
+      ...current,
+      [analyticId]: {
+        ...(current[analyticId] ?? createEmptySettingsReferenceForm(companies[0]?.id ?? '')),
+        isActive: event.target.checked,
+        error: null,
+      },
+    }))
+  }
+
+  async function handleCreateAnalytic(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setNewAnalytic((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/settings/analytics'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildSettingsReferencePayload(newAnalytic)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La création de l’analytique a échoué.'))
+      }
+
+      await loadAdminSecurityData()
+      setNewAnalytic(createEmptySettingsReferenceForm(newAnalytic.companyId))
+    } catch (createError) {
+      setNewAnalytic((current) => ({
+        ...current,
+        isSaving: false,
+        error: createError instanceof Error ? createError.message : 'Erreur de création.',
+      }))
+    }
+  }
+
+  async function handleSaveAnalytic(analyticId: string) {
+    const editableAnalytic = editableAnalytics[analyticId]
+    if (!editableAnalytic) {
+      return
+    }
+
+    setEditableAnalytics((current) => ({
+      ...current,
+      [analyticId]: { ...editableAnalytic, isSaving: true, error: null },
+    }))
+
+    try {
+      const response = await fetch(apiPath(`api/settings/analytics/${analyticId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildSettingsReferencePayload(editableAnalytic)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La mise à jour de l’analytique a échoué.'))
+      }
+
+      await loadAdminSecurityData()
+    } catch (saveError) {
+      setEditableAnalytics((current) => ({
+        ...current,
+        [analyticId]: {
+          ...(current[analyticId] ?? editableAnalytic),
+          isSaving: false,
+          error: saveError instanceof Error ? saveError.message : 'Erreur de mise à jour.',
+        },
+      }))
+    }
+  }
+
+  function handleNewExploitationFieldChange(
+    field: 'code' | 'label' | 'companyId',
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    setNewExploitation((current) => ({
+      ...current,
+      [field]: field === 'code' ? event.target.value.toUpperCase() : event.target.value,
+      error: null,
+    }))
+  }
+
+  function handleNewExploitationStatusChange(event: ChangeEvent<HTMLInputElement>) {
+    setNewExploitation((current) => ({
+      ...current,
+      isActive: event.target.checked,
+      error: null,
+    }))
+  }
+
+  function handleEditableExploitationFieldChange(
+    exploitationId: string,
+    field: 'code' | 'label' | 'companyId',
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    setEditableExploitations((current) => ({
+      ...current,
+      [exploitationId]: {
+        ...(current[exploitationId] ?? createEmptySettingsReferenceForm(companies[0]?.id ?? '')),
+        [field]: field === 'code' ? event.target.value.toUpperCase() : event.target.value,
+        error: null,
+      },
+    }))
+  }
+
+  function handleEditableExploitationStatusChange(exploitationId: string, event: ChangeEvent<HTMLInputElement>) {
+    setEditableExploitations((current) => ({
+      ...current,
+      [exploitationId]: {
+        ...(current[exploitationId] ?? createEmptySettingsReferenceForm(companies[0]?.id ?? '')),
+        isActive: event.target.checked,
+        error: null,
+      },
+    }))
+  }
+
+  async function handleCreateExploitation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setNewExploitation((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/settings/exploitations'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildSettingsReferencePayload(newExploitation)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La création de l’exploitation a échoué.'))
+      }
+
+      await loadAdminSecurityData()
+      setNewExploitation(createEmptySettingsReferenceForm(newExploitation.companyId))
+    } catch (createError) {
+      setNewExploitation((current) => ({
+        ...current,
+        isSaving: false,
+        error: createError instanceof Error ? createError.message : 'Erreur de création.',
+      }))
+    }
+  }
+
+  async function handleSaveExploitation(exploitationId: string) {
+    const editableExploitation = editableExploitations[exploitationId]
+    if (!editableExploitation) {
+      return
+    }
+
+    setEditableExploitations((current) => ({
+      ...current,
+      [exploitationId]: { ...editableExploitation, isSaving: true, error: null },
+    }))
+
+    try {
+      const response = await fetch(apiPath(`api/settings/exploitations/${exploitationId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildSettingsReferencePayload(editableExploitation)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La mise à jour de l’exploitation a échoué.'))
+      }
+
+      await loadAdminSecurityData()
+    } catch (saveError) {
+      setEditableExploitations((current) => ({
+        ...current,
+        [exploitationId]: {
+          ...(current[exploitationId] ?? editableExploitation),
+          isSaving: false,
+          error: saveError instanceof Error ? saveError.message : 'Erreur de mise à jour.',
+        },
+      }))
+    }
+  }
+
   function handlePostAuthLoaderComplete() {
     sessionStorage.removeItem(postAuthLoaderStorageKey)
     setShowPostAuthLoader(false)
@@ -638,6 +1189,8 @@ function App() {
 
   const editingProfile = profiles.find((profile) => profile.id === editingProfileId) ?? null
   const editingEditableProfile = editingProfile ? editableProfiles[editingProfile.id] ?? null : null
+  const editingAccount = accounts.find((account) => account.id === editingAccountId) ?? null
+  const editingEditableAccount = editingAccount ? editableAccounts[editingAccount.id] ?? null : null
 
   if (isLoading) {
     return (
@@ -653,24 +1206,36 @@ function App() {
 
   if (!currentUser) {
     return (
-      <div className="auth-shell">
-        <section className="auth-brand-panel">
+      <div className="auth-shell auth-shell-reference">
+        <section className="auth-brand-panel auth-brand-panel-reference">
           <div className="auth-brand-halo" aria-hidden="true" />
-          <div className="auth-brand-lockup">
-            <img className="auth-groupe-laure-logo" src="./groupe-laure-logo.jpg" alt="Groupe Laure" />
-            <div className="auth-brand-divider" aria-hidden="true">×</div>
-            <div className="auth-nexus-brand">
-              <img className="brand-icon" src="./nexus-app-icon.svg" alt="Nexus" />
-              <img className="brand-wordmark auth-wordmark" src="./nexus-wordmark-simplified.png" alt="Nexus" />
+          <div className="auth-brand-curves" aria-hidden="true" />
+          <div className="auth-brand-particles" aria-hidden="true" />
+          <div className="auth-brand-lockup auth-brand-lockup-reference">
+            <img className="auth-groupe-laure-logo" src="./groupe-laure-logo-complet.jpg" alt="Groupe Laure" />
+            <div className="auth-brand-divider" aria-hidden="true">&times;</div>
+            <div className="auth-nexus-brand auth-nexus-brand-reference">
+              <img className="auth-nexus-favicon" src="./nexus-favicon.png" alt="Nexus" />
+              <img className="auth-nexus-logo" src="./nexus-logo-complet.png" alt="Nexus" />
             </div>
           </div>
-          <span className="eyebrow">Groupe Laure × Nexus</span>
-          <h1>Connexion sécurisée</h1>
-          <p>Plateforme interne Groupe Laure.</p>
+          <h1>Connexion s&eacute;curis&eacute;e</h1>
+          <div className="auth-title-accent" aria-hidden="true">
+            <span className="accent-purple" />
+            <span className="accent-gold" />
+            <span className="accent-green" />
+          </div>
+          <div className="auth-brand-copy auth-brand-copy-reference">
+            <p>Plateforme interne du Groupe Laure.</p>
+            <p>Le syst&egrave;me d'information modulaire du Groupe Laure.</p>
+          </div>
         </section>
 
-        <section className="auth-card">
-          <span className="eyebrow">Accès interne</span>
+        <section className="auth-card auth-card-reference">
+          <div className="auth-card-header">
+            <div className="auth-card-icon" aria-hidden="true" />
+            <span className="eyebrow">ACC&Egrave;S INTERNE</span>
+          </div>
           <h2>Ouvrir une session</h2>
           <form className="auth-form" onSubmit={handleLogin}>
             <label>
@@ -678,6 +1243,7 @@ function App() {
               <input
                 autoComplete="username"
                 name="login"
+                placeholder="Votre identifiant"
                 value={credentials.login}
                 onChange={(event) => setCredentials((current) => ({ ...current, login: event.target.value }))}
               />
@@ -687,30 +1253,35 @@ function App() {
               <input
                 autoComplete="current-password"
                 name="password"
+                placeholder="Votre mot de passe"
                 type="password"
                 value={credentials.password}
                 onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
               />
             </label>
 
+            <div className="auth-form-meta">
+              <a className="auth-forgot-link" href="#!" onClick={(event) => event.preventDefault()}>
+                Mot de passe oubli&eacute; ?
+              </a>
+            </div>
+
             {loginError ? <p className="form-error">{loginError}</p> : null}
             {error ? <p className="form-error">{error}</p> : null}
 
-            <button className="primary-button" disabled={isSubmitting} type="submit">
-              {isSubmitting ? 'Connexion…' : 'Se connecter'}
+            <button className="primary-button auth-submit-button" disabled={isSubmitting} type="submit">
+              {isSubmitting ? 'Connexion...' : 'Se connecter'}
             </button>
           </form>
 
-          <div className="bootstrap-credentials">
-            <strong>Compte bootstrap</strong>
-            <span>Login : <code>admin</code></span>
-            <span>Mot de passe : <code>NewNexus!2026</code></span>
+          <div className="auth-trust-note auth-trust-note-reference">
+            <strong>Vos acc&egrave;s sont prot&eacute;g&eacute;s</strong>
+            <span>Connexion s&eacute;curis&eacute;e au syst&egrave;me d'information.</span>
           </div>
         </section>
       </div>
     )
   }
-
   if (showPostAuthLoader) {
     return <PostLoginBrandTransition onComplete={handlePostAuthLoaderComplete} />
   }
@@ -731,7 +1302,13 @@ function App() {
             <button
               key={entry}
               className={`sidebar-link ${selectedNavigation === entry ? 'sidebar-link-active' : ''}`}
-              onClick={() => setSelectedNavigation(entry)}
+              onClick={() => {
+                setSelectedNavigation(entry)
+                if (entry === 'Administration') {
+                  setSelectedAdministrationSection('Accueil')
+                  setSelectedSettingsSection('Accueil')
+                }
+              }}
               type="button"
             >
               {entry}
@@ -812,6 +1389,36 @@ function App() {
           <section className="status-banner status-banner-warning">
             <strong>Aucun accès métier disponible.</strong>
             <span>Ce compte existe, mais aucun droit lecture/écriture n’est encore attribué.</span>
+          </section>
+        ) : null}
+
+        {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Accueil' ? (
+          <section className="workspace-grid">
+            <article className="panel-card panel-card-wide administration-synthesis-card">
+              <div className="panel-heading">
+                <span className="eyebrow">Administration</span>
+                <h2>Choisir un espace d’administration</h2>
+              </div>
+              <p className="profiles-toolbar-copy">
+                Les fonctions d’administration sont volontairement séparées pour éviter les écrans fourre-tout.
+              </p>
+              <div className="dashboard-actions">
+                {administrationSubmenuEntries
+                  .filter((entry) => entry !== 'Accueil')
+                  .map((entry) => (
+                    <button
+                      key={entry}
+                      className="dashboard-action-card"
+                      onClick={() => setSelectedAdministrationSection(entry)}
+                      type="button"
+                    >
+                      <span className="eyebrow">{entry}</span>
+                      <strong>{entry}</strong>
+                      <p>{getAdministrationSectionDescription(entry)}</p>
+                    </button>
+                  ))}
+              </div>
+            </article>
           </section>
         ) : null}
 
@@ -1032,59 +1639,67 @@ function App() {
                 <span className="eyebrow">Comptes</span>
                 <h2>Administration des accès utilisateurs</h2>
               </div>
-              <div className="accounts-table">
-                <div className="accounts-table-head">
-                  <span>Utilisateur</span>
-                  <span>Profil</span>
-                  <span>Statut</span>
-                  <span>Dernière connexion</span>
-                  <span>Actions</span>
+              <div className="administration-synthesis-layout">
+                <div className="administration-synthesis-copy">
+                  <p className="profiles-toolbar-copy">
+                    Chaque compte affiche son profil, son statut et les informations de suivi. Ouvrez la configuration pour modifier le détail.
+                  </p>
+                  <div className="profiles-quick-links" aria-label="Liste des comptes utilisateurs">
+                    {accounts.map((account) => (
+                      <button
+                        key={`account-link-${account.id}`}
+                        className="profile-link-chip"
+                        onClick={() => openEditAccountModal(account.id)}
+                        type="button"
+                      >
+                        {account.displayName}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                <div className="administration-synthesis-actions">
+                  <button className="primary-button" onClick={openCreateAccountModal} type="button">
+                    Ajouter un compte
+                  </button>
+                </div>
+              </div>
+              <div className="profiles-overview-grid">
                 {accounts.map((account) => {
-                  const editableAccount = editableAccounts[account.id]
                   return (
-                    <div key={account.id} className="accounts-table-row">
-                      <span>
-                        <strong>{account.displayName}</strong>
-                        <small>{account.login}</small>
-                      </span>
-
-                      <span className="account-edit-cell">
-                        <select value={editableAccount?.profileId ?? ''} onChange={(event) => handleProfileChange(account.id, event)}>
-                          <option value="">Sans profil</option>
-                          {profiles.map((profile) => (
-                            <option key={profile.id} value={profile.id}>
-                              {profile.label}
-                            </option>
-                          ))}
-                        </select>
-                      </span>
-
-                      <span className="account-edit-cell">
-                        <label className="toggle-label">
-                          <input
-                            checked={editableAccount?.isActive ?? account.isActive}
-                            onChange={(event) => handleActiveChange(account.id, event)}
-                            type="checkbox"
-                          />
-                          <span>{editableAccount?.isActive ?? account.isActive ? 'Actif' : 'Inactif'}</span>
-                        </label>
-                      </span>
-
-                      <span>{account.lastLoginAtUtc ? new Date(account.lastLoginAtUtc).toLocaleString() : 'Jamais'}</span>
-
-                      <span className="account-edit-cell">
-                        <button
-                          className="secondary-button"
-                          disabled={editableAccount?.isSaving}
-                          onClick={() => void handleSaveAccount(account.id)}
-                          type="button"
-                        >
-                          {editableAccount?.isSaving ? 'Enregistrement…' : 'Enregistrer'}
+                    <article key={account.id} className="profile-summary-card accent-navy">
+                      <header className="profile-summary-header">
+                        <div>
+                          <h3>{account.displayName}</h3>
+                          <p>{account.login}</p>
+                        </div>
+                        <span className={`profile-status-badge ${account.isActive ? 'is-active' : 'is-inactive'}`}>
+                          {account.isActive ? 'Actif' : 'Inactif'}
+                        </span>
+                      </header>
+                      <div className="profile-summary-rights">
+                        <div className="profile-summary-right">
+                          <span>Profil</span>
+                          <strong>{account.profile?.label ?? 'Sans profil'}</strong>
+                        </div>
+                        <div className="profile-summary-right">
+                          <span>Email</span>
+                          <strong>{account.email ?? 'Non renseigné'}</strong>
+                        </div>
+                        <div className="profile-summary-right">
+                          <span>Dernière connexion</span>
+                          <strong>{account.lastLoginAtUtc ? new Date(account.lastLoginAtUtc).toLocaleString() : 'Jamais'}</strong>
+                        </div>
+                        <div className="profile-summary-right">
+                          <span>Mot de passe</span>
+                          <strong>{account.mustChangePassword ? 'Changement requis' : 'À jour'}</strong>
+                        </div>
+                      </div>
+                      <div className="profile-summary-actions">
+                        <button className="secondary-button" onClick={() => openEditAccountModal(account.id)} type="button">
+                          Configurer le compte
                         </button>
-                        {editableAccount?.error ? <small className="account-error">{editableAccount.error}</small> : null}
-                      </span>
-                    </div>
+                      </div>
+                    </article>
                   )
                 })}
               </div>
@@ -1094,19 +1709,414 @@ function App() {
 
         {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Paramètres' ? (
           <section className="workspace-grid">
-            <article className="panel-card panel-card-wide">
+            <article className="panel-card panel-card-wide settings-card">
               <div className="panel-heading">
                 <span className="eyebrow">Paramètres</span>
-                <h2>Socle de paramétrage</h2>
+                <h2>Socle de paramétrage transverse</h2>
               </div>
-              <p>
-                Cette section accueillera les paramètres transverses de NewNexus. Le cadrage fonctionnel reste à finaliser
-                avant implémentation.
-              </p>
+              <div className="settings-intro-grid">
+                <div className="settings-intro-copy">
+                  <p>Cette vue centralise les premiers référentiels transverses de NewNexus.</p>
+                  <p>
+                    {companies.length} société(s), {analytics.length} analytique(s) et {exploitations.length} exploitation(s)
+                    actuellement chargée(s).
+                  </p>
+                  <p className="settings-note">
+                    Les sociétés Groupe Laure sont alimentées via SIRENE. Les analytiques et exploitations seront gérés ici
+                    directement dès qu’une société de rattachement est disponible.
+                  </p>
+                </div>
+                <div className="settings-kpis">
+                  <div className="metric-card metric-card-navy">
+                    <span className="metric-label">Sociétés</span>
+                    <strong>{companies.length}</strong>
+                  </div>
+                  <div className="metric-card metric-card-purple">
+                    <span className="metric-label">Analytiques</span>
+                    <strong>{analytics.length}</strong>
+                  </div>
+                  <div className="metric-card metric-card-cyan">
+                    <span className="metric-label">Exploitations</span>
+                    <strong>{exploitations.length}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {companies.length === 0 ? (
+                <div className="status-banner status-banner-warning">
+                  <strong>Paramétrage bloqué</strong>
+                  <span>Ajoutez d’abord une société Groupe Laure pour créer les analytiques et exploitations.</span>
+                </div>
+              ) : null}
+
+              <section className="admin-subnav" aria-label="Sous-menu paramètres">
+                {settingsSubmenuEntries.map((entry) => (
+                  <button
+                    key={entry}
+                    className={`admin-subnav-link ${selectedSettingsSection === entry ? 'admin-subnav-link-active' : ''}`}
+                    onClick={() => setSelectedSettingsSection(entry)}
+                    type="button"
+                  >
+                    {entry}
+                  </button>
+                ))}
+              </section>
+
+              {selectedSettingsSection === 'Accueil' ? (
+                <div className="dashboard-actions">
+                  {settingsSubmenuEntries
+                    .filter((entry) => entry !== 'Accueil')
+                    .map((entry) => (
+                      <button
+                        key={entry}
+                        className="dashboard-action-card"
+                        onClick={() => setSelectedSettingsSection(entry)}
+                        type="button"
+                      >
+                        <span className="eyebrow">Paramètres</span>
+                        <strong>{entry}</strong>
+                        <p>{getSettingsSectionDescription(entry)}</p>
+                      </button>
+                    ))}
+                </div>
+              ) : null}
+
+              {selectedSettingsSection !== 'Accueil' ? (
+              <div className="settings-reference-grid settings-reference-grid-single">
+                {selectedSettingsSection === 'Sociétés' ? (
+                <section className="settings-list-section">
+                  <div className="settings-list-header">
+                    <h3>Sociétés Groupe Laure</h3>
+                    <small>Saisie contrôlée avant SIRENE</small>
+                  </div>
+                  <form className="settings-form settings-create-form" onSubmit={handleCreateCompany}>
+                    <label>
+                      <span>SIREN</span>
+                      <input
+                        inputMode="numeric"
+                        maxLength={9}
+                        placeholder="123456789"
+                        value={newCompany.siren}
+                        onChange={(event) => handleNewCompanyFieldChange('siren', event)}
+                      />
+                    </label>
+                    <label>
+                      <span>Nom affiché</span>
+                      <input
+                        placeholder="Nom court"
+                        value={newCompany.displayName}
+                        onChange={(event) => handleNewCompanyFieldChange('displayName', event)}
+                      />
+                    </label>
+                    <label>
+                      <span>Raison sociale</span>
+                      <input
+                        placeholder="Raison sociale complète"
+                        value={newCompany.legalName}
+                        onChange={(event) => handleNewCompanyFieldChange('legalName', event)}
+                      />
+                    </label>
+                    <label className="toggle-label settings-toggle">
+                      <input checked={newCompany.isActive} onChange={handleNewCompanyStatusChange} type="checkbox" />
+                      <span>{newCompany.isActive ? 'Active' : 'Inactive'}</span>
+                    </label>
+                    <div className="profile-action-row">
+                      <button className="primary-button" disabled={newCompany.isSaving} type="submit">
+                        {newCompany.isSaving ? 'Création…' : 'Ajouter la société'}
+                      </button>
+                      {newCompany.error ? <small className="account-error">{newCompany.error}</small> : null}
+                    </div>
+                  </form>
+                  <div className="settings-list">
+                    {companies.length === 0 ? (
+                      <div className="settings-empty">Aucune société chargée pour le moment.</div>
+                    ) : (
+                      companies.map((company) => (
+                        <article className="settings-edit-card" key={company.id}>
+                          <div className="settings-edit-grid">
+                            <label>
+                              <span>SIREN</span>
+                              <input
+                                inputMode="numeric"
+                                maxLength={9}
+                                value={editableCompanies[company.id]?.siren ?? company.siren}
+                                onChange={(event) => handleEditableCompanyFieldChange(company.id, 'siren', event)}
+                              />
+                            </label>
+                            <label>
+                              <span>Nom affiché</span>
+                              <input
+                                value={editableCompanies[company.id]?.displayName ?? company.displayName}
+                                onChange={(event) => handleEditableCompanyFieldChange(company.id, 'displayName', event)}
+                              />
+                            </label>
+                            <label>
+                              <span>Raison sociale</span>
+                              <input
+                                value={editableCompanies[company.id]?.legalName ?? company.legalName}
+                                onChange={(event) => handleEditableCompanyFieldChange(company.id, 'legalName', event)}
+                              />
+                            </label>
+                            <label className="toggle-label settings-toggle">
+                              <input
+                                checked={editableCompanies[company.id]?.isActive ?? company.isActive}
+                                onChange={(event) => handleEditableCompanyStatusChange(company.id, event)}
+                                type="checkbox"
+                              />
+                              <span>{editableCompanies[company.id]?.isActive ?? company.isActive ? 'Active' : 'Inactive'}</span>
+                            </label>
+                          </div>
+                          <div className="settings-inline-actions">
+                            <small>SIREN {company.siren}</small>
+                            <button
+                              className="secondary-button"
+                              disabled={editableCompanies[company.id]?.isSaving}
+                              onClick={() => void handleSaveCompany(company.id)}
+                              type="button"
+                            >
+                              {editableCompanies[company.id]?.isSaving ? 'Enregistrement…' : 'Enregistrer'}
+                            </button>
+                            {editableCompanies[company.id]?.error ? (
+                              <small className="account-error">{editableCompanies[company.id]?.error}</small>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </section>
+                ) : null}
+
+                {selectedSettingsSection === 'Analytiques' ? (
+                <section className="settings-list-section">
+                  <div className="settings-list-header">
+                    <h3>Analytiques</h3>
+                    <small>Code sur 4 caractères</small>
+                  </div>
+                  <form className="settings-form settings-create-form" onSubmit={handleCreateAnalytic}>
+                    <label>
+                      <span>Code</span>
+                      <input
+                        maxLength={4}
+                        placeholder="ABCD"
+                        value={newAnalytic.code}
+                        onChange={(event) => handleNewAnalyticFieldChange('code', event)}
+                      />
+                    </label>
+                    <label>
+                      <span>Libellé</span>
+                      <input
+                        placeholder="Libellé analytique"
+                        value={newAnalytic.label}
+                        onChange={(event) => handleNewAnalyticFieldChange('label', event)}
+                      />
+                    </label>
+                    <label>
+                      <span>Société</span>
+                      <select
+                        value={newAnalytic.companyId}
+                        onChange={(event) => handleNewAnalyticFieldChange('companyId', event)}
+                      >
+                        <option value="">Sélectionner</option>
+                        {companies.map((company) => (
+                          <option key={company.id} value={company.id}>
+                            {company.displayName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="toggle-label settings-toggle">
+                      <input checked={newAnalytic.isActive} onChange={handleNewAnalyticStatusChange} type="checkbox" />
+                      <span>{newAnalytic.isActive ? 'Actif' : 'Inactif'}</span>
+                    </label>
+                    <div className="profile-action-row">
+                      <button className="primary-button" disabled={companies.length === 0 || newAnalytic.isSaving} type="submit">
+                        {newAnalytic.isSaving ? 'Création…' : 'Ajouter l’analytique'}
+                      </button>
+                      {newAnalytic.error ? <small className="account-error">{newAnalytic.error}</small> : null}
+                    </div>
+                  </form>
+                  <div className="settings-list">
+                    {analytics.length === 0 ? (
+                      <div className="settings-empty">Aucun analytique chargé pour le moment.</div>
+                    ) : (
+                      analytics.map((analytic) => (
+                        <article className="settings-edit-card" key={analytic.id}>
+                          <div className="settings-edit-grid">
+                            <label>
+                              <span>Code</span>
+                              <input
+                                maxLength={4}
+                                value={editableAnalytics[analytic.id]?.code ?? analytic.code}
+                                onChange={(event) => handleEditableAnalyticFieldChange(analytic.id, 'code', event)}
+                              />
+                            </label>
+                            <label>
+                              <span>Libellé</span>
+                              <input
+                                value={editableAnalytics[analytic.id]?.label ?? analytic.label}
+                                onChange={(event) => handleEditableAnalyticFieldChange(analytic.id, 'label', event)}
+                              />
+                            </label>
+                            <label>
+                              <span>Société</span>
+                              <select
+                                value={editableAnalytics[analytic.id]?.companyId ?? analytic.company.id}
+                                onChange={(event) => handleEditableAnalyticFieldChange(analytic.id, 'companyId', event)}
+                              >
+                                {companies.map((company) => (
+                                  <option key={company.id} value={company.id}>
+                                    {company.displayName}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="toggle-label settings-toggle">
+                              <input
+                                checked={editableAnalytics[analytic.id]?.isActive ?? analytic.isActive}
+                                onChange={(event) => handleEditableAnalyticStatusChange(analytic.id, event)}
+                                type="checkbox"
+                              />
+                              <span>{editableAnalytics[analytic.id]?.isActive ?? analytic.isActive ? 'Actif' : 'Inactif'}</span>
+                            </label>
+                          </div>
+                          <div className="settings-inline-actions">
+                            <small>SIREN {analytic.company.siren}</small>
+                            <button
+                              className="secondary-button"
+                              disabled={editableAnalytics[analytic.id]?.isSaving}
+                              onClick={() => void handleSaveAnalytic(analytic.id)}
+                              type="button"
+                            >
+                              {editableAnalytics[analytic.id]?.isSaving ? 'Enregistrement…' : 'Enregistrer'}
+                            </button>
+                            {editableAnalytics[analytic.id]?.error ? (
+                              <small className="account-error">{editableAnalytics[analytic.id]?.error}</small>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </section>
+                ) : null}
+
+                {selectedSettingsSection === 'Exploitations' ? (
+                <section className="settings-list-section">
+                  <div className="settings-list-header">
+                    <h3>Exploitations</h3>
+                    <small>Rattachées à une société</small>
+                  </div>
+                  <form className="settings-form settings-create-form" onSubmit={handleCreateExploitation}>
+                    <label>
+                      <span>Code</span>
+                      <input
+                        placeholder="EXP"
+                        value={newExploitation.code}
+                        onChange={(event) => handleNewExploitationFieldChange('code', event)}
+                      />
+                    </label>
+                    <label>
+                      <span>Libellé</span>
+                      <input
+                        placeholder="Libellé exploitation"
+                        value={newExploitation.label}
+                        onChange={(event) => handleNewExploitationFieldChange('label', event)}
+                      />
+                    </label>
+                    <label>
+                      <span>Société</span>
+                      <select
+                        value={newExploitation.companyId}
+                        onChange={(event) => handleNewExploitationFieldChange('companyId', event)}
+                      >
+                        <option value="">Sélectionner</option>
+                        {companies.map((company) => (
+                          <option key={company.id} value={company.id}>
+                            {company.displayName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="toggle-label settings-toggle">
+                      <input checked={newExploitation.isActive} onChange={handleNewExploitationStatusChange} type="checkbox" />
+                      <span>{newExploitation.isActive ? 'Active' : 'Inactive'}</span>
+                    </label>
+                    <div className="profile-action-row">
+                      <button className="primary-button" disabled={companies.length === 0 || newExploitation.isSaving} type="submit">
+                        {newExploitation.isSaving ? 'Création…' : 'Ajouter l’exploitation'}
+                      </button>
+                      {newExploitation.error ? <small className="account-error">{newExploitation.error}</small> : null}
+                    </div>
+                  </form>
+                  <div className="settings-list">
+                    {exploitations.length === 0 ? (
+                      <div className="settings-empty">Aucune exploitation chargée pour le moment.</div>
+                    ) : (
+                      exploitations.map((exploitation) => (
+                        <article className="settings-edit-card" key={exploitation.id}>
+                          <div className="settings-edit-grid">
+                            <label>
+                              <span>Code</span>
+                              <input
+                                value={editableExploitations[exploitation.id]?.code ?? exploitation.code}
+                                onChange={(event) => handleEditableExploitationFieldChange(exploitation.id, 'code', event)}
+                              />
+                            </label>
+                            <label>
+                              <span>Libellé</span>
+                              <input
+                                value={editableExploitations[exploitation.id]?.label ?? exploitation.label}
+                                onChange={(event) => handleEditableExploitationFieldChange(exploitation.id, 'label', event)}
+                              />
+                            </label>
+                            <label>
+                              <span>Société</span>
+                              <select
+                                value={editableExploitations[exploitation.id]?.companyId ?? exploitation.company.id}
+                                onChange={(event) => handleEditableExploitationFieldChange(exploitation.id, 'companyId', event)}
+                              >
+                                {companies.map((company) => (
+                                  <option key={company.id} value={company.id}>
+                                    {company.displayName}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="toggle-label settings-toggle">
+                              <input
+                                checked={editableExploitations[exploitation.id]?.isActive ?? exploitation.isActive}
+                                onChange={(event) => handleEditableExploitationStatusChange(exploitation.id, event)}
+                                type="checkbox"
+                              />
+                              <span>{editableExploitations[exploitation.id]?.isActive ?? exploitation.isActive ? 'Active' : 'Inactive'}</span>
+                            </label>
+                          </div>
+                          <div className="settings-inline-actions">
+                            <small>SIREN {exploitation.company.siren}</small>
+                            <button
+                              className="secondary-button"
+                              disabled={editableExploitations[exploitation.id]?.isSaving}
+                              onClick={() => void handleSaveExploitation(exploitation.id)}
+                              type="button"
+                            >
+                              {editableExploitations[exploitation.id]?.isSaving ? 'Enregistrement…' : 'Enregistrer'}
+                            </button>
+                            {editableExploitations[exploitation.id]?.error ? (
+                              <small className="account-error">{editableExploitations[exploitation.id]?.error}</small>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </section>
+                ) : null}
+              </div>
+              ) : null}
             </article>
           </section>
         ) : null}
-
         {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Outils' ? (
           <section className="workspace-grid">
             <article className="panel-card panel-card-wide">
@@ -1120,6 +2130,196 @@ function App() {
               </p>
             </article>
           </section>
+        ) : null}
+
+        {isCreateAccountModalOpen ? (
+          <div className="modal-overlay" onClick={closeCreateAccountModal} role="presentation">
+            <section
+              aria-labelledby="create-account-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">Création</span>
+                  <h2 id="create-account-title">Ajouter un compte</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeCreateAccountModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="account-form-card" onSubmit={handleCreateAccount}>
+                <div className="account-form-grid">
+                  <label>
+                    <span>Login</span>
+                    <input value={newAccount.login} onChange={(event) => handleNewAccountFieldChange('login', event)} />
+                  </label>
+                  <label>
+                    <span>Nom affiché</span>
+                    <input value={newAccount.displayName} onChange={(event) => handleNewAccountFieldChange('displayName', event)} />
+                  </label>
+                  <label>
+                    <span>Email</span>
+                    <input value={newAccount.email} onChange={(event) => handleNewAccountFieldChange('email', event)} />
+                  </label>
+                  <label>
+                    <span>Matricule</span>
+                    <input value={newAccount.employeeNumber} onChange={(event) => handleNewAccountFieldChange('employeeNumber', event)} />
+                  </label>
+                  <label>
+                    <span>Profil</span>
+                    <select value={newAccount.profileId} onChange={(event) => handleNewAccountFieldChange('profileId', event)}>
+                      <option value="">Sans profil</option>
+                      {profiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Mot de passe initial</span>
+                    <input type="password" value={newAccount.password} onChange={(event) => handleNewAccountFieldChange('password', event)} />
+                  </label>
+                  <label className="toggle-label settings-toggle">
+                    <input checked={newAccount.isActive} onChange={(event) => handleNewAccountBooleanChange('isActive', event)} type="checkbox" />
+                    <span>{newAccount.isActive ? 'Compte actif' : 'Compte inactif'}</span>
+                  </label>
+                  <label className="toggle-label settings-toggle">
+                    <input
+                      checked={newAccount.mustChangePassword}
+                      onChange={(event) => handleNewAccountBooleanChange('mustChangePassword', event)}
+                      type="checkbox"
+                    />
+                    <span>Changement de mot de passe requis</span>
+                  </label>
+                </div>
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={newAccount.isSaving} type="submit">
+                    {newAccount.isSaving ? 'Création…' : 'Créer le compte'}
+                  </button>
+                  {newAccount.error ? <small className="account-error">{newAccount.error}</small> : null}
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
+        {editingAccount && editingEditableAccount ? (
+          <div className="modal-overlay" onClick={closeEditAccountModal} role="presentation">
+            <section
+              aria-labelledby="edit-account-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">Configuration</span>
+                  <h2 id="edit-account-title">Configurer le compte</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeEditAccountModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <section className="account-form-card">
+                <header className="profile-editor-header">
+                  <div>
+                    <h3>{editingAccount.displayName}</h3>
+                    <p>{editingAccount.login}</p>
+                  </div>
+                  <span className={`profile-status-badge ${editingEditableAccount.isActive ? 'is-active' : 'is-inactive'}`}>
+                    {editingEditableAccount.isActive ? 'Actif' : 'Inactif'}
+                  </span>
+                </header>
+                <div className="account-form-grid">
+                  <label>
+                    <span>Login</span>
+                    <input
+                      value={editingEditableAccount.login}
+                      onChange={(event) => handleEditableAccountFieldChange(editingAccount.id, 'login', event)}
+                    />
+                  </label>
+                  <label>
+                    <span>Nom affiché</span>
+                    <input
+                      value={editingEditableAccount.displayName}
+                      onChange={(event) => handleEditableAccountFieldChange(editingAccount.id, 'displayName', event)}
+                    />
+                  </label>
+                  <label>
+                    <span>Email</span>
+                    <input
+                      value={editingEditableAccount.email}
+                      onChange={(event) => handleEditableAccountFieldChange(editingAccount.id, 'email', event)}
+                    />
+                  </label>
+                  <label>
+                    <span>Matricule</span>
+                    <input
+                      value={editingEditableAccount.employeeNumber}
+                      onChange={(event) => handleEditableAccountFieldChange(editingAccount.id, 'employeeNumber', event)}
+                    />
+                  </label>
+                  <label>
+                    <span>Profil</span>
+                    <select
+                      value={editingEditableAccount.profileId}
+                      onChange={(event) => handleEditableAccountFieldChange(editingAccount.id, 'profileId', event)}
+                    >
+                      <option value="">Sans profil</option>
+                      {profiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Nouveau mot de passe</span>
+                    <input
+                      placeholder="Laisser vide pour conserver"
+                      type="password"
+                      value={editingEditableAccount.password}
+                      onChange={(event) => handleEditableAccountFieldChange(editingAccount.id, 'password', event)}
+                    />
+                  </label>
+                  <label className="toggle-label settings-toggle">
+                    <input
+                      checked={editingEditableAccount.isActive}
+                      onChange={(event) => handleEditableAccountBooleanChange(editingAccount.id, 'isActive', event)}
+                      type="checkbox"
+                    />
+                    <span>{editingEditableAccount.isActive ? 'Compte actif' : 'Compte inactif'}</span>
+                  </label>
+                  <label className="toggle-label settings-toggle">
+                    <input
+                      checked={editingEditableAccount.mustChangePassword}
+                      onChange={(event) => handleEditableAccountBooleanChange(editingAccount.id, 'mustChangePassword', event)}
+                      type="checkbox"
+                    />
+                    <span>Changement de mot de passe requis</span>
+                  </label>
+                </div>
+                <div className="profile-action-row">
+                  <button
+                    className="secondary-button"
+                    disabled={editingEditableAccount.isSaving}
+                    onClick={() => void handleSaveAccount(editingAccount.id)}
+                    type="button"
+                  >
+                    {editingEditableAccount.isSaving ? 'Enregistrement…' : 'Enregistrer le compte'}
+                  </button>
+                  {editingEditableAccount.error ? <small className="account-error">{editingEditableAccount.error}</small> : null}
+                </div>
+              </section>
+            </section>
+          </div>
         ) : null}
 
         {isCreateProfileModalOpen ? (
@@ -1298,6 +2498,88 @@ function buildRightsFromProfile(profile: SecurityProfileItem, modules: SecurityM
   )
 }
 
+function apiPath(path: string) {
+  return `${apiBasePath}${path.replace(/^\/+/, '')}`
+}
+
+function createEmptyAccountForm(): EditableAccountState {
+  return {
+    login: '',
+    displayName: '',
+    email: '',
+    employeeNumber: '',
+    password: '',
+    profileId: '',
+    isActive: true,
+    mustChangePassword: true,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildAccountPayload(account: EditableAccountState, isCreation: boolean) {
+  return {
+    login: account.login.trim(),
+    displayName: account.displayName.trim(),
+    email: account.email.trim() || null,
+    employeeNumber: account.employeeNumber.trim() || null,
+    ...(isCreation ? { password: account.password } : { newPassword: account.password || null }),
+    securityProfileId: account.profileId || null,
+    isActive: account.isActive,
+    mustChangePassword: account.mustChangePassword,
+  }
+}
+
+function createEmptySettingsReferenceForm(companyId = ''): SettingsReferenceFormState {
+  return {
+    code: '',
+    label: '',
+    companyId,
+    isActive: true,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function createEmptyCompanyForm(): CompanyFormState {
+  return {
+    siren: '',
+    displayName: '',
+    legalName: '',
+    isActive: true,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildCompanyPayload(form: CompanyFormState) {
+  return {
+    siren: form.siren.trim(),
+    displayName: form.displayName.trim(),
+    legalName: form.legalName.trim(),
+    isActive: form.isActive,
+  }
+}
+
+function buildSettingsReferencePayload(form: SettingsReferenceFormState) {
+  return {
+    code: form.code.trim(),
+    label: form.label.trim(),
+    companyId: form.companyId,
+    isActive: form.isActive,
+  }
+}
+
+async function getRequestError(response: Response, fallback: string) {
+  const payload = (await response.json().catch(() => null)) as {
+    title?: string
+    errors?: Record<string, string[]>
+  } | null
+
+  const validationMessage = Object.values(payload?.errors ?? {}).flat()[0]
+  return validationMessage ?? payload?.title ?? fallback
+}
+
 function translateAccessLevel(accessLevel: string) {
   switch (accessLevel) {
     case 'Read':
@@ -1343,6 +2625,32 @@ function getWorkspaceDescription(selectedNavigation: string, isInformatique: boo
   return 'Cette vue présente uniquement les modules réellement accessibles dans le périmètre exploitation.'
 }
 
+function getAdministrationSectionDescription(section: (typeof administrationSubmenuEntries)[number]) {
+  switch (section) {
+    case 'Comptes utilisateurs':
+      return 'Créer, modifier, activer ou rattacher les comptes aux profils.'
+    case 'Profils':
+      return 'Configurer les profils et leurs droits par module.'
+    case 'Paramètres':
+      return 'Administrer les référentiels transverses de base.'
+    case 'Outils':
+      return 'Préparer les futurs outils techniques et de maintenance.'
+    default:
+      return 'Vue d’ensemble des espaces d’administration.'
+  }
+}
+
+function getSettingsSectionDescription(section: (typeof settingsSubmenuEntries)[number]) {
+  switch (section) {
+    case 'Sociétés':
+      return 'Créer et maintenir les sociétés Groupe Laure.'
+    case 'Analytiques':
+      return 'Créer et maintenir les codes analytiques rattachés aux sociétés.'
+    case 'Exploitations':
+      return 'Créer et maintenir les exploitations rattachées aux sociétés.'
+    default:
+      return 'Synthèse des référentiels transverses.'
+  }
+}
+
 export default App
-
-

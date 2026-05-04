@@ -13,7 +13,7 @@ export function PostLoginBrandTransition({
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       onComplete?.()
-    }, 5000)
+    }, 2800)
 
     return () => window.clearTimeout(timeout)
   }, [onComplete])
@@ -21,41 +21,39 @@ export function PostLoginBrandTransition({
   return (
     <div className="brand-transition-screen" role="status" aria-live="polite" aria-label={label}>
       <main className="preview-stage">
+        <div className="preview-aura preview-aura-left" aria-hidden="true" />
+        <div className="preview-aura preview-aura-right" aria-hidden="true" />
+        <div className="preview-grain" aria-hidden="true" />
+
         <div className="preview-content">
           <div className="preview-brand-row">
-            <div className="preview-energy" />
-
-            <div className="preview-laure-card">
-              <img src="./groupe-laure-logo.jpg" alt="Groupe Laure Transports & Logistique" />
+            <div className="preview-laure-wrap">
+              <div className="preview-laure-glow" aria-hidden="true" />
+              <div className="preview-laure-card">
+                <img src="./groupe-laure-symbole-selectionne.png" alt="Symbole Groupe Laure" />
+              </div>
+              <img className="preview-laure-wordmark" src="./groupe-laure-logo-complet.jpg" alt="Groupe Laure" />
             </div>
 
-            <div className="preview-separator" aria-hidden="true" />
+            <div className="preview-fusion-lane" aria-hidden="true">
+              <div className="preview-energy preview-energy-gold" />
+              <div className="preview-energy preview-energy-purple" />
+              <div className="preview-energy preview-energy-cyan" />
+              <div className="preview-energy preview-energy-green" />
+              <div className="preview-spark" />
+            </div>
 
             <div className="preview-nexus-wrap">
-              <div className="preview-nexus-icon" aria-hidden="true">
-                <div className="preview-corner-orange" />
-                <div className="preview-corner-green" />
-              </div>
-
-              <div className="preview-nexus-word" aria-label="nexus">
-                <span>n</span>
-                <span>e</span>
-                <span>x</span>
-                <span>u</span>
-                <span>s</span>
-              </div>
+              <img className="preview-nexus-icon" src="./nexus-favicon.png" alt="Icône Nexus" />
+              <img className="preview-nexus-logo" src="./nexus-logo-complet.png" alt="Nexus" />
             </div>
-
-            <div className="preview-shimmer" />
           </div>
 
-          <div className="preview-loader" aria-hidden="true">
-            <i />
-            <i />
-            <i />
+          <div className="preview-final-loader" aria-hidden="true">
+            <span className="loader-dot loader-dot-muted" />
+            <span className="loader-dot loader-dot-active" />
+            <span className="loader-dot loader-dot-muted" />
           </div>
-
-          <div className="preview-status">Redirection vers le tableau de bord…</div>
         </div>
       </main>
     </div>

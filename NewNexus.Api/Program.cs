@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using NewNexus.Data.Postgres;
 using NewNexus.Domain.Security;
+using NewNexus.Domain.Transverse;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -460,6 +461,293 @@ app.MapGet("/api/security/accounts", async (NewNexusDbContext dbContext) =>
     return Results.Ok(accounts);
 }).RequireAuthorization("RequireInformatique");
 
+app.MapPost("/api/security/accounts", async (CreateUserAccountRequest request, NewNexusDbContext dbContext) =>
+{
+    var validationErrors = await ValidateCreateUserAccountRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var account = new UserAccount
+    {
+        Id = Guid.NewGuid(),
+        Login = request.Login.Trim(),
+        DisplayName = request.DisplayName.Trim(),
+        Email = NormalizeOptionalText(request.Email),
+        EmployeeNumber = NormalizeOptionalText(request.EmployeeNumber),
+        PasswordHash = PasswordHasher.HashPassword(request.Password),
+        MustChangePassword = request.MustChangePassword,
+        SecurityProfileId = request.SecurityProfileId,
+        IsActive = request.IsActive,
+        CreatedAtUtc = DateTime.UtcNow
+    };
+
+    dbContext.UserAccounts.Add(account);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/security/accounts/{account.Id}", new { account.Id });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/security/accounts/{accountId:guid}", async (
+    Guid accountId,
+    UpdateUserAccountRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    var currentUserId = GetUserId(principal);
+    var account = await dbContext.UserAccounts.SingleOrDefaultAsync(userAccount => userAccount.Id == accountId);
+    if (account is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateUpdateUserAccountRequestAsync(request, dbContext, accountId);
+    if (currentUserId == account.Id && request.SecurityProfileId is null)
+    {
+        validationErrors["securityProfileId"] = ["Vous ne pouvez pas retirer votre propre profil d'administration."];
+    }
+
+    if (currentUserId == account.Id && !request.IsActive)
+    {
+        validationErrors["isActive"] = ["Vous ne pouvez pas desactiver votre propre compte."];
+    }
+
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    account.Login = request.Login.Trim();
+    account.DisplayName = request.DisplayName.Trim();
+    account.Email = NormalizeOptionalText(request.Email);
+    account.EmployeeNumber = NormalizeOptionalText(request.EmployeeNumber);
+    account.MustChangePassword = request.MustChangePassword;
+    account.SecurityProfileId = request.SecurityProfileId;
+    account.IsActive = request.IsActive;
+
+    if (!string.IsNullOrWhiteSpace(request.NewPassword))
+    {
+        account.PasswordHash = PasswordHasher.HashPassword(request.NewPassword);
+        account.MustChangePassword = true;
+    }
+
+    await dbContext.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
+{
+    var companies = await dbContext.Companies
+        .AsNoTracking()
+        .OrderBy(company => company.DisplayName)
+        .Select(company => new
+        {
+            company.Id,
+            company.Siren,
+            company.DisplayName,
+            company.LegalName,
+            company.IsActive,
+            company.CreatedAtUtc
+        })
+        .ToListAsync();
+
+    var analytics = await dbContext.Analytics
+        .AsNoTracking()
+        .Include(item => item.Company)
+        .OrderBy(item => item.Code)
+        .ThenBy(item => item.Label)
+        .Select(item => new
+        {
+            item.Id,
+            item.Code,
+            item.Label,
+            item.IsActive,
+            Company = new
+            {
+                item.Company!.Id,
+                item.Company.Siren,
+                item.Company.DisplayName
+            }
+        })
+        .ToListAsync();
+
+    var exploitations = await dbContext.Exploitations
+        .AsNoTracking()
+        .Include(item => item.Company)
+        .OrderBy(item => item.Code)
+        .ThenBy(item => item.Label)
+        .Select(item => new
+        {
+            item.Id,
+            item.Code,
+            item.Label,
+            item.IsActive,
+            Company = new
+            {
+                item.Company!.Id,
+                item.Company.Siren,
+                item.Company.DisplayName
+            }
+        })
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        Companies = companies,
+        Analytics = analytics,
+        Exploitations = exploitations
+    });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/settings/companies", async (UpsertCompanyRequest request, NewNexusDbContext dbContext) =>
+{
+    var validationErrors = await ValidateCompanyRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var company = new Company
+    {
+        Id = Guid.NewGuid(),
+        Siren = request.Siren.Trim(),
+        DisplayName = request.DisplayName.Trim(),
+        LegalName = request.LegalName.Trim(),
+        IsActive = request.IsActive,
+        CreatedAtUtc = DateTime.UtcNow
+    };
+
+    dbContext.Companies.Add(company);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/settings/companies/{company.Id}", new { company.Id });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/settings/companies/{companyId:guid}", async (
+    Guid companyId,
+    UpsertCompanyRequest request,
+    NewNexusDbContext dbContext) =>
+{
+    var company = await dbContext.Companies.SingleOrDefaultAsync(item => item.Id == companyId);
+    if (company is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateCompanyRequestAsync(request, dbContext, companyId);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    company.Siren = request.Siren.Trim();
+    company.DisplayName = request.DisplayName.Trim();
+    company.LegalName = request.LegalName.Trim();
+    company.IsActive = request.IsActive;
+
+    await dbContext.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/settings/analytics", async (UpsertAnalyticRequest request, NewNexusDbContext dbContext) =>
+{
+    var validationErrors = await ValidateAnalyticRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var analytic = new Analytic
+    {
+        Id = Guid.NewGuid(),
+        Code = request.Code.Trim().ToUpperInvariant(),
+        Label = request.Label.Trim(),
+        CompanyId = request.CompanyId,
+        IsActive = request.IsActive
+    };
+
+    dbContext.Analytics.Add(analytic);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/settings/analytics/{analytic.Id}", new { analytic.Id });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/settings/analytics/{analyticId:guid}", async (
+    Guid analyticId,
+    UpsertAnalyticRequest request,
+    NewNexusDbContext dbContext) =>
+{
+    var analytic = await dbContext.Analytics.SingleOrDefaultAsync(item => item.Id == analyticId);
+    if (analytic is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateAnalyticRequestAsync(request, dbContext, analyticId);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    analytic.Code = request.Code.Trim().ToUpperInvariant();
+    analytic.Label = request.Label.Trim();
+    analytic.CompanyId = request.CompanyId;
+    analytic.IsActive = request.IsActive;
+
+    await dbContext.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/settings/exploitations", async (UpsertExploitationRequest request, NewNexusDbContext dbContext) =>
+{
+    var validationErrors = await ValidateExploitationRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var exploitation = new Exploitation
+    {
+        Id = Guid.NewGuid(),
+        Code = request.Code.Trim().ToUpperInvariant(),
+        Label = request.Label.Trim(),
+        CompanyId = request.CompanyId,
+        IsActive = request.IsActive
+    };
+
+    dbContext.Exploitations.Add(exploitation);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/settings/exploitations/{exploitation.Id}", new { exploitation.Id });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/settings/exploitations/{exploitationId:guid}", async (
+    Guid exploitationId,
+    UpsertExploitationRequest request,
+    NewNexusDbContext dbContext) =>
+{
+    var exploitation = await dbContext.Exploitations.SingleOrDefaultAsync(item => item.Id == exploitationId);
+    if (exploitation is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateExploitationRequestAsync(request, dbContext, exploitationId);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    exploitation.Code = request.Code.Trim().ToUpperInvariant();
+    exploitation.Label = request.Label.Trim();
+    exploitation.CompanyId = request.CompanyId;
+    exploitation.IsActive = request.IsActive;
+
+    await dbContext.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
 app.MapPut("/api/security/accounts/{accountId:guid}/profile", async (
     Guid accountId,
     UpdateAccountProfileRequest request,
@@ -679,10 +967,234 @@ static ProfileRightsBuildResult TryBuildDesiredRights(
         : new ProfileRightsBuildResult(true, new Dictionary<string, string[]>(), rightsByModuleId);
 }
 
+static string? NormalizeOptionalText(string? value)
+{
+    return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
+
+static async Task<Dictionary<string, string[]>> ValidateCreateUserAccountRequestAsync(
+    CreateUserAccountRequest request,
+    NewNexusDbContext dbContext)
+{
+    var errors = await ValidateUserAccountCoreAsync(
+        request.Login,
+        request.DisplayName,
+        request.Email,
+        request.SecurityProfileId,
+        dbContext);
+
+    if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 10)
+    {
+        errors["password"] = ["Le mot de passe initial doit contenir au moins 10 caracteres."];
+    }
+
+    return errors;
+}
+
+static async Task<Dictionary<string, string[]>> ValidateUpdateUserAccountRequestAsync(
+    UpdateUserAccountRequest request,
+    NewNexusDbContext dbContext,
+    Guid currentAccountId)
+{
+    var errors = await ValidateUserAccountCoreAsync(
+        request.Login,
+        request.DisplayName,
+        request.Email,
+        request.SecurityProfileId,
+        dbContext,
+        currentAccountId);
+
+    if (!string.IsNullOrWhiteSpace(request.NewPassword) && request.NewPassword.Length < 10)
+    {
+        errors["newPassword"] = ["Le nouveau mot de passe doit contenir au moins 10 caracteres."];
+    }
+
+    return errors;
+}
+
+static async Task<Dictionary<string, string[]>> ValidateUserAccountCoreAsync(
+    string login,
+    string displayName,
+    string? email,
+    Guid? securityProfileId,
+    NewNexusDbContext dbContext,
+    Guid? currentAccountId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var normalizedLogin = login.Trim();
+    var normalizedDisplayName = displayName.Trim();
+    var normalizedEmail = NormalizeOptionalText(email);
+
+    if (string.IsNullOrWhiteSpace(normalizedLogin))
+    {
+        errors["login"] = ["Le login est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(normalizedDisplayName))
+    {
+        errors["displayName"] = ["Le nom affiche est obligatoire."];
+    }
+
+    if (!string.IsNullOrWhiteSpace(normalizedEmail) && !normalizedEmail.Contains('@'))
+    {
+        errors["email"] = ["L'adresse email est invalide."];
+    }
+
+    var loginExists = await dbContext.UserAccounts.AnyAsync(account =>
+        account.Login == normalizedLogin &&
+        account.Id != currentAccountId);
+    if (loginExists)
+    {
+        errors["login"] = ["Ce login existe deja."];
+    }
+
+    if (securityProfileId is not null)
+    {
+        var profileExists = await dbContext.SecurityProfiles.AnyAsync(profile =>
+            profile.Id == securityProfileId.Value &&
+            profile.IsActive);
+        if (!profileExists)
+        {
+            errors["securityProfileId"] = ["Le profil selectionne est introuvable ou inactif."];
+        }
+    }
+
+    return errors;
+}
+
+static async Task<Dictionary<string, string[]>> ValidateCompanyRequestAsync(
+    UpsertCompanyRequest request,
+    NewNexusDbContext dbContext,
+    Guid? currentCompanyId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var siren = request.Siren.Trim();
+    var displayName = request.DisplayName.Trim();
+    var legalName = request.LegalName.Trim();
+
+    if (siren.Length != 9 || siren.Any(character => !char.IsDigit(character)))
+    {
+        errors["siren"] = ["Le SIREN doit contenir exactement 9 chiffres."];
+    }
+
+    if (string.IsNullOrWhiteSpace(displayName))
+    {
+        errors["displayName"] = ["Le nom d'affichage est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(legalName))
+    {
+        errors["legalName"] = ["La raison sociale est obligatoire."];
+    }
+
+    var sirenExists = await dbContext.Companies.AnyAsync(item =>
+        item.Siren == siren &&
+        item.Id != currentCompanyId);
+    if (sirenExists)
+    {
+        errors["siren"] = ["Ce SIREN existe deja."];
+    }
+
+    return errors;
+}
+
+static async Task<Dictionary<string, string[]>> ValidateAnalyticRequestAsync(
+    UpsertAnalyticRequest request,
+    NewNexusDbContext dbContext,
+    Guid? currentAnalyticId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var code = request.Code.Trim().ToUpperInvariant();
+    var label = request.Label.Trim();
+
+    if (code.Length != 4)
+    {
+        errors["code"] = ["Le code analytique doit contenir exactement 4 caractères."];
+    }
+
+    if (string.IsNullOrWhiteSpace(label))
+    {
+        errors["label"] = ["Le libellé analytique est obligatoire."];
+    }
+
+    var companyExists = await dbContext.Companies.AnyAsync(company => company.Id == request.CompanyId);
+    if (!companyExists)
+    {
+        errors["companyId"] = ["La société sélectionnée est introuvable."];
+    }
+
+    var codeExists = await dbContext.Analytics.AnyAsync(item =>
+        item.Code == code &&
+        item.Id != currentAnalyticId);
+    if (codeExists)
+    {
+        errors["code"] = ["Ce code analytique existe déjà."];
+    }
+
+    return errors;
+}
+
+static async Task<Dictionary<string, string[]>> ValidateExploitationRequestAsync(
+    UpsertExploitationRequest request,
+    NewNexusDbContext dbContext,
+    Guid? currentExploitationId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var code = request.Code.Trim().ToUpperInvariant();
+    var label = request.Label.Trim();
+
+    if (string.IsNullOrWhiteSpace(code))
+    {
+        errors["code"] = ["Le code exploitation est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(label))
+    {
+        errors["label"] = ["Le libellé exploitation est obligatoire."];
+    }
+
+    var companyExists = await dbContext.Companies.AnyAsync(company => company.Id == request.CompanyId);
+    if (!companyExists)
+    {
+        errors["companyId"] = ["La société sélectionnée est introuvable."];
+    }
+
+    var codeExists = await dbContext.Exploitations.AnyAsync(item =>
+        item.Code == code &&
+        item.Id != currentExploitationId);
+    if (codeExists)
+    {
+        errors["code"] = ["Ce code exploitation existe déjà."];
+    }
+
+    return errors;
+}
+
 internal sealed record LoginRequest(string Login, string Password);
 internal sealed record UpdateAccountProfileRequest(Guid? SecurityProfileId);
 internal sealed record UpdateAccountStatusRequest(bool IsActive);
+internal sealed record CreateUserAccountRequest(
+    string Login,
+    string DisplayName,
+    string? Email,
+    string? EmployeeNumber,
+    string Password,
+    Guid? SecurityProfileId,
+    bool IsActive,
+    bool MustChangePassword);
+internal sealed record UpdateUserAccountRequest(
+    string Login,
+    string DisplayName,
+    string? Email,
+    string? EmployeeNumber,
+    string? NewPassword,
+    Guid? SecurityProfileId,
+    bool IsActive,
+    bool MustChangePassword);
 internal sealed record ProfileModuleRightRequest(Guid SecurityModuleId, string AccessLevel);
 internal sealed record CreateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
 internal sealed record UpdateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
+internal sealed record UpsertCompanyRequest(string Siren, string DisplayName, string LegalName, bool IsActive);
+internal sealed record UpsertAnalyticRequest(string Code, string Label, Guid CompanyId, bool IsActive);
+internal sealed record UpsertExploitationRequest(string Code, string Label, Guid CompanyId, bool IsActive);
 internal sealed record ProfileRightsBuildResult(bool IsValid, Dictionary<string, string[]> Errors, Dictionary<Guid, ModuleAccessLevel> RightsByModuleId);

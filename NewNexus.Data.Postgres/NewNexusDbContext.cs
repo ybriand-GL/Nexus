@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NewNexus.Data.Postgres.Security;
+using NewNexus.Data.Postgres.Transverse;
 using NewNexus.Domain.Security;
+using NewNexus.Domain.Transverse;
 
 namespace NewNexus.Data.Postgres;
 
@@ -10,6 +12,9 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
     public DbSet<SecurityProfile> SecurityProfiles => Set<SecurityProfile>();
     public DbSet<SecurityProfileModuleRight> SecurityProfileModuleRights => Set<SecurityProfileModuleRight>();
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<Company> Companies => Set<Company>();
+    public DbSet<Analytic> Analytics => Set<Analytic>();
+    public DbSet<Exploitation> Exploitations => Set<Exploitation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -17,5 +22,8 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
         modelBuilder.ApplyConfiguration(new SecurityProfileConfiguration());
         modelBuilder.ApplyConfiguration(new SecurityProfileModuleRightConfiguration());
         modelBuilder.ApplyConfiguration(new UserAccountConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyConfiguration());
+        modelBuilder.ApplyConfiguration(new AnalyticConfiguration());
+        modelBuilder.ApplyConfiguration(new ExploitationConfiguration());
     }
 }

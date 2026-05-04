@@ -602,3 +602,231 @@ Ordre cible de construction:
   - `npm run build` OK
   - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release` OK
   - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+
+## 2026-04-30 - Perimetre Parametres
+
+- decision fonctionnelle:
+  - les referentiels `Societes Groupe Laure`, `Analytiques` et `Exploitations` seront integres dans `Administration > Parametres`
+- impact backlog:
+  - le prochain lot transverse a developper doit donc etre pense comme un lot `Parametres`
+  - l'entree `Parametres` n'est plus un simple placeholder d'administration, mais le point d'entree des premiers referentiels transverses
+
+## 2026-04-30 - Premier lot Parametres transverse
+
+- evolution backend:
+  - ajout des entites `Company`, `Analytic` et `Exploitation`
+  - ajout des mappings EF Core PostgreSQL associes
+  - ajout des `DbSet` transverse dans `NewNexusDbContext`
+  - ajout des endpoints:
+    - `GET /api/settings/bootstrap`
+    - `POST /api/settings/analytics`
+    - `PUT /api/settings/analytics/{id}`
+    - `POST /api/settings/exploitations`
+    - `PUT /api/settings/exploitations/{id}`
+- evolution base:
+  - migration `TransverseSettingsSocle` generee
+  - migration appliquee sur la base locale `NewNexus`
+  - schemas et tables en place:
+    - `transverse.Company`
+    - `transverse.Analytic`
+    - `transverse.Exploitation`
+- evolution frontend:
+  - remplacement du placeholder `Administration > Parametres` par une vue de synthese lisible
+  - affichage des compteurs et des listes:
+    - societes Groupe Laure
+    - analytiques
+    - exploitations
+  - positionnement volontaire sur un premier lot de lecture, sans ecran d'edition avancee a ce stade
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release` OK
+  - `dotnet ef database update` OK
+  - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` OK
+  - `GET /newNexus/api/system/info` OK
+  - `GET /newNexus/api/settings/bootstrap` retourne bien `401` hors connexion, conforme a la protection attendue
+
+## 2026-05-04 - Edition Parametres analytiques et exploitations
+
+- reprise du contexte et du backlog pour relancer le chantier `Administration > Parametres`
+- evolution frontend:
+  - ajout des formulaires de creation pour `Analytiques` et `Exploitations`
+  - ajout de l'edition inline des analytiques existants:
+    - code
+    - libelle
+    - societe de rattachement
+    - statut actif / inactif
+  - ajout de l'edition inline des exploitations existantes:
+    - code
+    - libelle
+    - societe de rattachement
+    - statut actif / inactif
+  - affichage d'un bloc d'alerte si aucune societe Groupe Laure n'est disponible
+- conservation du cadrage:
+  - les societes restent en lecture dans cette passe
+  - la creation des societes via SIRENE reste a brancher
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- publication IIS non relancee pendant cette passe
+
+## 2026-05-04 - Saisie controlee des societes Parametres
+
+- evolution backend:
+  - ajout de `POST /api/settings/companies`
+  - ajout de `PUT /api/settings/companies/{companyId}`
+  - validation SIREN:
+    - 9 chiffres obligatoires
+    - unicite du SIREN
+  - validation des libelles:
+    - nom d'affichage obligatoire
+    - raison sociale obligatoire
+- evolution frontend:
+  - ajout d'un formulaire de creation des societes dans `Administration > Parametres`
+  - ajout de l'edition inline des societes existantes:
+    - SIREN
+    - nom affiche
+    - raison sociale
+    - statut actif / inactif
+  - le message de blocage des analytiques/exploitations est maintenant rattache a l'absence de societe disponible
+- cadrage conserve:
+  - cette saisie est une saisie controlee transitoire
+  - le branchement SIRENE reel reste a developper
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+  - frontend reconstruit et recopie dans `NewNexus.Api\wwwroot`
+  - API publiee dans `C:\inetpub\newnexus`
+  - application IIS `Localaure/newNexus` maintenue
+- validation publication:
+  - `GET /newNexus/` retourne `200`
+  - `GET /newNexus/api/system/info` retourne `200`
+  - `GET /newNexus/api/settings/bootstrap` retourne `401` hors connexion, conforme a la protection attendue
+
+## 2026-05-04 - Correction connexion URL sans slash final
+
+- anomalie constatee:
+  - depuis la page de connexion, erreur JSON `Unexpected token '<', "<!doctype "... is not valid JSON`
+  - cause probable confirmee par test HTTP: les appels relatifs `./api/...` peuvent sortir de `/newNexus` lorsque la page est ouverte sans slash final
+  - dans ce cas, IIS renvoie du HTML du site parent au lieu du JSON API attendu
+- correction frontend:
+  - ajout d'un helper `apiPath(...)`
+  - construction des appels API avec `import.meta.env.BASE_URL`
+  - les appels ciblent maintenant explicitement `/newNexus/api/...`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- prochaine etape:
+  - publication IIS
+  - verification login publie
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus` retourne `200 text/html`
+  - `GET /newNexus/` retourne `200 text/html`
+  - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
+  - `GET /newNexus/api/auth/me` avec le cookie de session retourne `200 application/json`
+  - compte confirme: `admin`, profil `Informatique`, droits V1 en `Write`
+
+## 2026-05-04 - Accueils Administration / Parametres et comptes utilisateurs
+
+- correction ergonomique Administration:
+  - l'entree `Administration` n'ouvre plus directement `Profils`
+  - ajout d'un accueil Administration avec cartes de choix:
+    - `Comptes utilisateurs`
+    - `Profils`
+    - `Parametres`
+    - `Outils`
+- correction ergonomique Parametres:
+  - ajout d'un mini-accueil `Parametres`
+  - separation des vues:
+    - `Societes`
+    - `Analytiques`
+    - `Exploitations`
+  - l'objectif est d'eviter l'ecran fouillis avec tous les referentiels sur une seule vue
+- evolution backend comptes:
+  - ajout de `POST /api/security/accounts`
+  - ajout de `PUT /api/security/accounts/{accountId}`
+  - validation:
+    - login obligatoire et unique
+    - nom affiche obligatoire
+    - email basiquement valide si renseigne
+    - profil actif si selectionne
+    - mot de passe initial de 10 caracteres minimum a la creation
+    - nouveau mot de passe de 10 caracteres minimum si renseigne en edition
+  - protections conservees:
+    - impossible de retirer son propre profil d'administration
+    - impossible de desactiver son propre compte
+- evolution frontend comptes:
+  - ajout d'un formulaire de creation de compte
+  - ajout de cartes d'edition inline pour les comptes existants:
+    - login
+    - nom affiche
+    - email
+    - matricule
+    - profil
+    - statut actif / inactif
+    - obligation de changement de mot de passe
+    - reinitialisation optionnelle du mot de passe
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- prochaine etape:
+  - publication IIS
+  - verification HTTP et login publie
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
+  - `GET /newNexus/api/security/accounts` avec cookie de session retourne `200 application/json`
+
+## 2026-05-04 - Alignement visuel Comptes utilisateurs sur Profils
+
+- evolution frontend comptes:
+  - la vue `Administration > Comptes utilisateurs` reprend le visuel de `Profils`
+  - liste des comptes presentee en cartes de synthese
+  - bouton principal `Ajouter un compte` ouvrant une modale de creation
+  - bouton `Configurer le compte` sur chaque carte ouvrant une modale d'edition
+  - les champs de configuration restent complets:
+    - login
+    - nom affiche
+    - email
+    - matricule
+    - profil
+    - statut actif / inactif
+    - obligation de changement de mot de passe
+    - nouveau mot de passe optionnel
+- correction mineure:
+  - fermeture de la modale de configuration apres enregistrement du compte
+  - retrait d'un effet de bord inutile dans la creation de societe
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
+  - `GET /newNexus/api/security/accounts` avec cookie de session retourne `200 application/json`
+
+## 2026-05-04 - Correction modale ajout de compte
+
+- anomalie constatee:
+  - les zones de saisie de la modale `Ajouter un compte` se superposaient
+- correction frontend:
+  - passage de la grille comptes en deux colonnes dans les modales
+  - exclusion des checkbox des styles reserves aux champs texte/select
+  - alignement explicite des lignes de bascule `Compte actif` et `Changement de mot de passe requis`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
+  - `GET /newNexus/api/security/accounts` avec cookie de session retourne `200 application/json`

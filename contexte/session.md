@@ -1055,3 +1055,23 @@ Ordre cible de construction:
   - liste des cles API regroupee par fournisseur logiciel, une carte par logiciel
 - validation technique:
   - `npm run build` OK
+
+## 2026-05-04 - Alignement final auth Figma et sortie loader
+
+- corrections authentification:
+  - comparaison avec `C:\Dev\NewNexus\identite visuelle\preview_nexus_premium_v5_figma_sso.html`
+  - libelle `GROUPE LAURE • NEXUS` replace au-dessus du lockup Nexus comme dans la maquette validee
+  - suppression du `Groupe Laure` isole qui apparaissait sous le mot Nexus
+  - ajout des deux courbes SVG manquantes pour retrouver les cinq vagues animees de la maquette
+- corrections post-auth:
+  - ordre de connexion ajuste pour hydrater l'etat utilisateur avant affichage du loader
+  - garde-fou React ajoute pour sortir automatiquement de l'animation meme si le composant de transition ne declenche pas son callback
+  - libelle final de l'animation harmonise en `GROUPE LAURE • NEXUS`
+- validation technique:
+  - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-DJQsnXBe.css` et `index-eK3vzr-W.js`

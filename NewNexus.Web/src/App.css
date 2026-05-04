@@ -2401,6 +2401,8 @@
 .auth-brand-ribbons .r1 { stroke: rgba(247, 217, 138, .74); stroke-width: 4.6; animation-duration: 9s, 6.8s; }
 .auth-brand-ribbons .r2 { stroke: rgba(255, 255, 255, .72); stroke-width: 3.6; animation-duration: 7.5s, 5.8s; }
 .auth-brand-ribbons .r3 { stroke: rgba(108, 61, 255, .46); stroke-width: 3.6; animation-duration: 8.6s, 6.3s; }
+.auth-brand-ribbons .r4 { stroke: rgba(233, 20, 20, .44); stroke-width: 3; animation-duration: 10.2s, 7.2s; }
+.auth-brand-ribbons .r5 { stroke: rgba(25, 188, 235, .40); stroke-width: 3; animation-duration: 8.1s, 6.1s; }
 
 @keyframes authRibbonFloat {
   from { transform: translateX(0) translateY(0); }
@@ -2462,16 +2464,6 @@
   filter: drop-shadow(0 16px 24px rgba(0, 0, 0, .24));
 }
 
-.auth-brand-panel-reference > .eyebrow {
-  position: relative;
-  z-index: 1;
-  margin: 0 0 6px;
-  color: rgba(247, 217, 138, .86);
-  font-size: 12px;
-  letter-spacing: .34em;
-  text-align: center;
-}
-
 .auth-brand-copy-reference {
   position: relative;
   z-index: 1;
@@ -2479,15 +2471,17 @@
 }
 
 .auth-product-line {
-  margin: 0 auto 8px !important;
-  color: rgba(247, 217, 138, .86) !important;
-  font-size: 12px !important;
+  position: relative;
+  z-index: 1;
+  margin: 0 0 6px;
+  color: rgba(247, 217, 138, .86);
+  font-size: 12px;
   letter-spacing: .34em;
-  line-height: 1.2 !important;
+  line-height: 1.2;
+  text-align: center;
   text-transform: uppercase;
 }
 
-.auth-brand-copy-reference p:first-child,
 .auth-brand-copy-reference p:last-child {
   margin: 10px auto 0;
   color: rgba(255, 255, 255, .88);

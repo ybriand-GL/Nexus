@@ -38,7 +38,7 @@ export function PostLoginBrandTransition({
         <section className="post-auth-final">
           <img className="post-auth-icon" src={nexusIcon} alt="" aria-hidden="true" />
           <img className="post-auth-wordmark" src={nexusWordmark} alt="Nexus" />
-          <p>GROUPE LAURE . NEXUS</p>
+          <p>GROUPE LAURE • NEXUS</p>
         </section>
       </main>
     </div>

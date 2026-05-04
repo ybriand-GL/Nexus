@@ -316,6 +316,19 @@ function App() {
     return () => window.clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    if (!showPostAuthLoader) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      sessionStorage.removeItem(postAuthLoaderStorageKey)
+      setShowPostAuthLoader(false)
+    }, 4300)
+
+    return () => window.clearTimeout(timer)
+  }, [showPostAuthLoader])
+
   const rightsByModuleCode = useMemo(() => {
     const map = new Map<string, string>()
     for (const right of currentUser?.rights ?? []) {
@@ -695,9 +708,9 @@ function App() {
       }
 
       const user = (await response.json()) as AuthenticatedUser
+      await hydrateAuthenticatedState(user)
       sessionStorage.setItem(postAuthLoaderStorageKey, 'pending')
       setShowPostAuthLoader(true)
-      await hydrateAuthenticatedState(user)
     } catch (submitError) {
       setLoginError(submitError instanceof Error ? submitError.message : 'Erreur de connexion.')
     } finally {
@@ -1552,18 +1565,19 @@ function App() {
               <path className="r1" d="M-40,520 C120,380 220,348 392,430 C548,506 664,448 828,286 C962,154 1110,150 1356,214 C1440,236 1498,258 1560,292" />
               <path className="r2" d="M-30,434 C126,406 248,332 406,372 C586,420 702,460 878,420 C1042,382 1178,304 1346,268 C1426,252 1492,250 1560,256" />
               <path className="r3" d="M82,616 C248,594 378,516 540,460 C724,396 888,458 1042,500 C1170,536 1300,512 1458,448 C1500,430 1532,410 1560,392" />
+              <path className="r4" d="M288,106 C454,154 584,246 718,368 C826,466 936,498 1116,468 C1292,438 1410,376 1560,286" />
+              <path className="r5" d="M320,646 C512,614 692,548 842,450 C994,350 1122,292 1260,252 C1364,222 1450,206 1560,198" />
             </svg>
           </div>
           <div className="auth-brand-particles" aria-hidden="true" />
+          <div className="auth-product-line">GROUPE LAURE • NEXUS</div>
           <div className="auth-brand-lockup auth-brand-lockup-reference" aria-label="Nexus">
             <img className="auth-nexus-favicon" src={nexusIcon} alt="" aria-hidden="true" />
             <span className="auth-nexus-wordmark">
               <img className="auth-nexus-logo" src={nexusWordmark} alt="Nexus" />
             </span>
           </div>
-          <span className="eyebrow">Groupe Laure</span>
           <div className="auth-brand-copy auth-brand-copy-reference">
-            <p className="auth-product-line">GROUPE LAURE . NEXUS</p>
             <p>Le syst&egrave;me d'information modulaire du Groupe Laure.</p>
           </div>
         </section>

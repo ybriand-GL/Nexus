@@ -1275,3 +1275,26 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-q2G_L207.css` et `index-BDs32zol.js`
+
+## 2026-05-04 - Scaffold RH Lucca et comptes
+
+- corrections Administration / Parametres:
+  - ajout d'une entree `Salaries`
+  - cadrage affiche: source unique Lucca, distinction conducteurs, creation automatique de comptes
+  - regle explicite: un compte issu d'un salarie importe doit rester sans droit tant qu'un profil NewNexus n'est pas affecte
+  - aucun import Lucca reel ni creation automatique de compte n'est active a ce stade
+- corrections Administration / Outils:
+  - ajout d'une tache planifiee cible `LUCCA_ACCOUNT_PROVISIONING`
+  - la tache est positionnee apres import salaries Lucca et reste au statut de cadrage
+- backlog:
+  - `Salaries`, `Distinction conducteurs` et `Creation auto des comptes depuis salaries` passent en `SCAFFOLDE`
+  - l'interface Lucca est precisee avec le scaffold salaries/provisioning
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundle publie: `index-CBJymuku.js`

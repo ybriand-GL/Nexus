@@ -263,6 +263,8 @@ const navigationEntries = ['Accueil', 'Administration', 'Exploitation', 'Gestion
 const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
 const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
 const hiddenIntegrationProviderCodes = new Set(['LEGACY_NEXUS', 'TRACTOR_TRACKING'])
+const employeeSettingsSection = 'Salari\u00e9s'
+const settingsNavigationEntries = [...settingsSubmenuEntries, employeeSettingsSection] as const
 const toolsSubmenuEntries = ['Accueil', 'Clés API', 'Tâches planifiées', 'Requêteur SQL', 'Traces', 'Diagnostics'] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
@@ -318,7 +320,7 @@ function App() {
   const [selectedAdministrationSection, setSelectedAdministrationSection] =
     useState<(typeof administrationSubmenuEntries)[number]>('Accueil')
   const [selectedSettingsSection, setSelectedSettingsSection] =
-    useState<(typeof settingsSubmenuEntries)[number]>('Accueil')
+    useState<string>('Accueil')
   const [selectedToolsSection, setSelectedToolsSection] =
     useState<string>('Accueil')
   const [error, setError] = useState<string | null>(null)
@@ -461,6 +463,14 @@ function App() {
         cadence: 'Quotidienne cible',
         status: 'À raccorder',
         description: 'Importer les salariés, puis qualifier les conducteurs selon le mapping retenu.',
+      },
+      {
+        code: 'LUCCA_ACCOUNT_PROVISIONING',
+        label: 'Provisioning comptes Lucca',
+        scope: 'Ressources humaines',
+        cadence: 'Apr\u00e8s import salari\u00e9s',
+        status: '\u00c0 cadrer',
+        description: 'Pr\u00e9parer la cr\u00e9ation automatique de comptes sans droit depuis les salari\u00e9s import\u00e9s.',
       },
       {
         code: 'TRUCKONLINE_FLEET_SYNC',
@@ -621,6 +631,30 @@ function App() {
         label: 'Erreurs applicatives',
         retention: '365 jours cible',
         description: 'Exceptions serveur, indisponibilit\u00e9s PostgreSQL et erreurs critiques.',
+      },
+    ],
+    [],
+  )
+
+  const employeeReadinessItems = useMemo(
+    () => [
+      {
+        code: 'LUCCA_SOURCE',
+        label: 'Source unique Lucca',
+        status: '\u00c0 raccorder',
+        description: 'Le salari\u00e9 NewNexus doit provenir de Lucca, sans saisie locale concurrente.',
+      },
+      {
+        code: 'DRIVER_QUALIFICATION',
+        label: 'Distinction conducteurs',
+        status: '\u00c0 cadrer',
+        description: 'La qualification conducteur sera port\u00e9e dans le mod\u00e8le local apr\u00e8s import RH.',
+      },
+      {
+        code: 'ACCOUNT_PROVISIONING',
+        label: 'Cr\u00e9ation auto des comptes',
+        status: '\u00c0 cadrer',
+        description: 'Les comptes cr\u00e9\u00e9s depuis les salari\u00e9s devront d\u00e9marrer sans droit applicatif.',
       },
     ],
     [],
@@ -2697,7 +2731,7 @@ function App() {
               ) : null}
 
               <section className="admin-subnav" aria-label="Sous-menu paramètres">
-                {settingsSubmenuEntries.map((entry) => (
+                {settingsNavigationEntries.map((entry) => (
                   <button
                     key={entry}
                     className={`admin-subnav-link ${selectedSettingsSection === entry ? 'admin-subnav-link-active' : ''}`}
@@ -2711,7 +2745,7 @@ function App() {
 
               {selectedSettingsSection === 'Accueil' ? (
                 <div className="dashboard-actions">
-                  {settingsSubmenuEntries
+                  {settingsNavigationEntries
                     .filter((entry) => entry !== 'Accueil')
                     .map((entry) => (
                       <button
@@ -3064,6 +3098,36 @@ function App() {
                         </article>
                       ))
                     )}
+                  </div>
+                </section>
+                ) : null}
+
+                {selectedSettingsSection === employeeSettingsSection ? (
+                <section className="settings-list-section">
+                  <div className="settings-list-header">
+                    <h3>Salari&eacute;s</h3>
+                    <small>Source unique Lucca</small>
+                  </div>
+                  <p className="profiles-toolbar-copy">
+                    Premier cadrage du r&eacute;f&eacute;rentiel salari&eacute;s avant raccord Lucca. Aucun import r&eacute;el ni cr&eacute;ation de compte automatique n&apos;est encore activ&eacute;.
+                  </p>
+                  <div className="tools-catalog-grid">
+                    {employeeReadinessItems.map((item) => (
+                      <article className="tool-blueprint-card" key={item.code}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{item.code}</span>
+                            <h3>{item.label}</h3>
+                          </div>
+                          <span className="profile-status-badge is-inactive">{item.status}</span>
+                        </header>
+                        <p>{item.description}</p>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="trace-retention-strip">
+                    <strong>R&egrave;gle de s&eacute;curit&eacute;</strong>
+                    <span>Un compte issu d&apos;un salari&eacute; import&eacute; devra rester sans droit tant qu&apos;un profil NewNexus n&apos;est pas affect&eacute; explicitement.</span>
                   </div>
                 </section>
                 ) : null}
@@ -4215,12 +4279,14 @@ function getToolsSectionDescription(section: string) {
   }
 }
 
-function getSettingsSectionDescription(section: (typeof settingsSubmenuEntries)[number]) {
+function getSettingsSectionDescription(section: string) {
   switch (section) {
     case 'Sociétés':
       return 'Créer et maintenir les sociétés Groupe Laure.'
     case 'Analytiques':
       return 'Créer et maintenir les codes analytiques rattachés aux sociétés.'
+    case employeeSettingsSection:
+      return 'Pr\u00e9parer le r\u00e9f\u00e9rentiel salari\u00e9s Lucca, la qualification conducteur et la cr\u00e9ation de comptes sans droit.'
     case 'Exploitations':
       return 'Créer et maintenir les exploitations rattachées aux sociétés.'
     default:

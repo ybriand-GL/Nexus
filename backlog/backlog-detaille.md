@@ -93,15 +93,15 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Societes Groupe Laure | EN_COURS | Tables, endpoints create/update, UI create/update et recherche SIRENE par SIREN en place; enrichissement complet SIRENE a poursuivre |
 | Transverse | Analytiques | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place |
 | Transverse | Exploitations | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place |
-| Transverse | Salaries | CADRE | Source unique LUCCA |
-| Transverse | Distinction conducteurs | CADRE | A porter dans le modele local |
-| Transverse | Creation auto des comptes depuis salaries | CADRE | Compte sans droit a l'import |
+| Transverse | Salaries | SCAFFOLDE | Entree `Parametres > Salaries` preparee: source unique Lucca, aucun import reel active |
+| Transverse | Distinction conducteurs | SCAFFOLDE | Regle de qualification conducteur cadree dans l'ecran Salaries; modele local a developper |
+| Transverse | Creation auto des comptes depuis salaries | SCAFFOLDE | Regle cadree: compte cree depuis Lucca sans droit tant qu'un profil NewNexus n'est pas affecte |
 | Transverse | Tiers | CADRE | Multi-types, details a completer plus tard |
 | Transverse | Rattachement multi-analytiques des tiers | CADRE | Table de liaison prevue |
 | Transverse | Materiels | CADRE | Import, numero de parc unique |
 | Transverse | Parametrage des interfaces | EN_COURS | Table `IntegrationCredential`, UI Outils et import des cles Nexus legacy en place |
 | Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
-| Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
+| Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
 | Transverse | Requeteur SQL controle | SCAFFOLDE | Catalogue de requetes nommees prepare; execution SQL libre exclue, lecture seule et journalisation a developper avant activation |
 | Transverse | Consultation des traces | SCAFFOLDE | Flux Authentification, Actions administrateur, Integrations et Erreurs applicatives prepares; collecte, stockage et masquage des secrets a developper |
 | UX | Bandeaux titres applicatifs | TERMINE | Bloc lateral Session active retire visuellement et gabarit titre uniformise |
@@ -111,7 +111,7 @@ Derniere mise a jour: 2026-05-04
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Interfaces | SIRENE | EN_COURS | Creation societes active; client ID legacy importe dans les cles API |
-| Interfaces | LUCCA | EN_COURS | Parametres legacy importes; integration metier salaries a porter |
+| Interfaces | LUCCA | EN_COURS | Parametres legacy importes; ecran Salaries et tache provisioning comptes prepares, integration metier a developper |
 | Interfaces | Truckonline | EN_COURS | Parametres et secrets legacy importes; integration metier a porter |
 | Interfaces | YellowBox | EN_COURS | Parametres et secrets legacy importes; integration metier a porter |
 | Interfaces | Geocodage | EN_COURS | Emplacements Geoapify/Google disponibles dans Outils; aucune valeur legacy renseignee detectee |

@@ -119,6 +119,38 @@ if (!string.IsNullOrWhiteSpace(basePath))
     app.UsePathBase(basePath);
 }
 
+var databaseErrorLogger = app.Services.GetRequiredService<ILoggerFactory>()
+    .CreateLogger("NewNexus.Database");
+
+app.Use(async (httpContext, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception exception) when (IsDatabaseUnavailableException(exception))
+    {
+        databaseErrorLogger.LogError(exception, "PostgreSQL is unavailable for {Path}.", httpContext.Request.Path);
+
+        if (httpContext.Response.HasStarted)
+        {
+            throw;
+        }
+
+        httpContext.Response.Clear();
+        httpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        httpContext.Response.ContentType = "application/problem+json";
+        await httpContext.Response.WriteAsJsonAsync(new
+        {
+            Type = "https://httpstatuses.io/503",
+            Title = "Base de données inaccessible.",
+            Status = StatusCodes.Status503ServiceUnavailable,
+            Detail = "NewNexus ne peut pas joindre PostgreSQL pour le moment. Vérifiez que le service de base de données est démarré puis réessayez.",
+            Code = "DATABASE_UNAVAILABLE"
+        });
+    }
+});
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseCors("NewNexusFront");
@@ -1780,6 +1812,37 @@ static string? GetJsonString(JsonElement element, string propertyName)
     return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
         ? value.GetString()
         : null;
+}
+
+static bool IsDatabaseUnavailableException(Exception exception)
+{
+    IEnumerable<Exception> exceptions = exception is AggregateException aggregateException
+        ? aggregateException.Flatten().InnerExceptions
+        : new[] { exception };
+
+    foreach (var item in exceptions)
+    {
+        if (IsDatabaseUnavailableExceptionCore(item))
+        {
+            return true;
+        }
+
+        if (item.InnerException is not null && IsDatabaseUnavailableException(item.InnerException))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool IsDatabaseUnavailableExceptionCore(Exception exception)
+{
+    var typeName = exception.GetType().FullName ?? string.Empty;
+
+    return typeName == "Npgsql.NpgsqlException" ||
+        exception is InvalidOperationException &&
+        exception.Message.Contains("transient failure", StringComparison.OrdinalIgnoreCase);
 }
 
 static string? FirstNonEmpty(params string?[] values)

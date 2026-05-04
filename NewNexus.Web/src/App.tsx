@@ -581,7 +581,7 @@ function App() {
       }
 
       if (!meResponse.ok) {
-        throw new Error('Impossible de récupérer le compte connecté.')
+        throw new Error(await getRequestError(meResponse, 'Impossible de récupérer le compte connecté.'))
       }
 
       const user = (await meResponse.json()) as AuthenticatedUser
@@ -625,8 +625,11 @@ function App() {
       fetch(apiPath('api/settings/bootstrap')),
     ])
 
-    if (!modulesResponse.ok || !profilesResponse.ok || !accountsResponse.ok || !settingsResponse.ok) {
-      throw new Error('Impossible de charger l’administration de sécurité.')
+    const failedAdminResponse = [modulesResponse, profilesResponse, accountsResponse, settingsResponse].find(
+      (response) => !response.ok,
+    )
+    if (failedAdminResponse) {
+      throw new Error(await getRequestError(failedAdminResponse, 'Impossible de charger l’administration de sécurité.'))
     }
 
     const [modulesPayload, profilesPayload, accountsPayload, settingsPayload] = await Promise.all([
@@ -708,7 +711,7 @@ function App() {
       }
 
       if (!response.ok) {
-        throw new Error('La connexion a échoué.')
+        throw new Error(await getRequestError(response, 'La connexion a échoué.'))
       }
 
       const user = (await response.json()) as AuthenticatedUser
@@ -1076,7 +1079,7 @@ function App() {
       })
 
       if (!response.ok) {
-        throw new Error('La mise à jour du profil a échoué.')
+        throw new Error(await getRequestError(response, 'La mise à jour du profil a échoué.'))
       }
 
       await loadAdminSecurityData()
@@ -1180,7 +1183,7 @@ function App() {
       })
 
       if (!response.ok) {
-        throw new Error('La création du profil a échoué.')
+        throw new Error(await getRequestError(response, 'La création du profil a échoué.'))
       }
 
       await loadAdminSecurityData()

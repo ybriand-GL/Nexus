@@ -955,6 +955,12 @@ Ordre cible de construction:
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-D0NplWwd.css` et `index-BFn53tMu.js`
   - `dotnet ef database update` OK
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
@@ -1154,3 +1160,28 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-D0NplWwd.css` et `index-r48xBJTH.js`
+
+## 2026-05-04 - Ajouts backlog authentification et erreurs base
+
+- backlog securite:
+  - ajout du chantier `Connexion SSO reelle`
+  - ajout du chantier `Mot de passe oublie`
+- backlog technique:
+  - ajout du chantier `Message base de donnees inaccessible`
+- objectif:
+  - cadrer les prochains travaux d'authentification et remplacer les erreurs techniques par des messages utilisateur comprehensibles lorsque PostgreSQL est indisponible
+
+## 2026-05-04 - Message base PostgreSQL inaccessible
+
+- correction backend:
+  - ajout d'un middleware global de gestion des indisponibilites PostgreSQL
+  - retour API normalise en `503` avec `Code = DATABASE_UNAVAILABLE`
+  - journalisation serveur de l'erreur avec le chemin appele
+- correction frontend:
+  - lecture du message serveur sur `auth/me`, login et chargement administration
+  - conservation des messages de validation metier existants
+- backlog:
+  - passage du chantier `Message base de donnees inaccessible` en `TERMINE`
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK

@@ -61,9 +61,11 @@ Derniere mise a jour: 2026-05-04
 | Securite | Tables PostgreSQL securite | TERMINE | Migration `InitialSecuritySocle` generee |
 | Securite | Entites domaine securite | TERMINE | `SecurityModule`, `SecurityProfile`, `SecurityProfileModuleRight`, `UserAccount` crees |
 | Securite | Authentification applicative | TERMINE | Login/logout/me par cookie operationnels |
+| Securite | Connexion SSO reelle | A_FAIRE | Brancher le bouton SSO sur le fournisseur d'identite Groupe Laure, gerer le retour d'authentification et le rattachement au compte NewNexus |
 | Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
 | Securite | Gestion des profils | EN_COURS | Creation, edition et suppression backend en place, finalisation UI a poursuivre |
 | Securite | Gestion des comptes | EN_COURS | Lecture, creation, edition complete et changement de mot de passe utilisateur disponibles; recuperation mot de passe oublie a cadrer |
+| Securite | Mot de passe oublie | A_FAIRE | Prevoir le parcours de demande, generation de jeton temporaire, expiration, renouvellement et message utilisateur |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
 | Securite | Endpoints creation / edition comptes | TERMINE | `POST /api/security/accounts` et `PUT /api/security/accounts/{id}` exposes |
@@ -140,6 +142,7 @@ Derniere mise a jour: 2026-05-04
 | Technique | Premiere migration | TERMINE | `InitialSecuritySocle` generee |
 | Technique | Application migration sur base locale | TERMINE | Base `NewNexus` creee et migree localement |
 | Technique | Dashboard frontend branche a l'API socle | TERMINE | Lecture `system/info` et `security/bootstrap` |
+| Technique | Message base de donnees inaccessible | TERMINE | Middleware API `503 DATABASE_UNAVAILABLE` et affichage front du message serveur lorsque PostgreSQL est indisponible |
 | Technique | Script de publication IIS NewNexus | TERMINE | Script `publish_newnexus_iis.ps1` en place |
 | Technique | Migration authentification | TERMINE | `AuthenticationBootstrap` generee et appliquee |
 | Technique | Migration transverse Parametres | TERMINE | `TransverseSettingsSocle` generee et appliquee |

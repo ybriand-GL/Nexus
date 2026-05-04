@@ -85,6 +85,45 @@ type CompanyItem = {
   createdAtUtc: string
 }
 
+type SireneCompanyLookup = {
+  siren: string
+  siret: string | null
+  displayName: string | null
+  legalName: string | null
+  naf: string | null
+  source: string
+}
+
+type AdminDiagnostics = {
+  application: {
+    product: string
+    version: string
+    environment: string
+    basePath: string
+    serverTimeUtc: string
+  }
+  database: {
+    status: string
+    canConnect: boolean
+    provider: string | null
+  }
+  security: {
+    profileCount: number
+    accountCount: number
+  }
+  settings: {
+    companyCount: number
+    analyticCount: number
+    exploitationCount: number
+  }
+  integrations: {
+    sirene: {
+      status: string
+      provider: string
+    }
+  }
+}
+
 type AnalyticItem = {
   id: string
   code: string
@@ -156,6 +195,14 @@ type CompanyFormState = {
   error: string | null
 }
 
+type ChangePasswordState = {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+  isSaving: boolean
+  error: string | null
+}
+
 const navigationEntries = ['Accueil', 'Administration', 'Exploitation', 'Gestion administrative']
 const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
 const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
@@ -178,6 +225,7 @@ function App() {
   const [companies, setCompanies] = useState<CompanyItem[]>([])
   const [analytics, setAnalytics] = useState<AnalyticItem[]>([])
   const [exploitations, setExploitations] = useState<ExploitationItem[]>([])
+  const [adminDiagnostics, setAdminDiagnostics] = useState<AdminDiagnostics | null>(null)
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
   const [editableProfiles, setEditableProfiles] = useState<Record<string, EditableProfileState>>({})
   const [editableCompanies, setEditableCompanies] = useState<Record<string, CompanyFormState>>({})
@@ -194,8 +242,10 @@ function App() {
   const [newCompany, setNewCompany] = useState<CompanyFormState>(createEmptyCompanyForm())
   const [newAnalytic, setNewAnalytic] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
+  const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
+  const [isLookingUpNewCompany, setIsLookingUpNewCompany] = useState(false)
   const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false)
   const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false)
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
@@ -206,6 +256,7 @@ function App() {
   const [selectedSettingsSection, setSelectedSettingsSection] =
     useState<(typeof settingsSubmenuEntries)[number]>('Accueil')
   const [error, setError] = useState<string | null>(null)
+  const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -399,6 +450,12 @@ function App() {
     )
   }, [isInformatique, selectedNavigation])
 
+  useEffect(() => {
+    if (selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Outils') {
+      void loadAdminDiagnostics()
+    }
+  }, [isInformatique, selectedAdministrationSection, selectedNavigation])
+
   async function initialize() {
     setIsLoading(true)
     setError(null)
@@ -445,6 +502,7 @@ function App() {
     setCompanies([])
     setAnalytics([])
     setExploitations([])
+    setAdminDiagnostics(null)
     setEditableAccounts({})
     setEditableProfiles({})
     setEditableCompanies({})
@@ -481,6 +539,23 @@ function App() {
     setCompanies(settingsPayload.companies)
     setAnalytics(settingsPayload.analytics)
     setExploitations(settingsPayload.exploitations)
+  }
+
+  async function loadAdminDiagnostics() {
+    setDiagnosticsError(null)
+
+    try {
+      const response = await fetch(apiPath('api/admin/diagnostics'))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de charger les diagnostics.'))
+      }
+
+      setAdminDiagnostics((await response.json()) as AdminDiagnostics)
+    } catch (diagnosticsLoadError) {
+      setDiagnosticsError(
+        diagnosticsLoadError instanceof Error ? diagnosticsLoadError.message : 'Erreur de chargement des diagnostics.',
+      )
+    }
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -522,6 +597,48 @@ function App() {
     resetSessionState()
   }
 
+  async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setChangePassword((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/auth/change-password'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: changePassword.currentPassword,
+          newPassword: changePassword.newPassword,
+          confirmPassword: changePassword.confirmPassword,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Le changement de mot de passe a echoue.'))
+      }
+
+      const user = (await response.json()) as AuthenticatedUser
+      setChangePassword(createEmptyChangePasswordForm())
+      await hydrateAuthenticatedState(user)
+    } catch (submitError) {
+      setChangePassword((current) => ({
+        ...current,
+        isSaving: false,
+        error: submitError instanceof Error ? submitError.message : 'Erreur de changement de mot de passe.',
+      }))
+    }
+  }
+
+  function handleChangePasswordFieldChange(
+    field: 'currentPassword' | 'newPassword' | 'confirmPassword',
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    setChangePassword((current) => ({
+      ...current,
+      [field]: event.target.value,
+      error: null,
+    }))
+  }
+
   function resetSessionState() {
     setCurrentUser(null)
     setModules([])
@@ -535,6 +652,8 @@ function App() {
     setEditableCompanies({})
     setEditableAnalytics({})
     setEditableExploitations({})
+    setChangePassword(createEmptyChangePasswordForm())
+    setDiagnosticsError(null)
   }
 
   function updateEditableAccount(accountId: string, updater: (current: EditableAccountState) => EditableAccountState) {
@@ -881,6 +1000,43 @@ function App() {
       isActive: event.target.checked,
       error: null,
     }))
+  }
+
+  async function handleLookupNewCompanySirene() {
+    const siren = newCompany.siren.trim()
+    if (siren.length !== 9) {
+      setNewCompany((current) => ({ ...current, error: 'Saisissez un SIREN de 9 chiffres avant la recherche SIRENE.' }))
+      return
+    }
+
+    setIsLookingUpNewCompany(true)
+    setNewCompany((current) => ({ ...current, error: null }))
+
+    try {
+      const response = await fetch(apiPath(`api/settings/companies/sirene/${siren}`))
+      if (response.status === 404) {
+        throw new Error('Aucune société trouvée pour ce SIREN.')
+      }
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La recherche SIRENE a échoué.'))
+      }
+
+      const lookup = (await response.json()) as SireneCompanyLookup
+      setNewCompany((current) => ({
+        ...current,
+        displayName: lookup.displayName ?? current.displayName,
+        legalName: lookup.legalName ?? current.legalName,
+        error: null,
+      }))
+    } catch (lookupError) {
+      setNewCompany((current) => ({
+        ...current,
+        error: lookupError instanceof Error ? lookupError.message : 'Erreur de recherche SIRENE.',
+      }))
+    } finally {
+      setIsLookingUpNewCompany(false)
+    }
   }
 
   function handleEditableCompanyFieldChange(
@@ -1286,6 +1442,61 @@ function App() {
     return <PostLoginBrandTransition onComplete={handlePostAuthLoaderComplete} />
   }
 
+  if (currentUser.mustChangePassword) {
+    return (
+      <div className="auth-shell password-change-shell">
+        <section className="auth-card password-change-card">
+          <div className="auth-card-header">
+            <div className="auth-card-icon" aria-hidden="true" />
+            <span className="eyebrow">Sécurité du compte</span>
+          </div>
+          <h1>Changer votre mot de passe</h1>
+          <p>
+            Votre compte exige un nouveau mot de passe avant d’accéder aux modules NewNexus. Utilisez au moins 10 caractères.
+          </p>
+          <form className="auth-form" onSubmit={handleChangePassword}>
+            <label>
+              <span>Mot de passe actuel</span>
+              <input
+                autoComplete="current-password"
+                type="password"
+                value={changePassword.currentPassword}
+                onChange={(event) => handleChangePasswordFieldChange('currentPassword', event)}
+              />
+            </label>
+            <label>
+              <span>Nouveau mot de passe</span>
+              <input
+                autoComplete="new-password"
+                type="password"
+                value={changePassword.newPassword}
+                onChange={(event) => handleChangePasswordFieldChange('newPassword', event)}
+              />
+            </label>
+            <label>
+              <span>Confirmation</span>
+              <input
+                autoComplete="new-password"
+                type="password"
+                value={changePassword.confirmPassword}
+                onChange={(event) => handleChangePasswordFieldChange('confirmPassword', event)}
+              />
+            </label>
+
+            {changePassword.error ? <p className="form-error">{changePassword.error}</p> : null}
+
+            <button className="primary-button auth-submit-button" disabled={changePassword.isSaving} type="submit">
+              {changePassword.isSaving ? 'Enregistrement...' : 'Valider le nouveau mot de passe'}
+            </button>
+          </form>
+          <button className="ghost-button password-change-logout" onClick={handleLogout} type="button">
+            Se déconnecter
+          </button>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="nexus-app-shell">
       <aside className="nexus-sidebar">
@@ -1589,6 +1800,15 @@ function App() {
                 <h2>Vue d'ensemble des profils</h2>
               </div>
               <div className="profiles-overview-grid">
+                {profiles.length === 0 ? (
+                  <div className="workspace-empty">
+                    <strong>Aucun profil configuré</strong>
+                    <span>Créez un premier profil pour attribuer des droits aux comptes utilisateurs.</span>
+                    <button className="primary-button" onClick={openCreateProfileModal} type="button">
+                      Ajouter un profil
+                    </button>
+                  </div>
+                ) : null}
                 {profiles.map((profile) => {
                   const editableProfile = editableProfiles[profile.id]
                   if (!editableProfile) {
@@ -1664,6 +1884,15 @@ function App() {
                 </div>
               </div>
               <div className="profiles-overview-grid">
+                {accounts.length === 0 ? (
+                  <div className="workspace-empty">
+                    <strong>Aucun compte utilisateur</strong>
+                    <span>Ajoutez un compte pour donner accès à NewNexus et rattachez-le ensuite à un profil.</span>
+                    <button className="primary-button" onClick={openCreateAccountModal} type="button">
+                      Ajouter un compte
+                    </button>
+                  </div>
+                ) : null}
                 {accounts.map((account) => {
                   return (
                     <article key={account.id} className="profile-summary-card accent-navy">
@@ -1787,7 +2016,7 @@ function App() {
                 <section className="settings-list-section">
                   <div className="settings-list-header">
                     <h3>Sociétés Groupe Laure</h3>
-                    <small>Saisie contrôlée avant SIRENE</small>
+                    <small>Recherche SIRENE puis saisie contrôlée</small>
                   </div>
                   <form className="settings-form settings-create-form" onSubmit={handleCreateCompany}>
                     <label>
@@ -1800,6 +2029,14 @@ function App() {
                         onChange={(event) => handleNewCompanyFieldChange('siren', event)}
                       />
                     </label>
+                    <button
+                      className="secondary-button settings-lookup-button"
+                      disabled={isLookingUpNewCompany || newCompany.siren.length !== 9}
+                      onClick={() => void handleLookupNewCompanySirene()}
+                      type="button"
+                    >
+                      {isLookingUpNewCompany ? 'Recherche...' : 'Rechercher SIRENE'}
+                    </button>
                     <label>
                       <span>Nom affiché</span>
                       <input
@@ -2119,15 +2356,75 @@ function App() {
         ) : null}
         {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Outils' ? (
           <section className="workspace-grid">
-            <article className="panel-card panel-card-wide">
+            <article className="panel-card panel-card-wide admin-tools-card">
               <div className="panel-heading">
                 <span className="eyebrow">Outils</span>
-                <h2>Outils d’administration</h2>
+                <h2>Diagnostics d’administration</h2>
               </div>
-              <p>
-                Cette section accueillera les outils d’exploitation technique et de maintenance. Le contenu sera ajouté avec
-                le lot d’outillage.
+              <p className="profiles-toolbar-copy">
+                Vue de contrôle rapide pour vérifier l’application publiée, la base PostgreSQL et les premiers référentiels.
               </p>
+              <div className="administration-synthesis-actions">
+                <button className="secondary-button" onClick={() => void loadAdminDiagnostics()} type="button">
+                  Rafraîchir les diagnostics
+                </button>
+              </div>
+
+              {diagnosticsError ? (
+                <div className="status-banner status-banner-error">
+                  <strong>Diagnostics indisponibles</strong>
+                  <span>{diagnosticsError}</span>
+                </div>
+              ) : null}
+
+              {adminDiagnostics ? (
+                <>
+                  <div className="metrics-grid">
+                    <article className="metric-card metric-card-navy">
+                      <span className="metric-label">Application</span>
+                      <strong>{adminDiagnostics.application.product}</strong>
+                    </article>
+                    <article className="metric-card metric-card-purple">
+                      <span className="metric-label">Version</span>
+                      <strong>{adminDiagnostics.application.version}</strong>
+                    </article>
+                    <article className="metric-card metric-card-gold">
+                      <span className="metric-label">Base</span>
+                      <strong>{adminDiagnostics.database.canConnect ? 'Connectée' : 'Indisponible'}</strong>
+                    </article>
+                    <article className="metric-card metric-card-cyan">
+                      <span className="metric-label">SIRENE</span>
+                      <strong>{adminDiagnostics.integrations.sirene.status}</strong>
+                    </article>
+                  </div>
+                  <div className="admin-tools-grid">
+                    <article className="settings-row-card">
+                      <span className="eyebrow">Runtime</span>
+                      <strong>{adminDiagnostics.application.environment}</strong>
+                      <small>Base path: {adminDiagnostics.application.basePath}</small>
+                      <small>Serveur: {new Date(adminDiagnostics.application.serverTimeUtc).toLocaleString()}</small>
+                    </article>
+                    <article className="settings-row-card">
+                      <span className="eyebrow">PostgreSQL</span>
+                      <strong>{adminDiagnostics.database.status}</strong>
+                      <small>{adminDiagnostics.database.provider ?? 'Provider non renseigné'}</small>
+                    </article>
+                    <article className="settings-row-card">
+                      <span className="eyebrow">Sécurité</span>
+                      <strong>{adminDiagnostics.security.accountCount} compte(s)</strong>
+                      <small>{adminDiagnostics.security.profileCount} profil(s)</small>
+                    </article>
+                    <article className="settings-row-card">
+                      <span className="eyebrow">Paramètres</span>
+                      <strong>{adminDiagnostics.settings.companyCount} société(s)</strong>
+                      <small>{adminDiagnostics.settings.analyticCount} analytique(s)</small>
+                      <small>{adminDiagnostics.settings.exploitationCount} exploitation(s)</small>
+                    </article>
+                  </div>
+                </>
+              ) : (
+                <div className="settings-empty">Chargement des diagnostics...</div>
+              )}
             </article>
           </section>
         ) : null}
@@ -2152,6 +2449,12 @@ function App() {
               </div>
 
               <form className="account-form-card" onSubmit={handleCreateAccount}>
+                {profiles.length === 0 ? (
+                  <div className="status-banner status-banner-warning account-form-warning">
+                    <strong>Aucun profil disponible</strong>
+                    <span>Le compte pourra être créé, mais il restera sans droits tant qu’un profil actif ne lui sera pas rattaché.</span>
+                  </div>
+                ) : null}
                 <div className="account-form-grid">
                   <label>
                     <span>Login</span>
@@ -2512,6 +2815,16 @@ function createEmptyAccountForm(): EditableAccountState {
     profileId: '',
     isActive: true,
     mustChangePassword: true,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function createEmptyChangePasswordForm(): ChangePasswordState {
+  return {
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
     isSaving: false,
     error: null,
   }

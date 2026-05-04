@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -72,6 +73,12 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddNewNexusPostgres(builder.Configuration);
+builder.Services.AddHttpClient("Sirene", client =>
+{
+    client.BaseAddress = new Uri("https://recherche-entreprises.api.gouv.fr");
+    client.Timeout = TimeSpan.FromSeconds(8);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("NewNexus/0.1");
+});
 
 var app = builder.Build();
 
@@ -125,6 +132,66 @@ app.MapGet("/api/health", () => Results.Ok(new
     Status = "healthy",
     TimestampUtc = DateTime.UtcNow
 }));
+
+app.MapGet("/api/admin/diagnostics", async (NewNexusDbContext dbContext, HttpContext httpContext) =>
+{
+    var activeBasePath = httpContext.Request.PathBase.HasValue ? httpContext.Request.PathBase.Value : string.Empty;
+    var databaseStatus = "unreachable";
+    var canConnect = false;
+
+    try
+    {
+        canConnect = await dbContext.Database.CanConnectAsync();
+        databaseStatus = canConnect ? "ready" : "unreachable";
+    }
+    catch
+    {
+        databaseStatus = "error";
+    }
+
+    var profileCount = canConnect ? await dbContext.SecurityProfiles.CountAsync() : 0;
+    var accountCount = canConnect ? await dbContext.UserAccounts.CountAsync() : 0;
+    var companyCount = canConnect ? await dbContext.Companies.CountAsync() : 0;
+    var analyticCount = canConnect ? await dbContext.Analytics.CountAsync() : 0;
+    var exploitationCount = canConnect ? await dbContext.Exploitations.CountAsync() : 0;
+
+    return Results.Ok(new
+    {
+        Application = new
+        {
+            Product = "NewNexus",
+            Version = "0.1.0",
+            Environment = app.Environment.EnvironmentName,
+            BasePath = string.IsNullOrWhiteSpace(activeBasePath) ? "/" : activeBasePath,
+            ServerTimeUtc = DateTime.UtcNow
+        },
+        Database = new
+        {
+            Status = databaseStatus,
+            CanConnect = canConnect,
+            Provider = dbContext.Database.ProviderName
+        },
+        Security = new
+        {
+            ProfileCount = profileCount,
+            AccountCount = accountCount
+        },
+        Settings = new
+        {
+            CompanyCount = companyCount,
+            AnalyticCount = analyticCount,
+            ExploitationCount = exploitationCount
+        },
+        Integrations = new
+        {
+            Sirene = new
+            {
+                Status = "configured",
+                Provider = "API Recherche d'Entreprises"
+            }
+        }
+    });
+}).RequireAuthorization("RequireInformatique");
 
 app.MapPost("/api/auth/login", async (LoginRequest request, NewNexusDbContext dbContext, HttpContext httpContext) =>
 {
@@ -196,6 +263,41 @@ app.MapGet("/api/auth/me", async (NewNexusDbContext dbContext, ClaimsPrincipal p
 
     return account is null ? Results.Unauthorized() : Results.Ok(BuildAuthenticatedUser(account));
 });
+
+app.MapPost("/api/auth/change-password", async (
+    ChangePasswordRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    var userId = GetUserId(principal);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var account = await dbContext.UserAccounts
+        .Include(userAccount => userAccount.SecurityProfile!)
+            .ThenInclude(profile => profile.ModuleRights)
+                .ThenInclude(right => right.SecurityModule)
+        .SingleOrDefaultAsync(userAccount => userAccount.Id == userId.Value && userAccount.IsActive);
+
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var errors = ValidateChangePasswordRequest(request, account.PasswordHash);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    account.PasswordHash = PasswordHasher.HashPassword(request.NewPassword);
+    account.MustChangePassword = false;
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(BuildAuthenticatedUser(account));
+}).RequireAuthorization();
 
 app.MapGet("/api/security/modules", async (NewNexusDbContext dbContext) =>
 {
@@ -597,6 +699,59 @@ app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
         Companies = companies,
         Analytics = analytics,
         Exploitations = exploitations
+    });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapGet("/api/settings/companies/sirene/{siren}", async (string siren, IHttpClientFactory httpClientFactory) =>
+{
+    var normalizedSiren = new string(siren.Where(char.IsDigit).ToArray());
+    if (normalizedSiren.Length != 9)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["siren"] = ["Le SIREN doit contenir 9 chiffres."]
+        });
+    }
+
+    var client = httpClientFactory.CreateClient("Sirene");
+    using var response = await client.GetAsync($"/search?q={Uri.EscapeDataString(normalizedSiren)}&per_page=1");
+    if (!response.IsSuccessStatusCode)
+    {
+        return Results.Problem("La recherche SIRENE est indisponible.", statusCode: StatusCodes.Status502BadGateway);
+    }
+
+    await using var stream = await response.Content.ReadAsStreamAsync();
+    using var document = await JsonDocument.ParseAsync(stream);
+
+    if (!document.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+    {
+        return Results.NotFound();
+    }
+
+    var company = results.EnumerateArray()
+        .FirstOrDefault(result => string.Equals(GetJsonString(result, "siren"), normalizedSiren, StringComparison.OrdinalIgnoreCase));
+    if (company.ValueKind == JsonValueKind.Undefined)
+    {
+        return Results.NotFound();
+    }
+
+    var legalName = FirstNonEmpty(
+        GetJsonString(company, "nom_complet"),
+        GetJsonString(company, "nom_raison_sociale"),
+        GetJsonString(company, "denomination"));
+    var displayName = FirstNonEmpty(
+        GetJsonString(company, "nom_raison_sociale"),
+        GetJsonString(company, "nom_complet"),
+        GetJsonString(company, "denomination"));
+
+    return Results.Ok(new
+    {
+        Siren = normalizedSiren,
+        Siret = GetJsonString(company, "siret"),
+        DisplayName = displayName,
+        LegalName = legalName,
+        Naf = GetJsonString(company, "activite_principale"),
+        Source = "API Recherche d'Entreprises"
     });
 }).RequireAuthorization("RequireInformatique");
 
@@ -1012,6 +1167,48 @@ static async Task<Dictionary<string, string[]>> ValidateUpdateUserAccountRequest
     return errors;
 }
 
+static Dictionary<string, string[]> ValidateChangePasswordRequest(ChangePasswordRequest request, string passwordHash)
+{
+    var errors = new Dictionary<string, string[]>();
+
+    if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+    {
+        errors["currentPassword"] = ["Le mot de passe actuel est obligatoire."];
+    }
+    else if (!PasswordHasher.VerifyPassword(request.CurrentPassword, passwordHash))
+    {
+        errors["currentPassword"] = ["Le mot de passe actuel est incorrect."];
+    }
+
+    if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 10)
+    {
+        errors["newPassword"] = ["Le nouveau mot de passe doit contenir au moins 10 caracteres."];
+    }
+    else if (request.NewPassword == request.CurrentPassword)
+    {
+        errors["newPassword"] = ["Le nouveau mot de passe doit etre different du mot de passe actuel."];
+    }
+
+    if (request.ConfirmPassword != request.NewPassword)
+    {
+        errors["confirmPassword"] = ["La confirmation ne correspond pas au nouveau mot de passe."];
+    }
+
+    return errors;
+}
+
+static string? GetJsonString(JsonElement element, string propertyName)
+{
+    return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+        ? value.GetString()
+        : null;
+}
+
+static string? FirstNonEmpty(params string?[] values)
+{
+    return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
+}
+
 static async Task<Dictionary<string, string[]>> ValidateUserAccountCoreAsync(
     string login,
     string displayName,
@@ -1171,6 +1368,7 @@ static async Task<Dictionary<string, string[]>> ValidateExploitationRequestAsync
 }
 
 internal sealed record LoginRequest(string Login, string Password);
+internal sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
 internal sealed record UpdateAccountProfileRequest(Guid? SecurityProfileId);
 internal sealed record UpdateAccountStatusRequest(bool IsActive);
 internal sealed record CreateUserAccountRequest(

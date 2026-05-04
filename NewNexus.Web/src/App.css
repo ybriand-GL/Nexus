@@ -593,6 +593,22 @@
   margin: 0;
 }
 
+.workspace-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 22px;
+  border-radius: 24px;
+  border: 1px dashed rgba(11, 30, 117, 0.22);
+  background: linear-gradient(135deg, rgba(247, 249, 252, 0.96), rgba(255, 255, 255, 0.82));
+  color: var(--nexus-muted);
+}
+
+.workspace-empty strong {
+  color: var(--nexus-text);
+}
+
 .admin-subnav {
   display: flex;
   flex-wrap: wrap;
@@ -789,6 +805,10 @@
   border-radius: 22px;
   border: 1px solid var(--nexus-border);
   background: linear-gradient(180deg, rgba(247, 249, 252, 0.88), #fff);
+}
+
+.account-form-warning {
+  align-items: flex-start;
 }
 
 .account-form-grid {
@@ -1114,6 +1134,24 @@
   font-weight: 600;
 }
 
+.password-change-shell {
+  place-items: center;
+}
+
+.password-change-card {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.password-change-card p {
+  margin: 0;
+  color: var(--nexus-muted);
+  line-height: 1.7;
+}
+
+.password-change-logout {
+  justify-self: start;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1179,6 +1217,16 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.admin-tools-card {
+  gap: 20px;
+}
+
+.admin-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .settings-list,
@@ -1295,6 +1343,10 @@
   grid-column: 1 / -1;
 }
 
+.settings-lookup-button {
+  align-self: end;
+}
+
 .settings-reference-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: start;
@@ -1343,6 +1395,7 @@
   .settings-intro-grid,
   .settings-reference-grid,
   .settings-kpis,
+  .admin-tools-grid,
   .settings-form,
   .settings-edit-grid,
   .account-form-grid {

@@ -53,22 +53,22 @@ Derniere mise a jour: 2026-05-04
 | Securite | Authentification applicative | TERMINE | Login/logout/me par cookie operationnels |
 | Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
 | Securite | Gestion des profils | EN_COURS | Creation, edition et suppression backend en place, finalisation UI a poursuivre |
-| Securite | Gestion des comptes | EN_COURS | Lecture, creation et edition complete disponibles; changement de mot de passe utilisateur a finaliser cote parcours utilisateur |
+| Securite | Gestion des comptes | EN_COURS | Lecture, creation, edition complete et changement de mot de passe utilisateur disponibles; recuperation mot de passe oublie a cadrer |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
 | Securite | Endpoints creation / edition comptes | TERMINE | `POST /api/security/accounts` et `PUT /api/security/accounts/{id}` exposes |
-| Securite | Changement de mot de passe | A_DEVELOPPER | Necessaire pour sortir du bootstrap |
+| Securite | Changement de mot de passe | TERMINE | Endpoint utilisateur et ecran force `mustChangePassword` en place |
 | Securite | Controle d'autorisation backend | EN_COURS | Policy `RequireInformatique` en place sur les endpoints securite |
 | Securite | Protection frontend par droits | TERMINE | Navigation et dashboard filtres selon les droits reels |
 | Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
 | Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
-| Securite | Ecran administration des comptes | EN_COURS | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: liste de cartes, bouton `Configurer le compte`, creation via `Ajouter un compte` et modales de saisie corrigees |
+| Securite | Ecran administration des comptes | EN_COURS | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: cartes, configuration, creation, modales corrigees, etats vides et alerte sans profil |
 | Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
-| Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, creation via modale et edition directe depuis chaque carte en place |
-| Securite | Ecran administration des parametres | EN_COURS | Mini-accueil Parametres et entrees separees `Societes`, `Analytiques`, `Exploitations`; branchement SIRENE reel a faire |
-| Securite | Ecran administration des outils | CADRE | Sous-menu `Outils` pose, contenu a implementer |
+| Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, creation via modale, edition directe et etat vide en place |
+| Securite | Ecran administration des parametres | EN_COURS | Mini-accueil Parametres, entrees separees et recherche SIRENE par SIREN pour pre-remplir les societes |
+| Securite | Ecran administration des outils | EN_COURS | Diagnostics application, PostgreSQL, securite, parametres et SIRENE en place |
 | UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes; Administration et Parametres disposent maintenant d'accueils de choix |
 | UX | Accueil par profil | EN_COURS | Entree `Accueil` retablie comme page d'arrivee; personnalisation par profil a approfondir |
 | UX | Responsive tablette / smartphone / PC | A_PLANIFIER | Base responsive presente, passe de finition multi-format a planifier avant finalisation des modules |
@@ -78,7 +78,7 @@ Derniere mise a jour: 2026-05-04
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Transverse | Schema transverse V1 | TERMINE | Document redige |
-| Transverse | Societes Groupe Laure | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place; branchement SIRENE reel a faire |
+| Transverse | Societes Groupe Laure | EN_COURS | Tables, endpoints create/update, UI create/update et recherche SIRENE par SIREN en place; enrichissement complet SIRENE a poursuivre |
 | Transverse | Analytiques | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place |
 | Transverse | Exploitations | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place |
 | Transverse | Salaries | CADRE | Source unique LUCCA |
@@ -132,6 +132,7 @@ Derniere mise a jour: 2026-05-04
 | Technique | Migration authentification | TERMINE | `AuthenticationBootstrap` generee et appliquee |
 | Technique | Migration transverse Parametres | TERMINE | `TransverseSettingsSocle` generee et appliquee |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
+| Technique | Endpoint diagnostics administration | TERMINE | `GET /api/admin/diagnostics` publie pour le profil Informatique |
 
 ## 9. Hebergement et acces
 

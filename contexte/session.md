@@ -830,3 +830,94 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
   - `GET /newNexus/api/security/accounts` avec cookie de session retourne `200 application/json`
+
+## 2026-05-04 - Changement de mot de passe utilisateur
+
+- evolution backend:
+  - ajout de `POST /api/auth/change-password`
+  - validation du mot de passe actuel
+  - nouveau mot de passe de 10 caracteres minimum
+  - confirmation obligatoire du nouveau mot de passe
+  - remise a `false` de `MustChangePassword` apres changement valide
+- evolution frontend:
+  - ecran bloquant tant que le compte connecte a `mustChangePassword = true`
+  - formulaire mot de passe actuel / nouveau mot de passe / confirmation
+  - retour utilisateur sur les erreurs de validation
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
+  - `POST /newNexus/api/auth/change-password` avec mot de passe actuel invalide retourne `400`, validation backend active
+
+## 2026-05-04 - Ergonomie comptes et profils
+
+- evolution frontend:
+  - ajout d'un etat vide sur `Administration > Profils`
+  - ajout d'un etat vide sur `Administration > Comptes utilisateurs`
+  - ajout d'une alerte dans la modale `Ajouter un compte` lorsqu'aucun profil n'est disponible
+- cadrage:
+  - aucune action de suppression n'a ete ajoutee cote UI pendant cette passe
+  - les controles backend existants restent inchanges
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
+  - `GET /newNexus/api/security/accounts` avec cookie de session retourne `200 application/json`
+
+## 2026-05-04 - Recherche SIRENE societes
+
+- source officielle verifiee:
+  - API Recherche d'Entreprises ouverte sur data.gouv.fr
+  - limite annoncee: 7 appels / seconde
+  - donnees disponibles: denomination, SIREN, SIRET, NAF notamment
+- evolution backend:
+  - ajout du client HTTP `Sirene`
+  - ajout de `GET /api/settings/companies/sirene/{siren}`
+  - recherche par SIREN 9 chiffres via l'API Recherche d'Entreprises
+  - retour controle pour pre-remplir la societe: SIREN, SIRET, nom affiche, raison sociale, NAF, source
+- evolution frontend:
+  - bouton `Rechercher SIRENE` dans `Administration > Parametres > Societes`
+  - pre-remplissage du nom affiche et de la raison sociale
+  - conservation de la saisie controlee en secours
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
+  - `GET /newNexus/api/settings/companies/sirene/552100554` avec cookie de session retourne `200 application/json`
+
+## 2026-05-04 - Outils diagnostics administration
+
+- evolution backend:
+  - ajout de `GET /api/admin/diagnostics`
+  - endpoint protege par le profil `Informatique`
+  - expose application, base PostgreSQL, securite, parametres et integrations
+- evolution frontend:
+  - remplacement du placeholder `Administration > Outils`
+  - cartes de synthese diagnostics
+  - bouton de rafraichissement
+  - message d'erreur dedie si les diagnostics sont indisponibles
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
+- prochaine etape:
+  - publication IIS
+  - verification HTTP publiee
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
+  - `GET /newNexus/api/admin/diagnostics` avec cookie de session retourne `200 application/json`
+  - `GET /newNexus/api/security/accounts` avec cookie de session retourne `200 application/json`

@@ -1,0 +1,38 @@
+<svg viewBox="0 0 640 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="letter-grad-dark" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#2A2A2A"/>
+<stop offset="100%" stop-color="#666666"/>
+</linearGradient>
+<linearGradient id="gold-accent-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#FFF0C9"/>
+<stop offset="50%" stop-color="#D7A449"/>
+<stop offset="100%" stop-color="#F2D28A"/>
+</linearGradient>
+<filter id="glow-dark">
+<feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+<feMerge>
+<feMergeNode in="coloredBlur"/>
+<feMergeNode in="SourceGraphic"/>
+</feMerge>
+</filter>
+</defs>
+<g>
+<path d="M 20 30 L 20 90 L 35 90 L 35 55 L 75 90 L 90 90 L 90 30 L 75 30 L 75 65 L 35 30 Z" fill="url(#letter-grad-dark)" stroke="#D7A449" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="square"/>
+</g>
+<g>
+<path d="M 130 30 L 130 90 L 230 90 L 230 78 L 145 78 L 145 65 L 220 65 L 220 55 L 145 55 L 145 42 L 230 42 L 230 30 Z" fill="url(#letter-grad-dark)" stroke="#D7A449" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="square"/>
+<rect x="145" y="56" width="70" height="8" fill="url(#gold-accent-dark)" opacity="0.4"/>
+</g>
+<g>
+<path d="M 270 30 L 320 60 L 370 30 L 390 30 L 330 70 L 392 90 L 372 90 L 320 58 L 268 90 L 248 90 L 310 70 L 250 30 Z" fill="url(#letter-grad-dark)" stroke="#D7A449" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="square"/>
+<path d="M 280 38 L 325 62 L 370 38" stroke="url(#gold-accent-dark)" stroke-width="6" opacity="0.5" stroke-linecap="round"/>
+</g>
+<g>
+<path d="M 425 30 L 425 70 Q 425 85, 455 85 Q 485 85, 485 70 L 485 30 L 500 30 L 500 72 Q 500 95, 455 95 Q 410 95, 410 72 L 410 30 Z" fill="url(#letter-grad-dark)" stroke="#D7A449" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="square"/>
+</g>
+<g>
+<path d="M 620 42 Q 620 30, 575 30 Q 540 30, 540 45 Q 540 58, 575 60 L 595 62 Q 620 64, 620 78 Q 620 90, 575 90 Q 540 90, 540 78 L 555 78 Q 555 80, 575 80 Q 595 80, 595 75 Q 595 68, 575 67 L 555 65 Q 540 63, 540 48 Q 540 30, 575 30 Q 610 30, 620 42 Z" fill="url(#letter-grad-dark)" stroke="#D7A449" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="square"/>
+</g>
+<line x1="20" y1="95" x2="620" y2="95" stroke="#D7A449" stroke-width="0.5" opacity="0.3"/>
+</svg>

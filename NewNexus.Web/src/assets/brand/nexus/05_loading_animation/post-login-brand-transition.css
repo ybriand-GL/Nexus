@@ -71,7 +71,7 @@
   top: 40px;
   width: 460px;
   height: 280px;
-  background: radial-gradient(circle, rgba(94, 77, 255, 0.16), rgba(24, 188, 235, 0.04), transparent 72%);
+  background: radial-gradient(circle, rgba(247, 217, 138, 0.14), rgba(255, 240, 201, 0.05), transparent 72%);
 }
 
 .preview-grain {
@@ -174,7 +174,7 @@
 
 .preview-energy-purple {
   top: calc(50% - 16px);
-  background: linear-gradient(90deg, rgba(109, 74, 255, 0), rgba(109, 74, 255, 0.9), rgba(109, 74, 255, 0));
+  background: linear-gradient(90deg, rgba(215, 164, 73, 0), rgba(247, 217, 138, 0.86), rgba(215, 164, 73, 0));
   animation-delay: 0.08s;
 }
 
@@ -364,4 +364,41 @@
     opacity: 1 !important;
     transform: none !important;
   }
+}
+
+.brand-transition-screen {
+  background:
+    radial-gradient(circle at 26% 28%, rgba(215, 164, 73, .12), transparent 22%),
+    linear-gradient(135deg, #020306 0%, #060a12 45%, #020204 100%);
+}
+
+.preview-stage {
+  border-color: rgba(247, 217, 138, .18);
+  background:
+    radial-gradient(circle at 50% 16%, rgba(215, 164, 73, .12), transparent 24%),
+    radial-gradient(circle at 14% 78%, rgba(255, 240, 201, .08), transparent 24%),
+    linear-gradient(135deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
+  box-shadow: 0 34px 90px rgba(0, 0, 0, .38), inset 0 1px 0 rgba(255,255,255,.07);
+}
+
+.preview-aura-right {
+  background: radial-gradient(circle, rgba(247, 217, 138, .12), transparent 72%);
+}
+
+.preview-energy-gold,
+.preview-energy-purple,
+.preview-energy-cyan,
+.preview-energy-green {
+  background: linear-gradient(90deg, rgba(215, 164, 73, 0), rgba(247, 217, 138, .82), rgba(215, 164, 73, 0));
+}
+
+.preview-spark {
+  background: radial-gradient(circle, rgba(255, 255, 255, 1), rgba(247, 217, 138, .86) 38%, rgba(247, 217, 138, 0));
+  box-shadow: 0 0 28px rgba(215, 164, 73, .50);
+}
+
+.preview-nexus-icon {
+  background: rgba(5,6,10,.58);
+  border-color: rgba(247,217,138,.20);
+  box-shadow: 0 16px 28px rgba(0,0,0,.30), 0 0 30px rgba(215,164,73,.08);
 }

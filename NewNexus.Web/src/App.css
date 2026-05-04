@@ -11,9 +11,9 @@
   gap: 28px;
   padding: 32px;
   background:
-    radial-gradient(circle at 18% 18%, rgba(108, 61, 255, 0.1), transparent 22%),
-    radial-gradient(circle at 78% 72%, rgba(24, 188, 235, 0.1), transparent 26%),
-    linear-gradient(135deg, #ffffff 0%, #f7f9ff 100%);
+    radial-gradient(circle at 18% 18%, rgba(215, 164, 73, 0.12), transparent 22%),
+    radial-gradient(circle at 78% 72%, rgba(255, 240, 201, 0.08), transparent 26%),
+    linear-gradient(135deg, var(--nexus-bg-deep) 0%, var(--nexus-bg-night) 100%);
 }
 
 .auth-brand-panel,
@@ -43,9 +43,9 @@
   gap: 14px;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(247, 181, 0, 0.2), transparent 26%),
-    radial-gradient(circle at 80% 22%, rgba(24, 188, 235, 0.16), transparent 18%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
+    radial-gradient(circle at top left, rgba(215, 164, 73, 0.16), transparent 26%),
+    radial-gradient(circle at 80% 22%, rgba(255, 240, 201, 0.08), transparent 18%),
+    linear-gradient(135deg, rgba(10, 14, 22, 0.88), rgba(4, 6, 10, 0.96));
 }
 
 .auth-brand-halo {
@@ -54,7 +54,7 @@
   width: 440px;
   height: 440px;
   border-radius: 999px;
-  background: conic-gradient(from 230deg, rgba(247, 181, 0, 0.24), rgba(255, 138, 0, 0.24), rgba(108, 61, 255, 0.18), rgba(24, 188, 235, 0.16), rgba(36, 176, 90, 0.12), transparent);
+  background: conic-gradient(from 230deg, rgba(247, 217, 138, 0.22), rgba(215, 164, 73, 0.18), rgba(255, 240, 201, 0.10), transparent);
   filter: blur(56px);
   opacity: 0.95;
 }
@@ -197,8 +197,8 @@
 }
 
 .auth-form input:focus {
-  outline: 2px solid rgba(108, 61, 255, 0.18);
-  border-color: var(--nexus-purple);
+  outline: 2px solid rgba(215, 164, 73, 0.2);
+  border-color: var(--nexus-gold);
 }
 
 .primary-button,
@@ -212,10 +212,10 @@
 }
 
 .primary-button {
-  border: 0;
-  color: white;
-  background: linear-gradient(135deg, var(--nexus-navy), var(--nexus-purple));
-  box-shadow: 0 18px 32px rgba(79, 42, 239, 0.28);
+  border: 1px solid rgba(247,217,138,.45);
+  color: var(--nexus-text);
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.32);
 }
 
 .primary-button:disabled {
@@ -229,9 +229,9 @@
   padding: 18px 18px 18px 74px;
   border-radius: 22px;
   background:
-    radial-gradient(circle at 28px 50%, rgba(108, 61, 255, 0.12) 0 22px, transparent 23px),
-    linear-gradient(180deg, rgba(11, 30, 117, 0.04), rgba(11, 30, 117, 0.02));
-  border: 1px solid rgba(11, 30, 117, 0.08);
+    radial-gradient(circle at 28px 50%, rgba(215, 164, 73, 0.12) 0 22px, transparent 23px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--nexus-line);
   position: relative;
 }
 
@@ -241,7 +241,7 @@
   left: 24px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--nexus-purple);
+  color: var(--nexus-gold-soft);
   font-size: 1.2rem;
   font-weight: 700;
 }
@@ -279,7 +279,7 @@
   gap: 28px;
   background:
     radial-gradient(circle at 20% 10%, rgba(247, 181, 0, 0.24), transparent 24%),
-    radial-gradient(circle at 80% 18%, rgba(108, 61, 255, 0.22), transparent 22%),
+    radial-gradient(circle at 80% 18%, rgba(215, 164, 73, 0.16), transparent 22%),
     linear-gradient(180deg, #08185f 0%, var(--nexus-navy) 100%);
   color: white;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -438,13 +438,13 @@
 
 .primary-chip {
   color: white;
-  background: linear-gradient(135deg, var(--nexus-purple), #4f2aef);
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
 }
 
 .secondary-chip {
-  color: var(--nexus-purple);
-  background: white;
-  border: 1px solid rgba(108, 61, 255, 0.32);
+  color: var(--nexus-gold-soft);
+  background: rgba(247, 217, 138, 0.1);
+  border: 1px solid rgba(247, 217, 138, 0.28);
 }
 
 .hero-highlight {
@@ -584,7 +584,7 @@
 
 .dashboard-action-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(108, 61, 255, 0.3);
+  border-color: rgba(247, 217, 138, 0.3);
   box-shadow: 0 18px 36px rgba(11, 30, 117, 0.1);
 }
 
@@ -633,13 +633,13 @@
 
 .admin-subnav-link:hover {
   transform: translateY(-1px);
-  border-color: rgba(108, 61, 255, 0.28);
+  border-color: rgba(247, 217, 138, 0.28);
 }
 
 .admin-subnav-link-active {
-  border-color: rgba(108, 61, 255, 0.42);
-  color: var(--nexus-purple);
-  box-shadow: 0 16px 30px rgba(108, 61, 255, 0.12);
+  border-color: rgba(247, 217, 138, 0.42);
+  color: var(--nexus-gold-soft);
+  box-shadow: 0 16px 30px rgba(215, 164, 73, 0.16);
 }
 
 .panel-card {
@@ -886,7 +886,7 @@
     radial-gradient(circle at top left, rgba(247, 181, 0, 0.18), transparent 24%),
     radial-gradient(circle at 82% 20%, rgba(24, 188, 235, 0.14), transparent 18%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
-  border: 1px solid rgba(108, 61, 255, 0.12);
+  border: 1px solid rgba(247, 217, 138, 0.18);
   box-shadow: 0 20px 44px rgba(11, 30, 117, 0.08);
 }
 
@@ -917,9 +917,9 @@
   min-height: 38px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid rgba(108, 61, 255, 0.18);
-  background: rgba(108, 61, 255, 0.06);
-  color: var(--nexus-purple);
+  border: 1px solid rgba(247, 217, 138, 0.22);
+  background: rgba(247, 217, 138, 0.08);
+  color: var(--nexus-gold-soft);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -931,8 +931,8 @@
 
 .profile-link-chip:hover {
   transform: translateY(-1px);
-  border-color: rgba(108, 61, 255, 0.32);
-  background: rgba(108, 61, 255, 0.1);
+  border-color: rgba(247, 217, 138, 0.34);
+  background: rgba(247, 217, 138, 0.14);
 }
 
 .profiles-overview-grid {
@@ -1075,8 +1075,8 @@
 .profile-label-field input:focus,
 .rights-editor-row select:focus,
 .account-edit-cell select:focus {
-  outline: 2px solid rgba(108, 61, 255, 0.18);
-  border-color: var(--nexus-purple);
+  outline: 2px solid rgba(215, 164, 73, 0.2);
+  border-color: var(--nexus-gold);
 }
 
 .rights-editor-grid {
@@ -1109,16 +1109,16 @@
 .toggle-label input {
   width: 18px;
   height: 18px;
-  accent-color: var(--nexus-purple);
+  accent-color: var(--nexus-gold);
 }
 
 .secondary-button {
   min-height: 42px;
   padding: 0 14px;
   border-radius: 14px;
-  border: 1px solid rgba(108, 61, 255, 0.24);
-  background: rgba(108, 61, 255, 0.08);
-  color: var(--nexus-purple);
+  border: 1px solid rgba(247, 217, 138, 0.24);
+  background: rgba(247, 217, 138, 0.08);
+  color: var(--nexus-gold-soft);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -1392,9 +1392,9 @@
 .settings-create-form {
   padding: 16px;
   border-radius: 22px;
-  border: 1px solid rgba(108, 61, 255, 0.14);
+  border: 1px solid rgba(247, 217, 138, 0.18);
   background:
-    radial-gradient(circle at top right, rgba(108, 61, 255, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(215, 164, 73, 0.12), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 249, 252, 0.92));
 }
 
@@ -1428,8 +1428,8 @@
 .settings-form select:focus,
 .settings-edit-grid input:focus,
 .settings-edit-grid select:focus {
-  outline: 2px solid rgba(108, 61, 255, 0.18);
-  border-color: var(--nexus-purple);
+  outline: 2px solid rgba(215, 164, 73, 0.18);
+  border-color: var(--nexus-gold);
 }
 
 .settings-form .profile-action-row {
@@ -1620,7 +1620,7 @@
   display: block;
   height: 100%;
 }
-.auth-title-accent .accent-purple { width: 42%; background: #5e4dff; }
+.auth-title-accent .accent-purple { width: 42%; background: var(--nexus-gold); }
 .auth-title-accent .accent-gold { width: 29%; background: #ff9d14; }
 .auth-title-accent .accent-green { width: 29%; background: #10b95b; }
 .auth-brand-copy-reference {
@@ -1658,7 +1658,7 @@
   inset: auto auto -20% -14%;
   width: 720px;
   height: 520px;
-  background: radial-gradient(circle at 28% 30%, rgba(255, 177, 74, 0.36), rgba(108, 61, 255, 0.18) 36%, rgba(24, 188, 235, 0.12) 52%, transparent 74%);
+  background: radial-gradient(circle at 28% 30%, rgba(255, 177, 74, 0.34), rgba(247, 217, 138, 0.16) 36%, rgba(255, 240, 201, 0.1) 52%, transparent 74%);
   filter: blur(58px);
 }
 .auth-brand-panel-reference .auth-brand-curves {
@@ -1706,13 +1706,13 @@
   width: 58px;
   height: 58px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(94, 77, 255, 0.12), rgba(94, 77, 255, 0.06));
-  color: #5e4dff;
+  background: linear-gradient(180deg, rgba(247, 217, 138, 0.14), rgba(247, 217, 138, 0.06));
+  color: var(--nexus-gold-soft);
   font-size: 1.25rem;
-  box-shadow: inset 0 0 0 1px rgba(94, 77, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(247, 217, 138, 0.1);
 }
 .auth-card-reference .eyebrow {
-  color: #5247f5;
+  color: var(--nexus-gold-soft);
   font-size: 0.88rem;
   letter-spacing: 0.18em;
 }
@@ -1750,7 +1750,7 @@
   margin-top: -6px;
 }
 .auth-forgot-link {
-  color: #5a48ff;
+  color: var(--nexus-gold-soft);
   font-weight: 600;
   text-decoration: none;
 }
@@ -1761,8 +1761,8 @@
   min-height: 64px;
   border-radius: 18px;
   font-size: 1.05rem;
-  background: linear-gradient(90deg, #11268e 0%, #5e35ff 100%);
-  box-shadow: 0 26px 36px rgba(94, 53, 255, 0.2);
+  background: linear-gradient(90deg, #111827 0%, #8f6b27 100%);
+  box-shadow: 0 26px 36px rgba(215, 164, 73, 0.18);
 }
 .auth-trust-note-reference {
   grid-template-columns: auto 1fr;
@@ -1782,8 +1782,8 @@
   width: 48px;
   height: 48px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(94, 77, 255, 0.1), rgba(94, 77, 255, 0.04));
-  color: #5e4dff;
+  background: linear-gradient(180deg, rgba(247, 217, 138, 0.12), rgba(247, 217, 138, 0.05));
+  color: var(--nexus-gold-soft);
   font-size: 1.25rem;
 }
 .auth-trust-note-reference strong,
@@ -1827,5 +1827,451 @@
   }
   .auth-brand-panel-reference h1 {
     font-size: clamp(3.6rem, 14vw, 5.2rem);
+  }
+}
+
+/* Nexus dark identity layer: visual-only overrides, no business behavior changes. */
+.auth-shell,
+.nexus-app-shell {
+  background:
+    radial-gradient(circle at 24% 24%, rgba(215, 164, 73, .13), transparent 24%),
+    radial-gradient(circle at 76% 62%, rgba(255, 240, 201, .06), transparent 24%),
+    linear-gradient(135deg, var(--nexus-bg-deep) 0%, var(--nexus-bg-night) 56%, #020306 100%);
+  color: var(--nexus-text);
+  font-family: var(--nexus-font-body);
+}
+
+.auth-shell-reference {
+  position: relative;
+  grid-template-columns: minmax(0, 1.18fr) minmax(380px, 0.82fr);
+  gap: min(3.4vw, 40px);
+  padding: clamp(22px, 3vw, 42px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 26% 28%, rgba(215, 164, 73, .12), transparent 22%),
+    radial-gradient(circle at 48% 48%, rgba(255, 255, 255, .05), transparent 20%),
+    linear-gradient(135deg, #020306 0%, #060a12 45%, #020204 100%);
+}
+
+.auth-grain,
+.auth-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.auth-grain {
+  z-index: 0;
+  opacity: .04;
+  background-image:
+    linear-gradient(90deg, transparent 0 50%, rgba(255,255,255,.18) 50% 51%, transparent 51%),
+    linear-gradient(0deg, transparent 0 50%, rgba(255,255,255,.14) 50% 51%, transparent 51%);
+  background-size: 80px 80px;
+  mix-blend-mode: screen;
+}
+
+.auth-vignette {
+  z-index: 1;
+  background: radial-gradient(circle at center, transparent 22%, rgba(0,0,0,.20) 62%, rgba(0,0,0,.70) 100%);
+}
+
+.auth-shell-reference > section {
+  isolation: isolate;
+}
+
+.auth-brand-panel,
+.auth-card,
+.hero-card,
+.panel-card,
+.metric-card,
+.status-banner,
+.settings-empty,
+.settings-row-card,
+.settings-edit-card,
+.dashboard-action-card,
+.account-form-card,
+.account-edit-card,
+.profile-creation-card,
+.profile-editor-card,
+.profile-summary-card,
+.settings-create-form,
+.credential-card,
+.credential-form,
+.modal-card,
+.auth-trust-note {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025)),
+    radial-gradient(circle at 0% 0%, rgba(247,217,138,.055), transparent 36%);
+  border: 1px solid rgba(247,217,138,.18);
+  box-shadow: var(--nexus-shadow-card);
+  color: var(--nexus-text);
+}
+
+.auth-brand-panel-reference,
+.auth-card-reference {
+  position: relative;
+  z-index: 2;
+  min-height: min(760px, 88vh);
+  border-radius: 32px;
+  backdrop-filter: blur(16px);
+}
+
+.auth-brand-panel-reference {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 22px;
+  padding: clamp(28px, 4vw, 56px);
+  text-align: center;
+  overflow: hidden;
+}
+
+.auth-brand-panel-reference .auth-brand-halo {
+  inset: 8% -6%;
+  width: auto;
+  height: auto;
+  background:
+    radial-gradient(ellipse at 24% 50%, rgba(215,164,73,.15), transparent 24%),
+    radial-gradient(ellipse at 50% 48%, rgba(255,255,255,.06), transparent 16%),
+    radial-gradient(ellipse at 72% 54%, rgba(247,217,138,.08), transparent 20%);
+  filter: blur(42px);
+  opacity: 1;
+}
+
+.auth-brand-ribbons {
+  position: absolute;
+  inset: 0 -20% 0 -10%;
+  opacity: .58;
+  pointer-events: none;
+}
+
+.auth-brand-ribbons span {
+  position: absolute;
+  left: -8%;
+  width: 116%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(247,217,138,.72), rgba(255,255,255,.56), transparent);
+  box-shadow: 0 0 18px rgba(215,164,73,.10);
+  transform: rotate(-13deg);
+}
+
+.auth-brand-ribbons span:nth-child(1) { top: 42%; }
+.auth-brand-ribbons span:nth-child(2) { top: 52%; opacity: .72; }
+.auth-brand-ribbons span:nth-child(3) { top: 62%; opacity: .44; }
+
+.auth-brand-lockup-reference {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 132px minmax(260px, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: 24px;
+  width: min(820px, 100%);
+}
+
+.auth-brand-lockup-reference .auth-nexus-favicon {
+  width: 132px;
+  height: 132px;
+  padding: 9px;
+  border-radius: 26px;
+  background: rgba(5,6,10,.58);
+  border: 1px solid rgba(247,217,138,.20);
+  box-shadow: 0 16px 28px rgba(0,0,0,.30), 0 0 30px rgba(215,164,73,.08);
+}
+
+.auth-brand-lockup-reference .auth-nexus-logo {
+  width: min(100%, 560px);
+  filter: drop-shadow(0 16px 24px rgba(0,0,0,.24));
+}
+
+.auth-brand-panel-reference h1 {
+  position: relative;
+  z-index: 1;
+  max-width: 11ch;
+  margin: 0;
+  font-size: clamp(3.2rem, 6vw, 6rem);
+  line-height: .92;
+  letter-spacing: -.065em;
+  color: var(--nexus-text);
+}
+
+.auth-brand-copy-reference {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.auth-brand-copy-reference p:first-child,
+.auth-brand-copy-reference p:last-child,
+.auth-card p,
+.brand-copy,
+.hero-copy p,
+.group-card span,
+.profile-card p,
+.status-banner span,
+.settings-row-card small,
+.settings-edit-card small,
+.accounts-table-row small,
+.credential-card small,
+.settings-note,
+.profiles-toolbar-copy {
+  color: var(--nexus-text-muted);
+}
+
+.auth-card-reference {
+  align-content: start;
+  gap: 22px;
+  margin-block: 24px;
+  padding: clamp(28px, 3vw, 38px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025)),
+    radial-gradient(circle at 0% 50%, rgba(247,217,138,.06), transparent 36%);
+}
+
+.auth-card-reference h2 {
+  margin: 0;
+  font-size: clamp(2.1rem, 3vw, 3.25rem);
+  letter-spacing: -.03em;
+  color: var(--nexus-text);
+}
+
+.auth-card-icon-image {
+  width: 42px;
+  height: 42px;
+}
+
+.sso-primary-button {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(247,217,138,.45);
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+  color: var(--nexus-text);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 740;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 16px 28px rgba(0,0,0,.28);
+  overflow: hidden;
+}
+
+.sso-primary-button:hover,
+.sso-primary-button:focus-visible,
+.primary-button:hover,
+.secondary-button:hover {
+  border-color: rgba(247,217,138,.62);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 0 30px rgba(215,164,73,.14), 0 18px 30px rgba(0,0,0,.30);
+}
+
+.sso-primary-button img {
+  width: 44px;
+  height: 44px;
+}
+
+.auth-sso-help,
+.auth-exception-help {
+  margin: -8px 0 0;
+  font-size: .92rem;
+  line-height: 1.6;
+}
+
+.auth-exception-separator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--nexus-gold-soft);
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.auth-exception-separator::before,
+.auth-exception-separator::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(247,217,138,.28), transparent);
+}
+
+.auth-form input,
+.account-form-grid input:not([type='checkbox']),
+.account-form-grid select,
+.profile-form-grid input,
+.profile-label-field input,
+.rights-editor-row select,
+.account-edit-cell select,
+.settings-form input,
+.settings-form select,
+.settings-edit-grid input,
+.settings-edit-grid select,
+.credential-form input,
+.credential-form select,
+.credential-form textarea {
+  background: rgba(0,0,0,.20);
+  border: 1px solid rgba(255,255,255,.10);
+  color: var(--nexus-text);
+  box-shadow: none;
+}
+
+.auth-form input:focus,
+.account-form-grid input:focus,
+.account-form-grid select:focus,
+.profile-form-grid input:focus,
+.profile-label-field input:focus,
+.rights-editor-row select:focus,
+.account-edit-cell select:focus,
+.settings-form input:focus,
+.settings-form select:focus,
+.settings-edit-grid input:focus,
+.settings-edit-grid select:focus,
+.credential-form input:focus,
+.credential-form select:focus,
+.credential-form textarea:focus {
+  outline: 2px solid rgba(215,164,73,.18);
+  border-color: rgba(247,217,138,.48);
+  box-shadow: 0 0 0 3px rgba(215,164,73,.12);
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button {
+  border: 1px solid rgba(247,217,138,.28);
+  background: rgba(0,0,0,.18);
+  color: var(--nexus-text-soft);
+  box-shadow: 0 12px 24px rgba(0,0,0,.22);
+}
+
+.primary-button {
+  border-color: rgba(247,217,138,.45);
+  color: var(--nexus-text);
+}
+
+.auth-submit-button {
+  background: rgba(0,0,0,.18);
+  box-shadow: 0 16px 28px rgba(0,0,0,.28);
+}
+
+.auth-forgot-link,
+.form-error,
+.account-error {
+  color: #ffcc8a;
+}
+
+.nexus-sidebar {
+  background:
+    radial-gradient(circle at 24% 12%, rgba(215,164,73,.20), transparent 24%),
+    linear-gradient(180deg, rgba(9,13,21,.98), #030407 100%);
+  border-right: 1px solid rgba(247,217,138,.16);
+}
+
+.sidebar-link,
+.sidebar-status {
+  background: rgba(255,255,255,.045);
+  border-color: var(--nexus-line);
+}
+
+.sidebar-link-active,
+.sidebar-link:hover {
+  border-color: rgba(247,217,138,.44);
+  background: rgba(247,217,138,.10);
+}
+
+.hero-card,
+.administration-synthesis-card {
+  background:
+    radial-gradient(circle at top left, rgba(215,164,73,.12), transparent 24%),
+    linear-gradient(135deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
+}
+
+.primary-chip,
+.secondary-chip,
+.profile-link-chip,
+.profile-badge,
+.profile-status-badge,
+.credential-value {
+  border: 1px solid rgba(247,217,138,.22);
+  background: rgba(0,0,0,.20);
+  color: var(--nexus-gold-soft);
+}
+
+.dashboard-action-card:hover,
+.admin-subnav-link:hover,
+.admin-subnav-link-active {
+  border-color: rgba(247,217,138,.36);
+  color: var(--nexus-gold-soft);
+  box-shadow: 0 16px 30px rgba(0,0,0,.22);
+}
+
+.accounts-table-head {
+  background: rgba(255,255,255,.055);
+  color: var(--nexus-gold-soft);
+}
+
+.accounts-table-row {
+  background: rgba(255,255,255,.025);
+}
+
+.accounts-table-row:hover {
+  background: rgba(255,255,255,.055);
+}
+
+.toggle-label input {
+  accent-color: var(--nexus-gold);
+}
+
+.metric-card-navy,
+.metric-card-purple,
+.metric-card-gold,
+.metric-card-cyan,
+.accent-navy,
+.accent-purple,
+.accent-cyan,
+.accent-green,
+.accent-orange {
+  border-color: var(--nexus-gold);
+}
+
+.auth-title-accent .accent-purple,
+.auth-title-accent .accent-gold,
+.auth-title-accent .accent-green {
+  background: var(--nexus-gold);
+}
+
+.auth-trust-note-reference::before {
+  background: rgba(215,164,73,.12);
+  color: var(--nexus-gold-soft);
+}
+
+.modal-overlay {
+  background: rgba(0,0,0,.68);
+  backdrop-filter: blur(8px);
+}
+
+@media (max-width: 1180px) {
+  .auth-shell-reference {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 940px) {
+  .auth-brand-lockup-reference {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .auth-brand-lockup-reference .auth-nexus-logo {
+    width: min(100%, 360px);
   }
 }

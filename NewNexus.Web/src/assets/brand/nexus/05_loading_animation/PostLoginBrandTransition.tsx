@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import './post-login-brand-transition.css'
+import nexusIcon from '../../nexus-icon.svg'
+import nexusWordmark from '../../nexus-wordmark.svg'
 
 type PostLoginBrandTransitionProps = {
   onComplete?: () => void
@@ -44,8 +46,8 @@ export function PostLoginBrandTransition({
             </div>
 
             <div className="preview-nexus-wrap">
-              <img className="preview-nexus-icon" src="./nexus-favicon.png" alt="Icône Nexus" />
-              <img className="preview-nexus-logo" src="./nexus-logo-complet.png" alt="Nexus" />
+              <img className="preview-nexus-icon" src={nexusIcon} alt="Icone Nexus" />
+              <img className="preview-nexus-logo" src={nexusWordmark} alt="Nexus" />
             </div>
           </div>
 

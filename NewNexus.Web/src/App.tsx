@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
+import nexusIcon from './assets/brand/nexus-icon.svg'
+import nexusWordmark from './assets/brand/nexus-wordmark.svg'
 
 type SystemInfo = {
   product: string
@@ -1532,37 +1534,58 @@ function App() {
   if (!currentUser) {
     return (
       <div className="auth-shell auth-shell-reference">
+        <div className="auth-grain" aria-hidden="true" />
+        <div className="auth-vignette" aria-hidden="true" />
         <section className="auth-brand-panel auth-brand-panel-reference">
           <div className="auth-brand-halo" aria-hidden="true" />
-          <div className="auth-brand-curves" aria-hidden="true" />
+          <div className="auth-brand-ribbons" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
           <div className="auth-brand-particles" aria-hidden="true" />
-          <div className="auth-brand-lockup auth-brand-lockup-reference">
-            <img className="auth-groupe-laure-logo" src="./groupe-laure-logo-complet.jpg" alt="Groupe Laure" />
-            <div className="auth-brand-divider" aria-hidden="true">&times;</div>
-            <div className="auth-nexus-brand auth-nexus-brand-reference">
-              <img className="auth-nexus-favicon" src="./nexus-favicon.png" alt="Nexus" />
-              <img className="auth-nexus-logo" src="./nexus-logo-complet.png" alt="Nexus" />
-            </div>
+          <div className="auth-brand-lockup auth-brand-lockup-reference" aria-label="Nexus">
+            <img className="auth-nexus-favicon" src={nexusIcon} alt="" aria-hidden="true" />
+            <img className="auth-nexus-logo" src={nexusWordmark} alt="Nexus" />
           </div>
-          <h1>Connexion s&eacute;curis&eacute;e</h1>
-          <div className="auth-title-accent" aria-hidden="true">
-            <span className="accent-purple" />
-            <span className="accent-gold" />
-            <span className="accent-green" />
-          </div>
+          <span className="eyebrow">Groupe Laure</span>
+          <h1>Syst&egrave;me d'information modulaire</h1>
           <div className="auth-brand-copy auth-brand-copy-reference">
-            <p>Plateforme interne du Groupe Laure.</p>
-            <p>Le syst&egrave;me d'information modulaire du Groupe Laure.</p>
+            <p>Un acc&egrave;s institutionnel, sobre et s&eacute;curis&eacute; aux modules Nexus.</p>
+            <p>Connexion recommand&eacute;e avec le compte entreprise Groupe Laure.</p>
           </div>
         </section>
 
         <section className="auth-card auth-card-reference">
           <div className="auth-card-header">
-            <div className="auth-card-icon" aria-hidden="true" />
+            <img className="auth-card-icon-image" src={nexusIcon} alt="" aria-hidden="true" />
             <span className="eyebrow">ACC&Egrave;S INTERNE</span>
           </div>
-          <h2>Ouvrir une session</h2>
+          <h2>Ouvrir une session Nexus</h2>
+          <button
+            aria-describedby="sso-help"
+            className="sso-primary-button"
+            onClick={() =>
+              setLoginError(
+                'Le SSO entreprise Groupe Laure n est pas encore raccorde dans ce socle. Utilisez l acces exceptionnel si necessaire.',
+              )
+            }
+            type="button"
+          >
+            <img src={nexusIcon} alt="" aria-hidden="true" />
+            <span>Se connecter avec le compte entreprise Groupe Laure</span>
+          </button>
+          <p className="auth-sso-help" id="sso-help">
+            Le SSO est l'acc&egrave;s standard pour les collaborateurs Groupe Laure.
+          </p>
+
+          <div className="auth-exception-separator">
+            <span>Acc&egrave;s exceptionnel</span>
+          </div>
           <form className="auth-form" onSubmit={handleLogin}>
+            <p className="auth-exception-help">
+              Login et mot de passe sont r&eacute;serv&eacute;s aux comptes techniques, externes, hors SSO ou au mode secours.
+            </p>
             <label>
               <span>Login</span>
               <input
@@ -1594,7 +1617,7 @@ function App() {
             {loginError ? <p className="form-error">{loginError}</p> : null}
             {error ? <p className="form-error">{error}</p> : null}
 
-            <button className="primary-button auth-submit-button" disabled={isSubmitting} type="submit">
+            <button className="secondary-button auth-submit-button" disabled={isSubmitting} type="submit">
               {isSubmitting ? 'Connexion...' : 'Se connecter'}
             </button>
           </form>
@@ -1670,8 +1693,8 @@ function App() {
     <div className="nexus-app-shell">
       <aside className="nexus-sidebar">
         <div className="brand-panel">
-          <img className="brand-icon" src="./nexus-app-icon.svg" alt="NewNexus" />
-          <img className="brand-wordmark" src="./nexus-wordmark-simplified.png" alt="Nexus" />
+          <img className="brand-icon" src={nexusIcon} alt="NewNexus" />
+          <img className="brand-wordmark" src={nexusWordmark} alt="Nexus" />
           <p className="brand-copy">
             Socle premium NewNexus, conçu pour une lecture métier simple sous <code>/newNexus</code>.
           </p>

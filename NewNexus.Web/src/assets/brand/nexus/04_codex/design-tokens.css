@@ -1,27 +1,27 @@
 :root {
-  --nexus-navy: #0B1E75;
-  --nexus-gold: #F7B500;
-  --nexus-orange: #FF8A00;
-  --nexus-purple: #6C3DFF;
-  --nexus-cyan: #18BCEB;
-  --nexus-green: #24B05A;
+  --nexus-navy: #090D15;
+  --nexus-gold: #D7A449;
+  --nexus-orange: #B87A37;
+  --nexus-purple: #D7A449;
+  --nexus-cyan: #F2D28A;
+  --nexus-green: #7F8F78;
 
-  --nexus-bg: #F7F9FC;
-  --nexus-surface: #FFFFFF;
-  --nexus-border: #E5EAF3;
-  --nexus-text: #0B1E75;
-  --nexus-muted: #62708A;
+  --nexus-bg: #04060A;
+  --nexus-surface: rgba(10, 14, 22, .72);
+  --nexus-border: rgba(255, 255, 255, .10);
+  --nexus-text: #F3F5F7;
+  --nexus-muted: rgba(255, 255, 255, .68);
 
-  --nexus-radius-sm: 8px;
-  --nexus-radius-md: 12px;
-  --nexus-radius-lg: 16px;
-  --nexus-radius-xl: 24px;
+  --nexus-radius-sm: 12px;
+  --nexus-radius-md: 18px;
+  --nexus-radius-lg: 24px;
+  --nexus-radius-xl: 32px;
 
-  --nexus-shadow-card: 0 10px 30px rgba(11, 30, 117, 0.08);
-  --nexus-shadow-icon: 0 14px 35px rgba(11, 30, 117, 0.16);
+  --nexus-shadow-card: 0 28px 60px rgba(0, 0, 0, .36), inset 0 1px 0 rgba(255,255,255,.07);
+  --nexus-shadow-icon: 0 18px 34px rgba(0, 0, 0, .38);
 
-  --nexus-font-heading: "Sora", "Inter", system-ui, sans-serif;
-  --nexus-font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --nexus-font-heading: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --nexus-font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .nexus-app {
@@ -36,31 +36,31 @@
 }
 
 .nexus-card {
-  background: var(--nexus-surface);
+  background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
   border: 1px solid var(--nexus-border);
   border-radius: var(--nexus-radius-lg);
   box-shadow: var(--nexus-shadow-card);
 }
 
 .nexus-button-primary {
-  background: linear-gradient(135deg, var(--nexus-purple), #4F2AEF);
-  color: white;
-  border: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+  color: var(--nexus-text);
+  border: 1px solid rgba(247, 217, 138, .45);
   border-radius: var(--nexus-radius-md);
   padding: 0.75rem 1rem;
   font-weight: 700;
 }
 
 .nexus-button-secondary {
-  background: white;
-  color: var(--nexus-purple);
-  border: 1px solid var(--nexus-purple);
+  background: rgba(0,0,0,.18);
+  color: rgba(255, 255, 255, .84);
+  border: 1px solid var(--nexus-border);
   border-radius: var(--nexus-radius-md);
   padding: 0.75rem 1rem;
   font-weight: 700;
 }
 
-.nexus-badge-success { background: #E8F7EE; color: #127A3A; }
-.nexus-badge-info { background: #E7F8FE; color: #057DA6; }
-.nexus-badge-warning { background: #FFF3E0; color: #C65A00; }
-.nexus-badge-purple { background: #EEE9FF; color: var(--nexus-purple); }
+.nexus-badge-success { background: rgba(127, 143, 120, .16); color: #C7D2BF; }
+.nexus-badge-info { background: rgba(247, 217, 138, .12); color: #F2D28A; }
+.nexus-badge-warning { background: rgba(184, 122, 55, .16); color: #F2D28A; }
+.nexus-badge-purple { background: rgba(247, 217, 138, .12); color: var(--nexus-gold-soft); }

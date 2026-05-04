@@ -33,12 +33,13 @@ Derniere mise a jour: 2026-05-04
 | UX | Wireframes V1 | TERMINE | Document redige |
 | UX | Dashboard par profil | EN_COURS | Remplace progressivement par des vues de travail par entree, personnalisation a poursuivre |
 | UX | Coque frontend premium initiale | TERMINE | Shell Nexus 4C integre et branche au socle |
-| UX | Integration identite visuelle Nexus | TERMINE | Assets, palette, typo et favicon appliques |
+| UX | Integration identite visuelle Nexus | TERMINE | Assets officiels SVG, palette graphite/champagne et tokens centralises appliques depuis le prompt Nexus |
 | UX | Qualite accents et libelles UTF-8 | EN_COURS | Vigilance explicite, handoff de marque et ecrans critiques verifies |
-| UX | Tokens officiels du handoff | TERMINE | `design-tokens.css` et `design-tokens.json` integres au frontend |
+| UX | Tokens officiels du handoff | TERMINE | `nexus-theme.css`, `design-tokens.css` et `design-tokens.json` alignes sur l'identite Nexus sombre |
 | UX | Animation post-authentification | TERMINE | Transition `Groupe Laure × Nexus` integree, affichage unique après login |
 | UX | Favicon et identite navigateur | TERMINE | Icônes 16/32/180/192/512 et manifest publies |
 | UX | Page d'authentification premium | EN_COURS | Lockup Groupe Laure × Nexus intégré, finitions à confirmer |
+| UX | Authentification SSO visuelle | EN_COURS | Bouton SSO entreprise Groupe Laure place en action principale; raccord technique SSO reel a cadrer sans modifier la logique existante |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
 | UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |
 

@@ -958,3 +958,27 @@ Ordre cible de construction:
   - `POST /newNexus/api/admin/integrations/credentials/import-nexus` sans session retourne `401`
 - limite de validation:
   - le compte `admin` n'accepte plus les mots de passe documentes `NewNexus!2026` et `legri00`; aucun reset de mot de passe utilisateur n'a ete effectue
+
+## 2026-05-04 - Application prompt identite visuelle Nexus officielle
+
+- source appliquee:
+  - lecture de `C:\Dev\NewNexus\identite visuelle\Nexus\PROMPT_CODEX_NEXUS.md`
+  - prise en compte de la reference `reference/auth_reference_nexus_sso.html`
+  - reprise des assets officiels `nexus-icon.svg` et `nexus-wordmark.svg`
+- evolution frontend:
+  - ajout des assets officiels dans `NewNexus.Web/src/assets/brand`
+  - ajout de `NewNexus.Web/src/styles/nexus-theme.css` pour centraliser les tokens graphite, noir et champagne
+  - page de connexion alignee sur l'identite premium sombre Nexus
+  - SSO entreprise Groupe Laure mis en avant comme action principale visuelle
+  - formulaire login/mot de passe conserve en acces exceptionnel sans modification de logique metier
+  - sidebar et transition post-authentification raccordees aux SVG officiels
+  - nettoyage des anciennes valeurs violettes explicites dans les styles sources concernes
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK apres relance hors sandbox de la CLI .NET
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - `GET /newNexus/api/auth/me` sans session retourne `401`

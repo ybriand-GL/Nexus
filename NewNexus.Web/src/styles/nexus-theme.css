@@ -1,0 +1,34 @@
+:root {
+  --nexus-bg-deep: #04060A;
+  --nexus-bg-night: #090D15;
+  --nexus-bg-card: rgba(10, 14, 22, .72);
+  --nexus-bg-card-soft: rgba(10, 14, 22, .52);
+  --nexus-line: rgba(255, 255, 255, .10);
+  --nexus-line-soft: rgba(255, 255, 255, .07);
+  --nexus-line-gold: rgba(247, 217, 138, .24);
+  --nexus-gold: #D7A449;
+  --nexus-gold-soft: #F2D28A;
+  --nexus-ivory: #FFF0C9;
+  --nexus-text: #F3F5F7;
+  --nexus-text-soft: rgba(255, 255, 255, .84);
+  --nexus-text-muted: rgba(255, 255, 255, .68);
+  --nexus-shadow: rgba(0, 0, 0, .48);
+  --nexus-radius-sm: 12px;
+  --nexus-radius-md: 18px;
+  --nexus-radius-lg: 24px;
+  --nexus-radius-xl: 32px;
+  --nexus-font-heading: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --nexus-font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --nexus-navy: var(--nexus-bg-night);
+  --nexus-purple: var(--nexus-gold);
+  --nexus-cyan: var(--nexus-gold-soft);
+  --nexus-green: #7F8F78;
+  --nexus-orange: #B87A37;
+  --nexus-bg: var(--nexus-bg-deep);
+  --nexus-surface: var(--nexus-bg-card);
+  --nexus-border: var(--nexus-line);
+  --nexus-muted: var(--nexus-text-muted);
+  --nexus-shadow-card: 0 28px 60px rgba(0, 0, 0, .36), inset 0 1px 0 rgba(255,255,255,.07);
+  --nexus-shadow-icon: 0 18px 34px rgba(0, 0, 0, .38);
+}

@@ -5,7 +5,7 @@
     "navy": "#0B1E75",
     "gold": "#F7B500",
     "orange": "#FF8A00",
-    "purple": "#6C3DFF",
+    "purple": "#D7A449",
     "cyan": "#18BCEB",
     "green": "#24B05A",
     "white": "#FFFFFF",
@@ -16,7 +16,7 @@
     "successBg": "#E8F7EE",
     "warningBg": "#FFF3E0",
     "infoBg": "#E7F8FE",
-    "purpleBg": "#EEE9FF"
+    "purpleBg": "#1A1510"
   },
   "typography": {
     "heading": "Sora, Inter, system-ui, sans-serif",

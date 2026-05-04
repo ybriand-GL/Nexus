@@ -241,6 +241,7 @@ const navigationEntries = ['Accueil', 'Administration', 'Exploitation', 'Gestion
 const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
 const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
 const hiddenIntegrationProviderCodes = new Set(['LEGACY_NEXUS', 'TRACTOR_TRACKING'])
+const toolsSubmenuEntries = ['Accueil', 'Clés API', 'Tâches planifiées', 'Requêteur SQL', 'Traces', 'Diagnostics'] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
 const apiBasePath = import.meta.env.BASE_URL || '/'
@@ -293,6 +294,8 @@ function App() {
     useState<(typeof administrationSubmenuEntries)[number]>('Accueil')
   const [selectedSettingsSection, setSelectedSettingsSection] =
     useState<(typeof settingsSubmenuEntries)[number]>('Accueil')
+  const [selectedToolsSection, setSelectedToolsSection] =
+    useState<(typeof toolsSubmenuEntries)[number]>('Accueil')
   const [error, setError] = useState<string | null>(null)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [credentialsError, setCredentialsError] = useState<string | null>(null)
@@ -1799,6 +1802,7 @@ function App() {
                 if (entry === 'Administration') {
                   setSelectedAdministrationSection('Accueil')
                   setSelectedSettingsSection('Accueil')
+                  setSelectedToolsSection('Accueil')
                 }
               }}
               type="button"
@@ -1819,7 +1823,7 @@ function App() {
       </aside>
 
       <main className="nexus-main">
-        <section className={`hero-card ${selectedNavigation !== 'Accueil' ? 'hero-card-compact' : ''}`}>
+        <section className="hero-card">
           <div className="hero-copy">
             <span className="eyebrow">{selectedNavigation}</span>
             <h1>{getWorkspaceTitle(selectedNavigation)}</h1>
@@ -1834,31 +1838,6 @@ function App() {
               )}
             </div>
           </div>
-
-          <div className="hero-highlight">
-            <div className="hero-highlight-header">
-              <span className="eyebrow">Session active</span>
-              <span className="status-dot" />
-            </div>
-            <dl className="hero-stats">
-              <div>
-                <dt>Modules visibles</dt>
-                <dd>{visibleModules.length}</dd>
-              </div>
-              <div>
-                <dt>Droits lecture</dt>
-                <dd>{currentUser.rights.filter((right) => right.accessLevel === 'Read').length}</dd>
-              </div>
-              <div>
-                <dt>Droits écriture</dt>
-                <dd>{currentUser.rights.filter((right) => right.accessLevel === 'Write').length}</dd>
-              </div>
-              <div>
-                <dt>Environnement</dt>
-                <dd>{systemInfo?.environment ?? '...'}</dd>
-              </div>
-            </dl>
-          </div>
         </section>
 
         {selectedNavigation === 'Administration' && isInformatique ? (
@@ -1867,7 +1846,12 @@ function App() {
               <button
                 key={entry}
                 className={`admin-subnav-link ${selectedAdministrationSection === entry ? 'admin-subnav-link-active' : ''}`}
-                onClick={() => setSelectedAdministrationSection(entry)}
+                onClick={() => {
+                  setSelectedAdministrationSection(entry)
+                  if (entry === 'Outils') {
+                    setSelectedToolsSection('Accueil')
+                  }
+                }}
                 type="button"
               >
                 {entry}
@@ -1907,7 +1891,12 @@ function App() {
                     <button
                       key={entry}
                       className="dashboard-action-card"
-                      onClick={() => setSelectedAdministrationSection(entry)}
+                      onClick={() => {
+                        setSelectedAdministrationSection(entry)
+                        if (entry === 'Outils') {
+                          setSelectedToolsSection('Accueil')
+                        }
+                      }}
                       type="button"
                     >
                       <span className="eyebrow">{entry}</span>
@@ -2643,6 +2632,48 @@ function App() {
         ) : null}
         {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Outils' ? (
           <section className="workspace-grid">
+            <article className="panel-card panel-card-wide admin-tools-card tools-home-card">
+              <div className="panel-heading">
+                <span className="eyebrow">Outils</span>
+                <h2>Centre d’outils</h2>
+              </div>
+              <p className="profiles-toolbar-copy">
+                Les outils techniques sont regroupés par usage pour éviter une page unique fourre-tout.
+              </p>
+              <section className="admin-subnav tools-subnav" aria-label="Sous-menu outils">
+                {toolsSubmenuEntries.map((entry) => (
+                  <button
+                    key={entry}
+                    className={`admin-subnav-link ${selectedToolsSection === entry ? 'admin-subnav-link-active' : ''}`}
+                    onClick={() => setSelectedToolsSection(entry)}
+                    type="button"
+                  >
+                    {entry}
+                  </button>
+                ))}
+              </section>
+
+              {selectedToolsSection === 'Accueil' ? (
+                <div className="dashboard-actions tools-dashboard-actions">
+                  {toolsSubmenuEntries
+                    .filter((entry) => entry !== 'Accueil')
+                    .map((entry) => (
+                      <button
+                        key={`tools-home-${entry}`}
+                        className="dashboard-action-card"
+                        onClick={() => setSelectedToolsSection(entry)}
+                        type="button"
+                      >
+                        <span className="eyebrow">{entry}</span>
+                        <strong>{entry}</strong>
+                        <p>{getToolsSectionDescription(entry)}</p>
+                      </button>
+                    ))}
+                </div>
+              ) : null}
+            </article>
+
+            {selectedToolsSection === 'Diagnostics' ? (
             <article className="panel-card panel-card-wide admin-tools-card">
               <div className="panel-heading">
                 <span className="eyebrow">Outils</span>
@@ -2713,6 +2744,8 @@ function App() {
                 <div className="settings-empty">Chargement des diagnostics...</div>
               )}
             </article>
+            ) : null}
+            {selectedToolsSection === 'Clés API' ? (
             <article className="panel-card panel-card-wide integration-credentials-card">
               <div className="panel-heading">
                 <span className="eyebrow">Intégrations</span>
@@ -2798,6 +2831,22 @@ function App() {
                 ))}
               </div>
             </article>
+            ) : null}
+
+            {selectedToolsSection !== 'Accueil' &&
+            selectedToolsSection !== 'Clés API' &&
+            selectedToolsSection !== 'Diagnostics' ? (
+              <article className="panel-card panel-card-wide tool-placeholder-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Outils</span>
+                  <h2>{selectedToolsSection}</h2>
+                </div>
+                <div className="workspace-empty">
+                  <strong>Rubrique préparée</strong>
+                  <span>{getToolsSectionDescription(selectedToolsSection)}</span>
+                </div>
+              </article>
+            ) : null}
           </section>
         ) : null}
 
@@ -3447,6 +3496,23 @@ function getAdministrationSectionDescription(section: (typeof administrationSubm
       return 'Préparer les futurs outils techniques et de maintenance.'
     default:
       return 'Vue d’ensemble des espaces d’administration.'
+  }
+}
+
+function getToolsSectionDescription(section: (typeof toolsSubmenuEntries)[number]) {
+  switch (section) {
+    case 'Clés API':
+      return 'Déclarer et maintenir les accès API par logiciel externe.'
+    case 'Tâches planifiées':
+      return 'Préparer le suivi des traitements planifiés, exécutions et historiques.'
+    case 'Requêteur SQL':
+      return 'Préparer un espace de requêtes d’analyse contrôlées.'
+    case 'Traces':
+      return 'Préparer la consultation des journaux applicatifs et techniques.'
+    case 'Diagnostics':
+      return 'Contrôler rapidement l’application, la base et les référentiels.'
+    default:
+      return 'Vue d’ensemble des outils techniques disponibles.'
   }
 }
 

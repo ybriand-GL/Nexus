@@ -98,6 +98,8 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Rattachement multi-analytiques des tiers | CADRE | Table de liaison prevue |
 | Transverse | Materiels | CADRE | Import, numero de parc unique |
 | Transverse | Parametrage des interfaces | EN_COURS | Table `IntegrationCredential`, UI Outils et import des cles Nexus legacy en place |
+| Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
+| UX | Bandeaux titres applicatifs | TERMINE | Bloc lateral Session active retire visuellement et gabarit titre uniformise |
 
 ## 5. Interfaces
 

@@ -1133,3 +1133,24 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-BglM32XO.css` et `index--__lAYMg.js`
+
+## 2026-05-04 - Bandeaux titres et menus Outils
+
+- corrections bandeaux:
+  - retrait visuel du bloc lateral `Session active` dans les titres de page; ces informations restent disponibles dans l'accueil et ne doivent pas piloter la navigation
+  - gabarit `hero-card` repasse en colonne unique avec hauteur desktop fixe de `220px`
+  - titre, description et ligne d'action conserves dans une grille stable pour harmoniser Accueil, Administration, Exploitation et Gestion administrative
+- corrections Administration / Outils:
+  - ajout d'un accueil `Centre d'outils`
+  - creation du sous-menu Outils: `Accueil`, `Cles API`, `Taches planifiees`, `Requeteur SQL`, `Traces`, `Diagnostics`
+  - rubrique `Cles API` isolee dans son menu avec la liste et les actions existantes
+  - emplacements prepares pour les futures rubriques techniques sans modifier la logique metier existante
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-D0NplWwd.css` et `index-r48xBJTH.js`

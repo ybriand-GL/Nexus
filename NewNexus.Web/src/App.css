@@ -3064,3 +3064,37 @@
   color: var(--nexus-text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+.nexus-main .hero-card,
+.nexus-main .hero-card-compact {
+  grid-template-columns: 1fr;
+  height: 220px;
+  min-height: 220px;
+}
+
+.nexus-main .hero-copy {
+  min-height: 172px;
+}
+
+.tools-home-card {
+  gap: 18px;
+}
+
+.tools-subnav {
+  margin-top: 2px;
+}
+
+.tools-dashboard-actions {
+  margin-top: 4px;
+}
+
+.tool-placeholder-card {
+  align-content: start;
+}
+
+@media (max-width: 940px) {
+  .nexus-main .hero-card,
+  .nexus-main .hero-card-compact {
+    height: auto;
+  }
+}

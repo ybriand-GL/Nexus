@@ -373,6 +373,28 @@
   gap: 22px;
 }
 
+.nexus-main *,
+.modal-card * {
+  min-width: 0;
+}
+
+.nexus-main h1,
+.nexus-main h2,
+.nexus-main h3,
+.nexus-main p,
+.nexus-main strong,
+.nexus-main span,
+.nexus-main small,
+.nexus-main code,
+.modal-card h2,
+.modal-card h3,
+.modal-card p,
+.modal-card strong,
+.modal-card span,
+.modal-card small {
+  overflow-wrap: anywhere;
+}
+
 .hero-card {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
@@ -520,7 +542,7 @@
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
 }
 
@@ -563,7 +585,7 @@
 
 .dashboard-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
 }
 
@@ -1225,7 +1247,7 @@
 
 .admin-tools-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
 }
 
@@ -1282,7 +1304,7 @@
 
 .integration-credentials-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 14px;
 }
 
@@ -1290,6 +1312,7 @@
   display: grid;
   align-content: start;
   gap: 8px;
+  min-height: 260px;
   padding: 18px;
   border-radius: 22px;
   border: 1px solid var(--nexus-border);
@@ -1320,6 +1343,14 @@
   color: var(--nexus-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   overflow-wrap: anywhere;
+}
+
+.credential-modal-card {
+  width: min(980px, 100%);
+}
+
+.credential-modal-form {
+  margin: 0;
 }
 
 .settings-list,
@@ -2904,14 +2935,14 @@
 
 .nexus-main .hero-card {
   grid-template-columns: minmax(0, 1.5fr) minmax(260px, .5fr);
-  height: 220px;
+  min-height: 220px;
   padding: 24px 28px;
   align-items: stretch;
 }
 
 .nexus-main .hero-card-compact {
   grid-template-columns: minmax(0, 1.5fr) minmax(260px, .5fr);
-  height: 220px;
+  min-height: 220px;
   padding: 24px 28px;
 }
 
@@ -3010,7 +3041,7 @@
 }
 
 .nexus-main .dashboard-actions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .nexus-main input,

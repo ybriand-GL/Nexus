@@ -137,7 +137,6 @@ type IntegrationCredentialItem = {
   maskedValue: string | null
   value: string | null
   isActive: boolean
-  source: string | null
   notes: string | null
   createdAtUtc: string | null
   updatedAtUtc: string | null
@@ -241,6 +240,7 @@ type IntegrationCredentialFormState = {
 const navigationEntries = ['Accueil', 'Administration', 'Exploitation', 'Gestion administrative']
 const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
 const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
+const hiddenIntegrationProviderCodes = new Set(['LEGACY_NEXUS', 'TRACTOR_TRACKING'])
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
 const apiBasePath = import.meta.env.BASE_URL || '/'
@@ -285,6 +285,7 @@ function App() {
   const [isLookingUpNewCompany, setIsLookingUpNewCompany] = useState(false)
   const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false)
   const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false)
+  const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false)
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [selectedNavigation, setSelectedNavigation] = useState('Accueil')
@@ -371,13 +372,19 @@ function App() {
     [modulesByGroup],
   )
 
-  const credentialSummary = useMemo(() => {
-    const configured = integrationCredentials.filter((credential) => credential.hasValue).length
-    const secrets = integrationCredentials.filter((credential) => credential.hasValue && credential.isSecret).length
-    const providers = new Set(integrationCredentials.map((credential) => credential.providerCode)).size
+  const visibleIntegrationCredentials = useMemo(
+    () => integrationCredentials.filter(shouldDisplayIntegrationCredential),
+    [integrationCredentials],
+  )
 
-    return { configured, secrets, providers }
-  }, [integrationCredentials])
+  const credentialSummary = useMemo(() => {
+    const configured = visibleIntegrationCredentials.filter((credential) => credential.hasValue).length
+    const secrets = visibleIntegrationCredentials.filter((credential) => credential.hasValue && credential.isSecret).length
+    const active = visibleIntegrationCredentials.filter((credential) => credential.isActive && credential.hasValue).length
+    const providers = new Set(visibleIntegrationCredentials.map((credential) => credential.providerCode)).size
+
+    return { active, configured, secrets, providers }
+  }, [visibleIntegrationCredentials])
 
   const credentialsByProvider = useMemo(() => {
     const grouped = new Map<
@@ -388,32 +395,26 @@ function App() {
         configuredCount: number
         totalCount: number
         secretCount: number
-        source: string | null
-        lastImportedAtUtc: string | null
       }
     >()
 
-    for (const credential of integrationCredentials) {
+    for (const credential of visibleIntegrationCredentials) {
       const current = grouped.get(credential.providerCode) ?? {
         providerCode: credential.providerCode,
         providerLabel: credential.providerLabel,
         configuredCount: 0,
         totalCount: 0,
         secretCount: 0,
-        source: credential.source,
-        lastImportedAtUtc: credential.lastImportedAtUtc,
       }
 
       current.totalCount += 1
       current.configuredCount += credential.hasValue ? 1 : 0
       current.secretCount += credential.isSecret ? 1 : 0
-      current.source = current.source ?? credential.source
-      current.lastImportedAtUtc = getMostRecentDate(current.lastImportedAtUtc, credential.lastImportedAtUtc)
       grouped.set(credential.providerCode, current)
     }
 
     return Array.from(grouped.values()).sort((left, right) => left.providerLabel.localeCompare(right.providerLabel))
-  }, [integrationCredentials])
+  }, [visibleIntegrationCredentials])
 
   useEffect(() => {
     if (visibleNavigationEntries.length === 0) {
@@ -671,7 +672,7 @@ function App() {
     try {
       const response = await fetch(apiPath('api/admin/integrations/credentials'))
       if (!response.ok) {
-        throw new Error(await getRequestError(response, 'Impossible de charger les cles API.'))
+        throw new Error(await getRequestError(response, 'Impossible de charger les clés API.'))
       }
 
       const payload = (await response.json()) as IntegrationCredentialItem[]
@@ -681,7 +682,7 @@ function App() {
       )
     } catch (credentialsLoadError) {
       setCredentialsError(
-        credentialsLoadError instanceof Error ? credentialsLoadError.message : 'Erreur de chargement des cles API.',
+        credentialsLoadError instanceof Error ? credentialsLoadError.message : 'Erreur de chargement des clés API.',
       )
     }
   }
@@ -789,8 +790,30 @@ function App() {
 
   function handleCredentialSelectionChange(event: ChangeEvent<HTMLSelectElement>) {
     const selectedKey = event.target.value
-    const credential = integrationCredentials.find((item) => buildIntegrationCredentialKey(item) === selectedKey) ?? null
+    const credential = visibleIntegrationCredentials.find((item) => buildIntegrationCredentialKey(item) === selectedKey) ?? null
     setCredentialForm(buildCredentialFormFromItem(credential))
+  }
+
+  function openCreateCredentialModal() {
+    setCredentialForm(createEmptyIntegrationCredentialForm())
+    setIsCredentialModalOpen(true)
+  }
+
+  function openConfigureCredentialModal(providerCode: string) {
+    const credential =
+      visibleIntegrationCredentials.find(
+        (item) => item.providerCode === providerCode && (item.hasValue || item.keyName.includes('API_KEY')),
+      ) ??
+      visibleIntegrationCredentials.find((item) => item.providerCode === providerCode) ??
+      null
+
+    setCredentialForm(buildCredentialFormFromItem(credential))
+    setIsCredentialModalOpen(true)
+  }
+
+  function closeCredentialModal() {
+    setIsCredentialModalOpen(false)
+    setCredentialForm(createEmptyIntegrationCredentialForm())
   }
 
   function handleCredentialFormFieldChange(
@@ -829,22 +852,21 @@ function App() {
           value: credentialForm.value,
           isSecret: credentialForm.isSecret,
           isActive: credentialForm.isActive,
-          source: 'Manuel',
           notes: credentialForm.notes,
         }),
       })
 
       if (!response.ok) {
-        throw new Error(await getRequestError(response, 'L enregistrement de la cle API a echoue.'))
+        throw new Error(await getRequestError(response, 'L’enregistrement de la clé API a échoué.'))
       }
 
       await loadIntegrationCredentials()
-      setCredentialForm((current) => ({ ...current, value: '', isSaving: false, error: null }))
+      closeCredentialModal()
     } catch (saveError) {
       setCredentialForm((current) => ({
         ...current,
         isSaving: false,
-        error: saveError instanceof Error ? saveError.message : 'Erreur d enregistrement.',
+        error: saveError instanceof Error ? saveError.message : 'Erreur d’enregistrement.',
       }))
     }
   }
@@ -2693,21 +2715,24 @@ function App() {
             </article>
             <article className="panel-card panel-card-wide integration-credentials-card">
               <div className="panel-heading">
-                <span className="eyebrow">Integrations</span>
-                <h2>Cles API & acces externes</h2>
+                <span className="eyebrow">Intégrations</span>
+                <h2>Clés API et accès externes</h2>
               </div>
               <p className="profiles-toolbar-copy">
-                Centralisation des acces SIRENE, Lucca, TruckOnline, YellowBox, Geoapify, OpenStreetMap et anciens secrets Nexus. Les secrets restent masques.
+                Centralisation des accès SIRENE, Lucca, TruckOnline, YellowBox, Geoapify et OpenStreetMap. Les secrets restent masqués.
               </p>
               <div className="administration-synthesis-actions">
                 <button className="secondary-button" onClick={() => void loadIntegrationCredentials()} type="button">
-                  Rafraichir les cles
+                  Rafraîchir les clés
+                </button>
+                <button className="primary-button" onClick={openCreateCredentialModal} type="button">
+                  Ajouter une clé
                 </button>
               </div>
 
               {credentialsError ? (
                 <div className={`status-banner ${credentialsError.includes('erreur') ? 'status-banner-warning' : ''}`}>
-                  <strong>Etat des cles API</strong>
+                  <strong>État des clés API</strong>
                   <span>{credentialsError}</span>
                 </div>
               ) : null}
@@ -2718,7 +2743,7 @@ function App() {
                   <strong>{credentialSummary.providers}</strong>
                 </article>
                 <article className="metric-card metric-card-champagne">
-                  <span className="metric-label">Valeurs</span>
+                  <span className="metric-label">Clés renseignées</span>
                   <strong>{credentialSummary.configured}</strong>
                 </article>
                 <article className="metric-card metric-card-gold">
@@ -2726,16 +2751,83 @@ function App() {
                   <strong>{credentialSummary.secrets}</strong>
                 </article>
                 <article className="metric-card metric-card-cyan">
-                  <span className="metric-label">Legacy</span>
-                  <strong>{integrationCredentials.some((item) => item.source?.includes('legacy')) ? 'Importe' : 'A importer'}</strong>
+                  <span className="metric-label">Actives</span>
+                  <strong>{credentialSummary.active}</strong>
                 </article>
               </div>
 
-              <form className="credential-form" onSubmit={handleCredentialFormSubmit}>
+              <div className="profiles-overview-grid integration-credentials-grid">
+                {credentialsByProvider.map((provider) => (
+                  <article
+                    className={`profile-summary-card credential-card ${provider.configuredCount > 0 ? 'credential-card-configured accent-champagne' : 'accent-navy'}`}
+                    key={provider.providerCode}
+                  >
+                    <header className="profile-summary-header">
+                      <div>
+                        <span className="eyebrow">{provider.providerCode}</span>
+                        <h3>{provider.providerLabel}</h3>
+                      </div>
+                      <span className={`profile-status-badge ${provider.configuredCount > 0 ? 'is-active' : 'is-inactive'}`}>
+                        {provider.configuredCount > 0 ? 'Configurée' : 'À déclarer'}
+                      </span>
+                    </header>
+                    <div className="profile-summary-rights">
+                      <div className="profile-summary-right">
+                        <span>Clé logiciel</span>
+                        <strong>{provider.configuredCount > 0 ? 'Renseignée' : 'Non renseignée'}</strong>
+                      </div>
+                      <div className="profile-summary-right">
+                        <span>Paramètres techniques</span>
+                        <strong>{provider.totalCount}</strong>
+                      </div>
+                      <div className="profile-summary-right">
+                        <span>Secrets masqués</span>
+                        <strong>{provider.secretCount}</strong>
+                      </div>
+                    </div>
+                    <div className="profile-summary-actions">
+                      <button
+                        className="secondary-button"
+                        onClick={() => openConfigureCredentialModal(provider.providerCode)}
+                        type="button"
+                      >
+                        Configurer la clé
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        {isCredentialModalOpen ? (
+          <div className="modal-overlay" onClick={closeCredentialModal} role="presentation">
+            <section
+              aria-labelledby="credential-modal-title"
+              className="modal-card profile-modal-card credential-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">{credentialForm.selectedKey ? 'Configuration' : 'Création'}</span>
+                  <h2 id="credential-modal-title">
+                    {credentialForm.selectedKey ? 'Configurer la clé' : 'Ajouter une clé'}
+                  </h2>
+                </div>
+                <button className="modal-close-button" onClick={closeCredentialModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="credential-form credential-modal-form" onSubmit={handleCredentialFormSubmit}>
                 <label>
-                  <span>Cle connue</span>
+                  <span>Clé connue</span>
                   <select value={credentialForm.selectedKey} onChange={handleCredentialSelectionChange}>
-                    {integrationCredentials.map((credential) => (
+                    <option value="">Nouvelle clé</option>
+                    {visibleIntegrationCredentials.map((credential) => (
                       <option key={buildIntegrationCredentialKey(credential)} value={buildIntegrationCredentialKey(credential)}>
                         {credential.providerLabel} - {credential.displayName}
                       </option>
@@ -2747,7 +2839,7 @@ function App() {
                   <input value={credentialForm.providerCode} onChange={(event) => handleCredentialFormFieldChange('providerCode', event)} />
                 </label>
                 <label>
-                  <span>Libelle fournisseur</span>
+                  <span>Libellé fournisseur</span>
                   <input value={credentialForm.providerLabel} onChange={(event) => handleCredentialFormFieldChange('providerLabel', event)} />
                 </label>
                 <label>
@@ -2755,7 +2847,7 @@ function App() {
                   <input value={credentialForm.keyName} onChange={(event) => handleCredentialFormFieldChange('keyName', event)} />
                 </label>
                 <label>
-                  <span>Libelle</span>
+                  <span>Libellé</span>
                   <input value={credentialForm.displayName} onChange={(event) => handleCredentialFormFieldChange('displayName', event)} />
                 </label>
                 <label>
@@ -2773,7 +2865,7 @@ function App() {
                 </label>
                 <label className="toggle-label settings-toggle">
                   <input checked={credentialForm.isSecret} onChange={(event) => handleCredentialFormBooleanChange('isSecret', event)} type="checkbox" />
-                  <span>Valeur secrete</span>
+                  <span>Valeur secrète</span>
                 </label>
                 <label className="toggle-label settings-toggle">
                   <input checked={credentialForm.isActive} onChange={(event) => handleCredentialFormBooleanChange('isActive', event)} type="checkbox" />
@@ -2781,65 +2873,13 @@ function App() {
                 </label>
                 <div className="profile-action-row credential-form-actions">
                   <button className="primary-button" disabled={credentialForm.isSaving} type="submit">
-                    {credentialForm.isSaving ? 'Enregistrement...' : 'Enregistrer la cle'}
+                    {credentialForm.isSaving ? 'Enregistrement...' : 'Enregistrer la clé'}
                   </button>
                   {credentialForm.error ? <small className="account-error">{credentialForm.error}</small> : null}
                 </div>
               </form>
-
-              <div className="profiles-overview-grid integration-credentials-grid">
-                {credentialsByProvider.map((provider) => (
-                  <article
-                    className={`profile-summary-card credential-card ${provider.configuredCount > 0 ? 'credential-card-configured accent-champagne' : 'accent-navy'}`}
-                    key={provider.providerCode}
-                  >
-                    <header className="profile-summary-header">
-                      <div>
-                        <span className="eyebrow">{provider.providerCode}</span>
-                        <h3>{provider.providerLabel}</h3>
-                      </div>
-                      <span className={`profile-status-badge ${provider.configuredCount > 0 ? 'is-active' : 'is-inactive'}`}>
-                        {provider.configuredCount > 0 ? 'Configuree' : 'A declarer'}
-                      </span>
-                    </header>
-                    <div className="profile-summary-rights">
-                      <div className="profile-summary-right">
-                        <span>Cle logiciel</span>
-                        <strong>{provider.configuredCount > 0 ? 'Renseignee' : 'Non renseignee'}</strong>
-                      </div>
-                      <div className="profile-summary-right">
-                        <span>Parametres techniques</span>
-                        <strong>{provider.totalCount}</strong>
-                      </div>
-                      <div className="profile-summary-right">
-                        <span>Secrets masques</span>
-                        <strong>{provider.secretCount}</strong>
-                      </div>
-                      <div className="profile-summary-right">
-                        <span>Source</span>
-                        <strong>{provider.source ?? 'Manuelle'}</strong>
-                      </div>
-                    </div>
-                    <div className="profile-summary-actions">
-                      <button
-                        className="secondary-button"
-                        onClick={() => {
-                          const firstCredential = integrationCredentials.find((credential) => credential.providerCode === provider.providerCode) ?? null
-                          setCredentialForm(buildCredentialFormFromItem(firstCredential))
-                        }}
-                        type="button"
-                      >
-                        Configurer la cle
-                      </button>
-                    </div>
-                    {provider.lastImportedAtUtc ? (
-                      <small>Dernier import: {new Date(provider.lastImportedAtUtc).toLocaleString()}</small>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-            </article>
-          </section>
+            </section>
+          </div>
         ) : null}
 
         {isCreateAccountModalOpen ? (
@@ -3263,16 +3303,8 @@ function buildIntegrationCredentialKey(credential: IntegrationCredentialItem) {
   return `${credential.providerCode}|${credential.keyName}`
 }
 
-function getMostRecentDate(left: string | null, right: string | null) {
-  if (!left) {
-    return right
-  }
-
-  if (!right) {
-    return left
-  }
-
-  return new Date(left).getTime() >= new Date(right).getTime() ? left : right
+function shouldDisplayIntegrationCredential(credential: IntegrationCredentialItem) {
+  return !hiddenIntegrationProviderCodes.has(credential.providerCode.toUpperCase())
 }
 
 function buildCredentialFormFromItem(credential: IntegrationCredentialItem | null): IntegrationCredentialFormState {
@@ -3289,7 +3321,7 @@ function buildCredentialFormFromItem(credential: IntegrationCredentialItem | nul
     value: '',
     isSecret: credential.isSecret,
     isActive: credential.isConfigured ? credential.isActive : true,
-    notes: credential.notes ?? '',
+    notes: '',
     isSaving: false,
     error: null,
   }

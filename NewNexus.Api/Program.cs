@@ -245,7 +245,7 @@ app.MapPost("/api/admin/integrations/credentials", async (
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
-            ["credential"] = ["Le fournisseur et le nom technique de la cle sont obligatoires."]
+            ["credential"] = ["Le fournisseur et le nom technique de la clé sont obligatoires."]
         });
     }
 
@@ -261,7 +261,7 @@ app.MapPost("/api/admin/integrations/credentials", async (
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
-            ["value"] = ["La valeur est obligatoire pour declarer une nouvelle cle."]
+            ["value"] = ["La valeur est obligatoire pour déclarer une nouvelle clé."]
         });
     }
 
@@ -1133,7 +1133,9 @@ static IReadOnlyList<object> BuildCredentialResponses(
     IReadOnlyCollection<IntegrationCredential> credentials,
     IDataProtectionProvider dataProtectionProvider)
 {
-    var definitions = GetKnownCredentialDefinitions();
+    var definitions = GetKnownCredentialDefinitions()
+        .Where(definition => !IsHiddenIntegrationProvider(definition.ProviderCode))
+        .ToList();
     var definitionsByKey = definitions.ToDictionary(
         item => BuildCredentialKey(item.ProviderCode, item.KeyName),
         StringComparer.OrdinalIgnoreCase);
@@ -1150,7 +1152,8 @@ static IReadOnlyList<object> BuildCredentialResponses(
 
     foreach (var credential in credentials)
     {
-        if (!definitionsByKey.ContainsKey(BuildCredentialKey(credential.ProviderCode, credential.KeyName)))
+        if (!IsHiddenIntegrationProvider(credential.ProviderCode) &&
+            !definitionsByKey.ContainsKey(BuildCredentialKey(credential.ProviderCode, credential.KeyName)))
         {
             responses.Add(BuildCredentialResponse(credential, dataProtectionProvider, null));
         }
@@ -1356,25 +1359,7 @@ static async Task<LegacyImportResult> ImportLegacyAdminApiKeysAsync(
                 continue;
             }
 
-            var clearValue = TryUnprotectLegacyValue(row.KeyValue, legacyAdminProtector);
-            if (string.IsNullOrWhiteSpace(clearValue))
-            {
-                failed++;
-                messages.Add($"Cle API legacy {providerName}: valeur non dechiffrable.");
-                continue;
-            }
-
-            var definition = new IntegrationCredentialDefinition(
-                "LEGACY_NEXUS",
-                "Nexus legacy",
-                NormalizeTechnicalCode(providerName),
-                providerName,
-                true,
-                null,
-                "Importee depuis admin.api-keys.v1");
-
-            await UpsertImportedCredentialAsync(dbContext, dataProtectionProvider, definition, clearValue, cancellationToken);
-            imported++;
+            skipped++;
         }
     }
     catch
@@ -1449,7 +1434,7 @@ static async Task UpsertImportedCredentialAsync(
     credential.ProtectedValue = ProtectCredentialValue(value, dataProtectionProvider);
     credential.IsSecret = definition.IsSecret;
     credential.IsActive = true;
-    credential.Source = "Import Nexus legacy";
+    credential.Source = "Import automatique";
     credential.Notes = definition.Notes;
     credential.UpdatedAtUtc = now;
     credential.LastImportedAtUtc = now;
@@ -1543,23 +1528,29 @@ static string BuildCredentialKey(string providerCode, string keyName)
     return $"{NormalizeTechnicalCode(providerCode)}|{NormalizeTechnicalCode(keyName)}";
 }
 
+static bool IsHiddenIntegrationProvider(string providerCode)
+{
+    return string.Equals(providerCode, "LEGACY_NEXUS", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(providerCode, "TRACTOR_TRACKING", StringComparison.OrdinalIgnoreCase);
+}
+
 static IReadOnlyList<IntegrationCredentialDefinition> GetKnownCredentialDefinitions()
 {
     return
     [
-        new("SIRENE", "SIRENE", "SIRENE_CLIENT_ID", "Client ID", false, "SIRENE_CLIENT_ID", "Identifiant INSEE/API SIRENE legacy."),
-        new("SIRENE", "SIRENE", "SIRENE_CLIENT_SECRET", "Client secret", true, "SIRENE_CLIENT_SECRET", "Secret INSEE/API SIRENE si utilise."),
+        new("SIRENE", "SIRENE", "SIRENE_CLIENT_ID", "Client ID", false, "SIRENE_CLIENT_ID", "Identifiant INSEE/API SIRENE."),
+        new("SIRENE", "SIRENE", "SIRENE_CLIENT_SECRET", "Client secret", true, "SIRENE_CLIENT_SECRET", "Secret INSEE/API SIRENE si utilisé."),
         new("LUCCA", "Lucca", "LUCCA_BASE_URL", "URL de base", false, "LUCCA_BASE_URL", null),
-        new("LUCCA", "Lucca", "LUCCA_API_KEY", "Cle API", true, "LUCCA_API_KEY", null),
+        new("LUCCA", "Lucca", "LUCCA_API_KEY", "Clé API", true, "LUCCA_API_KEY", null),
         new("LUCCA", "Lucca", "LUCCA_USERS_PATH", "Chemin utilisateurs", false, "LUCCA_USERS_PATH", null),
         new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_BASE_URL", "URL de base", false, "TRUCKONLINE_BASE_URL", null),
-        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_API_KEY", "Cle API", true, "TRUCKONLINE_API_KEY", null),
-        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_PRIVATE_KEY", "Cle privee", true, "TRUCKONLINE_PRIVATE_KEY", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_API_KEY", "Clé API", true, "TRUCKONLINE_API_KEY", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_PRIVATE_KEY", "Clé privée", true, "TRUCKONLINE_PRIVATE_KEY", null),
         new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_DRIVER_STATUS_PATH_TEMPLATE", "Chemin statut conducteur", false, "TRUCKONLINE_DRIVER_STATUS_PATH_TEMPLATE", null),
-        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_GPS_WINDOW_BEFORE_MINUTES", "Fenetre GPS avant", false, "TRUCKONLINE_GPS_WINDOW_BEFORE_MINUTES", null),
-        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_GPS_WINDOW_AFTER_MINUTES", "Fenetre GPS apres", false, "TRUCKONLINE_GPS_WINDOW_AFTER_MINUTES", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_GPS_WINDOW_BEFORE_MINUTES", "Fenêtre GPS avant", false, "TRUCKONLINE_GPS_WINDOW_BEFORE_MINUTES", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_GPS_WINDOW_AFTER_MINUTES", "Fenêtre GPS après", false, "TRUCKONLINE_GPS_WINDOW_AFTER_MINUTES", null),
         new("YELLOWBOX", "YellowBox", "YELLOWBOX_BASE_URL", "URL de base", false, "YELLOWBOX_BASE_URL", null),
-        new("YELLOWBOX", "YellowBox", "YELLOWBOX_API_KEY", "Cle API", true, "YELLOWBOX_API_KEY", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_API_KEY", "Clé API", true, "YELLOWBOX_API_KEY", null),
         new("YELLOWBOX", "YellowBox", "YELLOWBOX_BASIC_LOGIN", "Login basic", false, "YELLOWBOX_BASIC_LOGIN", null),
         new("YELLOWBOX", "YellowBox", "YELLOWBOX_BASIC_PASSWORD", "Mot de passe basic", true, "YELLOWBOX_BASIC_PASSWORD", null),
         new("YELLOWBOX", "YellowBox", "YELLOWBOX_AUTH_MODE", "Mode authentification", false, "YELLOWBOX_AUTH_MODE", null),
@@ -1569,12 +1560,9 @@ static IReadOnlyList<IntegrationCredentialDefinition> GetKnownCredentialDefiniti
         new("YELLOWBOX", "YellowBox", "YELLOWBOX_REDIRECT_URI", "URI de redirection", false, "YELLOWBOX_REDIRECT_URI", null),
         new("YELLOWBOX", "YellowBox", "YELLOWBOX_SCOPE", "Scope OAuth", false, "YELLOWBOX_SCOPE", null),
         new("YELLOWBOX", "YellowBox", "YELLOWBOX_TOKEN_URL", "URL token", false, "YELLOWBOX_TOKEN_URL", null),
-        new("TRACTOR_TRACKING", "Suivi tracteurs", "TRACTOR_TRACKING_REFRESH_INTERVAL_MINUTES", "Rafraichissement", false, "TRACTOR_TRACKING_REFRESH_INTERVAL_MINUTES", null),
-        new("TRACTOR_TRACKING", "Suivi tracteurs", "TRACTOR_TRACKING_RETENTION_MONTHS", "Retention historique", false, "TRACTOR_TRACKING_RETENTION_MONTHS", null),
-        new("TRACTOR_TRACKING", "Suivi tracteurs", "TRACTOR_TRACKING_FUEL_INCREASE_THRESHOLD_PERCENT", "Seuil hausse carburant", false, "TRACTOR_TRACKING_FUEL_INCREASE_THRESHOLD_PERCENT", null),
-        new("GEOAPIFY", "Geoapify", "GEOAPIFY_API_KEY", "Cle API", true, null, "Importee depuis appsettings legacy si renseignee."),
-        new("GOOGLE_MAPS", "Google Maps", "GOOGLE_GEOCODING_API_KEY", "Cle geocoding", true, null, "Importee depuis appsettings legacy si renseignee."),
-        new("OPENSTREETMAP", "OpenStreetMap", "OPENSTREETMAP_NOMINATIM_BASE_URL", "URL Nominatim", false, null, "OpenStreetMap/Nominatim ne necessite pas de cle API dans Nexus legacy.")
+        new("GEOAPIFY", "Geoapify", "GEOAPIFY_API_KEY", "Clé API", true, null, null),
+        new("GOOGLE_MAPS", "Google Maps", "GOOGLE_GEOCODING_API_KEY", "Clé géocodage", true, null, null),
+        new("OPENSTREETMAP", "OpenStreetMap", "OPENSTREETMAP_NOMINATIM_BASE_URL", "URL Nominatim", false, null, "OpenStreetMap/Nominatim ne nécessite pas de clé API.")
     ];
 }
 

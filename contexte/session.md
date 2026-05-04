@@ -1111,3 +1111,25 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-D9t2l4BH.css` et `index-BvMN5wF-.js`
+
+## 2026-05-04 - Stabilisation visuelle globale et Outils
+
+- corrections visuelles globales:
+  - ajout de protections CSS `min-width: 0` et `overflow-wrap` sur cartes, titres, textes, badges et modales
+  - grilles principales passees en `auto-fit` pour eviter les chevauchements lorsque la largeur disponible baisse
+  - bandeaux titres repasses en hauteur minimale plutot que hauteur stricte afin d'eviter les recouvrements en cas de texte plus long
+- corrections Administration / Outils:
+  - remplacement du formulaire inline des cles API par une modale d'ajout/configuration
+  - fonctionnement rapproche de Profils: liste de cartes, bouton `Ajouter une cle`, bouton `Configurer la cle`
+  - suppression des traces visibles `Source`, `Manuelle`, `Import Nexus legacy` et des libelles legacy
+  - filtrage des fournisseurs techniques `LEGACY_NEXUS` et `TRACTOR_TRACKING`; les parametres tracteurs restent rattaches a TruckOnline
+  - reprise des accents sur les libelles de la page des cles API
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-BglM32XO.css` et `index--__lAYMg.js`

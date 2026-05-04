@@ -44,6 +44,7 @@ Derniere mise a jour: 2026-05-04
 | UX | Reprise stricte maquette Figma SSO | TERMINE | Connexion recalee sur `preview_nexus_premium_v5_figma_sso.html` avec SVG `nexus_icon_figma_clean.svg` et `nexus_wordmark_figma_clean.svg` exacts |
 | UX | Corrections recette authentification et surfaces sombres | TERMINE | Champs vides, oeil mot de passe, vagues animees, transition post-auth, horloge sidebar et blocs internes sombres |
 | UX | Alignement final auth Figma et sortie loader | TERMINE | `GROUPE LAURE • NEXUS` replace au-dessus du lockup, libelle parasite supprime, cinq vagues SVG et sortie post-auth securisee |
+| UX | Harmonisation gabarits et menus sombres | TERMINE | Auth recalibree sur les proportions finales de la maquette, sous-menus administration sombres et blocs principaux uniformises entre entrees |
 | Transverse | Outils cles API par logiciel | TERMINE | Import manuel retire de l'UI; liste regroupee a une carte par fournisseur logiciel |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
 | UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |

@@ -1075,3 +1075,23 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-DJQsnXBe.css` et `index-eK3vzr-W.js`
+
+## 2026-05-04 - Harmonisation gabarits auth et application
+
+- corrections authentification:
+  - lockup Nexus recalibre sur les cotes finales de la maquette: zone marque `940px`, lockup `860px`, pictogramme `126px`, wordmark `742px`
+  - suppression de l'encadrement interne du pictogramme pour afficher le SVG valide sans effet de boite additionnelle
+  - carte de connexion alignee sur la version finale de la maquette: largeur `560px`, padding `36px 34px`, titre sur une ligne
+  - grille auth ajustee en `1.06fr / .94fr` avec un espacement plus proche du rendu valide
+- corrections application:
+  - sous-menus Administration et Parametres forces en surfaces sombres, sans fond blanc residuel
+  - gabarit hero uniformise entre Accueil, Administration, Exploitation et Gestion administrative
+  - cartes principales de contenu forcees sur une hauteur minimale commune pour limiter les sauts visuels au changement de menu
+- validation technique:
+  - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-DynGBz90.css` et `index-9EcdUzqn.js`

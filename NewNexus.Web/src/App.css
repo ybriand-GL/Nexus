@@ -2281,9 +2281,9 @@
   position: relative;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(380px, .82fr);
+  grid-template-columns: minmax(0, 1.06fr) minmax(420px, .94fr);
   align-items: center;
-  gap: min(3.4vw, 40px);
+  gap: min(4.2vw, 54px);
   padding: clamp(20px, 3vw, 42px);
   overflow: hidden;
   isolation: isolate;
@@ -2341,8 +2341,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  justify-self: center;
   gap: clamp(16px, 1.6vw, 22px);
-  padding: 30px 18px;
+  width: min(940px, 100%);
+  min-height: min(690px, 78vh);
+  padding: 14px 16px;
   overflow: visible;
   text-align: center;
   background: transparent;
@@ -2430,23 +2433,22 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 28px;
   width: 100%;
-  max-width: 980px;
+  max-width: 860px;
+  margin: 2px auto 0;
 }
 
 .auth-brand-lockup-reference .auth-nexus-favicon {
-  width: 132px;
-  height: 132px;
+  width: 126px;
+  height: 126px;
   flex: 0 0 auto;
-  padding: 9px;
-  border-radius: 26px;
-  background: rgba(5, 6, 10, .58);
-  border: 1px solid rgba(247, 217, 138, .20);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, .03) inset,
-    0 16px 28px rgba(0, 0, 0, .30),
-    0 0 30px rgba(215, 164, 73, .08);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 0 18px rgba(215, 164, 73, .18)) drop-shadow(0 18px 28px rgba(0, 0, 0, .34));
 }
 
 .auth-nexus-wordmark {
@@ -2458,10 +2460,10 @@
 
 .auth-brand-lockup-reference .auth-nexus-logo {
   display: block;
-  width: clamp(760px, 60vw, 1080px);
+  width: min(742px, 89vw);
   max-width: 100%;
   height: auto;
-  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, .24));
+  filter: drop-shadow(0 0 10px rgba(215, 164, 73, .10)) drop-shadow(0 18px 28px rgba(0, 0, 0, .32));
 }
 
 .auth-brand-copy-reference {
@@ -2492,10 +2494,10 @@
 
 .auth-card-reference {
   align-content: start;
-  width: min(500px, 100%);
+  width: min(560px, 100%);
   min-height: auto;
   margin: 0 auto;
-  padding: clamp(28px, 3vw, 38px);
+  padding: 36px 34px;
   border-radius: 32px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .025)),
@@ -2525,10 +2527,11 @@
 .auth-card-reference h2 {
   margin: 0 0 24px;
   color: var(--nexus-text);
-  font-size: clamp(34px, 2.8vw, 52px);
+  font-size: clamp(36px, 2.55vw, 54px);
   line-height: 1.02;
   letter-spacing: -.03em;
   text-align: center;
+  white-space: nowrap;
 }
 
 .auth-card-reference .auth-form {
@@ -2900,13 +2903,21 @@
 }
 
 .nexus-main .hero-card {
-  min-height: 250px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, .5fr);
+  min-height: 220px;
+  padding: 24px 28px;
 }
 
 .nexus-main .hero-card-compact {
   grid-template-columns: minmax(0, 1.5fr) minmax(260px, .5fr);
   min-height: 220px;
   padding: 24px 28px;
+}
+
+.nexus-main .hero-copy h1 {
+  max-width: none;
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1;
 }
 
 .nexus-main .hero-copy h1,
@@ -2934,6 +2945,38 @@
 .nexus-main .module-list li,
 .nexus-main .rights-list li {
   border-color: rgba(255, 255, 255, .10);
+}
+
+.nexus-main .admin-subnav-link {
+  color: var(--nexus-text);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .025)),
+    radial-gradient(circle at 0% 0%, rgba(247, 217, 138, .045), transparent 42%);
+  border-color: rgba(247, 217, 138, .18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+.nexus-main .admin-subnav-link:hover,
+.nexus-main .admin-subnav-link-active {
+  color: var(--nexus-gold-soft);
+  background:
+    linear-gradient(180deg, rgba(247, 217, 138, .12), rgba(255, 255, 255, .03)),
+    radial-gradient(circle at 0% 0%, rgba(247, 217, 138, .075), transparent 42%);
+  border-color: rgba(247, 217, 138, .36);
+}
+
+.nexus-main > .workspace-grid,
+.nexus-main .dashboard-stack > .workspace-grid {
+  grid-template-columns: 1fr;
+}
+
+.nexus-main > .workspace-grid > .panel-card,
+.nexus-main .dashboard-stack > .workspace-grid > .panel-card {
+  min-height: 330px;
+}
+
+.nexus-main .dashboard-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .nexus-main input,

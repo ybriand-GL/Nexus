@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
-import nexusIcon from './assets/brand/nexus-icon.svg'
-import nexusWordmark from './assets/brand/nexus-wordmark.svg'
+import nexusIcon from './assets/brand/nexus_icon_figma_clean.svg'
+import nexusWordmark from './assets/brand/nexus_wordmark_figma_clean.svg'
 
 type SystemInfo = {
   product: string
@@ -1539,74 +1539,101 @@ function App() {
         <section className="auth-brand-panel auth-brand-panel-reference">
           <div className="auth-brand-halo" aria-hidden="true" />
           <div className="auth-brand-ribbons" aria-hidden="true">
-            <span />
-            <span />
-            <span />
+            <svg viewBox="0 0 1560 760" preserveAspectRatio="none">
+              <path className="r1" d="M-40,520 C120,380 220,348 392,430 C548,506 664,448 828,286 C962,154 1110,150 1356,214 C1440,236 1498,258 1560,292" />
+              <path className="r2" d="M-30,434 C126,406 248,332 406,372 C586,420 702,460 878,420 C1042,382 1178,304 1346,268 C1426,252 1492,250 1560,256" />
+              <path className="r3" d="M82,616 C248,594 378,516 540,460 C724,396 888,458 1042,500 C1170,536 1300,512 1458,448 C1500,430 1532,410 1560,392" />
+            </svg>
           </div>
           <div className="auth-brand-particles" aria-hidden="true" />
           <div className="auth-brand-lockup auth-brand-lockup-reference" aria-label="Nexus">
             <img className="auth-nexus-favicon" src={nexusIcon} alt="" aria-hidden="true" />
-            <img className="auth-nexus-logo" src={nexusWordmark} alt="Nexus" />
+            <span className="auth-nexus-wordmark">
+              <img className="auth-nexus-logo" src={nexusWordmark} alt="Nexus" />
+            </span>
           </div>
           <span className="eyebrow">Groupe Laure</span>
-          <h1>Syst&egrave;me d'information modulaire</h1>
           <div className="auth-brand-copy auth-brand-copy-reference">
-            <p>Un acc&egrave;s institutionnel, sobre et s&eacute;curis&eacute; aux modules Nexus.</p>
-            <p>Connexion recommand&eacute;e avec le compte entreprise Groupe Laure.</p>
+            <p>Le syst&egrave;me d'information modulaire du Groupe Laure.</p>
           </div>
         </section>
 
-        <section className="auth-card auth-card-reference">
+        <section className="auth-card auth-card-reference" aria-label="Connexion Nexus">
           <div className="auth-card-header">
             <img className="auth-card-icon-image" src={nexusIcon} alt="" aria-hidden="true" />
             <span className="eyebrow">ACC&Egrave;S INTERNE</span>
           </div>
-          <h2>Ouvrir une session Nexus</h2>
-          <button
-            aria-describedby="sso-help"
-            className="sso-primary-button"
-            onClick={() =>
-              setLoginError(
-                'Le SSO entreprise Groupe Laure n est pas encore raccorde dans ce socle. Utilisez l acces exceptionnel si necessaire.',
-              )
-            }
-            type="button"
-          >
-            <img src={nexusIcon} alt="" aria-hidden="true" />
-            <span>Se connecter avec le compte entreprise Groupe Laure</span>
-          </button>
-          <p className="auth-sso-help" id="sso-help">
-            Le SSO est l'acc&egrave;s standard pour les collaborateurs Groupe Laure.
-          </p>
-
-          <div className="auth-exception-separator">
-            <span>Acc&egrave;s exceptionnel</span>
-          </div>
+          <h2>Ouvrir une session</h2>
           <form className="auth-form" onSubmit={handleLogin}>
+            <div className="sso-section">
+              <div className="auth-mode">Connexion recommand&eacute;e</div>
+              <button
+                aria-describedby="sso-help"
+                className="sso-primary-button"
+                onClick={() =>
+                  setLoginError(
+                    'Le SSO entreprise Groupe Laure n est pas encore raccorde dans ce socle. Utilisez l acces exceptionnel si necessaire.',
+                  )
+                }
+                type="button"
+              >
+                <span className="sso-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M4 21V8.5L12 3l8 5.5V21" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M9 21v-7h6v7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M8.5 10.2h.01M12 10.2h.01M15.5 10.2h.01" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span>Se connecter avec le compte entreprise Groupe Laure</span>
+              </button>
+              <p className="auth-sso-help" id="sso-help">
+                Acc&egrave;s SSO avec le compte professionnel du Groupe Laure.
+              </p>
+            </div>
+
+            <div className="auth-exception-separator">
+              <span>Acc&egrave;s exceptionnel</span>
+            </div>
             <p className="auth-exception-help">
-              Login et mot de passe sont r&eacute;serv&eacute;s aux comptes techniques, externes, hors SSO ou au mode secours.
+              R&eacute;serv&eacute; aux comptes techniques, externes ou aux situations hors SSO.
             </p>
-            <label>
-              <span>Login</span>
-              <input
-                autoComplete="username"
-                name="login"
-                placeholder="Votre identifiant"
-                value={credentials.login}
-                onChange={(event) => setCredentials((current) => ({ ...current, login: event.target.value }))}
-              />
-            </label>
-            <label>
-              <span>Mot de passe</span>
-              <input
-                autoComplete="current-password"
-                name="password"
-                placeholder="Votre mot de passe"
-                type="password"
-                value={credentials.password}
-                onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
-              />
-            </label>
+            <div className="field">
+              <label htmlFor="login">Login</label>
+              <div className="input-wrap">
+                <span className="input-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 12c2.761 0 5-2.462 5-5.5S14.761 1 12 1 7 3.462 7 6.5 9.239 12 12 12Z" fill="currentColor" opacity="0.92" />
+                    <path d="M3 22c0-4.418 4.03-8 9-8s9 3.582 9 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <input
+                  autoComplete="username"
+                  id="login"
+                  name="login"
+                  value={credentials.login}
+                  onChange={(event) => setCredentials((current) => ({ ...current, login: event.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="password">Mot de passe</label>
+              <div className="input-wrap">
+                <span className="input-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="5" y="10" width="14" height="11" rx="3" fill="currentColor" opacity="0.92" />
+                    <path d="M8 10V7a4 4 0 1 1 8 0v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <input
+                  autoComplete="current-password"
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={credentials.password}
+                  onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
+                />
+              </div>
+            </div>
 
             <div className="auth-form-meta">
               <a className="auth-forgot-link" href="#!" onClick={(event) => event.preventDefault()}>
@@ -1618,7 +1645,8 @@ function App() {
             {error ? <p className="form-error">{error}</p> : null}
 
             <button className="secondary-button auth-submit-button" disabled={isSubmitting} type="submit">
-              {isSubmitting ? 'Connexion...' : 'Se connecter'}
+              <span className="label">{isSubmitting ? 'Connexion...' : 'Se connecter'}</span>
+              <img className="button-nexus-icon" src={nexusIcon} alt="" aria-hidden="true" />
             </button>
           </form>
 

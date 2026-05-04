@@ -1003,3 +1003,25 @@ Ordre cible de construction:
   - `GET /newNexus/api` retourne `200 application/json`
   - scan strict source, dist et `NewNexus.Api/wwwroot` sans violet/parme ni anciennes couleurs saturees historiques
   - `NewNexus.Api/wwwroot` ne contient plus les anciens PNG/ICO Nexus publics non conformes
+
+## 2026-05-04 - Correction stricte authentification Figma SSO
+
+- reference appliquee:
+  - reprise visuelle ciblee de `identite visuelle/preview_nexus_premium_v5_figma_sso.html`
+  - utilisation des SVG exacts du kit valide sous les noms applicatifs `nexus_icon_figma_clean.svg` et `nexus_wordmark_figma_clean.svg`
+  - hashes SHA256 des deux SVG applicatifs identiques aux assets source `identite visuelle/Nexus/assets`
+- correction frontend:
+  - page de connexion recalee sur un fond sombre premium plus profond et moins voile
+  - lockup Nexus en colonne avec proportions proches de la maquette validee
+  - carte de connexion sombre/verre fume, bord champagne subtil et relief leger
+  - champs login/mot de passe repasses en style sombre premium avec icones et texte clair
+  - SSO conserve comme action principale et formulaire login/mot de passe presente comme acces exceptionnel
+  - logique metier de connexion non modifiee
+- validation technique:
+  - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundle publie: `index-DKGoUJhM.css` et `index-B9kJf1zI.js`

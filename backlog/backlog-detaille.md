@@ -83,7 +83,7 @@ Derniere mise a jour: 2026-05-04
 | Securite | Ecran administration des outils | EN_COURS | Diagnostics application, PostgreSQL, securite, parametres, SIRENE, cles API, Taches planifiees, Requeteur SQL et Traces en place |
 | UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes; Administration et Parametres disposent maintenant d'accueils de choix |
 | UX | Accueil par profil | EN_COURS | Entree `Accueil` retablie comme page d'arrivee; personnalisation par profil a approfondir |
-| UX | Responsive tablette / smartphone / PC | A_PLANIFIER | Base responsive presente, passe de finition multi-format a planifier avant finalisation des modules |
+| UX | Responsive tablette / smartphone / PC | SCAFFOLDE | Passe CSS responsive initiale appliquee sur shell, menus, grilles, formulaires et modales; recette multi-format a poursuivre |
 
 ## 4. Transverse
 

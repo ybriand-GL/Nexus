@@ -1322,3 +1322,25 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundle publie: `index-Cj1r3Kwj.js`
+
+## 2026-05-04 - Reprise backlog et passe responsive initiale
+
+- contexte:
+  - reprise apres le scaffold `Tiers` / `Materiels`
+  - prochaine priorite backlog traitee: `UX | Responsive tablette / smartphone / PC`
+- corrections UX:
+  - ajout d'une couche CSS responsive dediee au shell applicatif
+  - navigation laterale repliee proprement en haut de page sur tablette/mobile
+  - grilles principales, cartes outils, modules, parametres, profils et taches adaptees aux largeurs reduites
+  - formulaires et modales contraints en largeur/hauteur pour eviter les debordements sur mobile
+- backlog:
+  - `Responsive tablette / smartphone / PC` passe de `A_PLANIFIER` a `SCAFFOLDE`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-DXVLchaD.css` et `index-e1zWj7qJ.js`

@@ -314,7 +314,7 @@ function App() {
   const [selectedSettingsSection, setSelectedSettingsSection] =
     useState<(typeof settingsSubmenuEntries)[number]>('Accueil')
   const [selectedToolsSection, setSelectedToolsSection] =
-    useState<(typeof toolsSubmenuEntries)[number]>('Accueil')
+    useState<string>('Accueil')
   const [error, setError] = useState<string | null>(null)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [credentialsError, setCredentialsError] = useState<string | null>(null)
@@ -479,6 +479,142 @@ function App() {
         cadence: 'Mensuelle cible',
         status: 'À cadrer',
         description: 'Préparer la politique de conservation des journaux applicatifs et techniques.',
+      },
+    ],
+    [],
+  )
+
+  const controlledSqlQueries = useMemo(
+    () => [
+      {
+        code: 'SECURITY_ACCOUNTS_OVERVIEW',
+        scope: 'Sécurité',
+        label: 'Synthèse des comptes utilisateurs',
+        status: 'À cadrer',
+        output: 'Comptes actifs, inactifs, profils rattachés et dernière connexion.',
+      },
+      {
+        code: 'MODULE_RIGHTS_MATRIX',
+        scope: 'Droits',
+        label: 'Matrice profils et modules',
+        status: 'À cadrer',
+        output: 'Lecture des droits par profil, module et niveau d’accès.',
+      },
+      {
+        code: 'TRANSVERSE_REFERENTIALS',
+        scope: 'Paramètres',
+        label: 'Référentiels transverses',
+        status: 'À cadrer',
+        output: 'Sociétés, analytiques et exploitations avec état actif.',
+      },
+      {
+        code: 'INTEGRATION_CREDENTIALS_AUDIT',
+        scope: 'Outils',
+        label: 'Audit des accès externes',
+        status: 'À cadrer',
+        output: 'Fournisseurs, clés renseignées, secrets masqués et activation.',
+      },
+    ],
+    [],
+  )
+
+  const traceStreams = useMemo(
+    () => [
+      {
+        code: 'AUTH_EVENTS',
+        scope: 'Sécurité',
+        label: 'Authentification',
+        retention: '90 jours cible',
+        description: 'Connexions, déconnexions, échecs de login et demandes de réinitialisation.',
+      },
+      {
+        code: 'ADMIN_ACTIONS',
+        scope: 'Administration',
+        label: 'Actions administrateur',
+        retention: '180 jours cible',
+        description: 'Création ou modification des comptes, profils, paramètres et clés API.',
+      },
+      {
+        code: 'INTEGRATION_RUNS',
+        scope: 'Interfaces',
+        label: 'Traitements d’intégration',
+        retention: '180 jours cible',
+        description: 'Exécutions SIRENE, Lucca, TruckOnline, YellowBox et erreurs de connecteurs.',
+      },
+      {
+        code: 'SYSTEM_ERRORS',
+        scope: 'Technique',
+        label: 'Erreurs applicatives',
+        retention: '365 jours cible',
+        description: 'Exceptions serveur, indisponibilités PostgreSQL et erreurs critiques.',
+      },
+    ],
+    [],
+  )
+
+  const controlledSqlCatalog = useMemo(
+    () => [
+      {
+        code: 'SECURITY_ACCOUNTS_OVERVIEW',
+        scope: 'S\u00e9curit\u00e9',
+        label: 'Synth\u00e8se des comptes utilisateurs',
+        status: '\u00c0 cadrer',
+        output: 'Comptes actifs, inactifs, profils rattach\u00e9s et derni\u00e8re connexion.',
+      },
+      {
+        code: 'MODULE_RIGHTS_MATRIX',
+        scope: 'Droits',
+        label: 'Matrice profils et modules',
+        status: '\u00c0 cadrer',
+        output: 'Lecture des droits par profil, module et niveau d\u2019acc\u00e8s.',
+      },
+      {
+        code: 'TRANSVERSE_REFERENTIALS',
+        scope: 'Param\u00e8tres',
+        label: 'R\u00e9f\u00e9rentiels transverses',
+        status: '\u00c0 cadrer',
+        output: 'Soci\u00e9t\u00e9s, analytiques et exploitations avec \u00e9tat actif.',
+      },
+      {
+        code: 'INTEGRATION_CREDENTIALS_AUDIT',
+        scope: 'Outils',
+        label: 'Audit des acc\u00e8s externes',
+        status: '\u00c0 cadrer',
+        output: 'Fournisseurs, cl\u00e9s renseign\u00e9es, secrets masqu\u00e9s et activation.',
+      },
+    ],
+    [],
+  )
+
+  const traceCatalog = useMemo(
+    () => [
+      {
+        code: 'AUTH_EVENTS',
+        scope: 'S\u00e9curit\u00e9',
+        label: 'Authentification',
+        retention: '90 jours cible',
+        description: 'Connexions, d\u00e9connexions, \u00e9checs de login et demandes de r\u00e9initialisation.',
+      },
+      {
+        code: 'ADMIN_ACTIONS',
+        scope: 'Administration',
+        label: 'Actions administrateur',
+        retention: '180 jours cible',
+        description: 'Cr\u00e9ation ou modification des comptes, profils, param\u00e8tres et cl\u00e9s API.',
+      },
+      {
+        code: 'INTEGRATION_RUNS',
+        scope: 'Interfaces',
+        label: 'Traitements d\u2019int\u00e9gration',
+        retention: '180 jours cible',
+        description: 'Ex\u00e9cutions SIRENE, Lucca, TruckOnline, YellowBox et erreurs de connecteurs.',
+      },
+      {
+        code: 'SYSTEM_ERRORS',
+        scope: 'Technique',
+        label: 'Erreurs applicatives',
+        retention: '365 jours cible',
+        description: 'Exceptions serveur, indisponibilit\u00e9s PostgreSQL et erreurs critiques.',
       },
     ],
     [],
@@ -3103,9 +3239,161 @@ function App() {
               </article>
             ) : null}
 
+            {selectedToolsSection === toolsSubmenuEntries[3] ? (
+              <article className="panel-card panel-card-wide tools-catalog-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Outils</span>
+                  <h2>Requ&ecirc;teur SQL</h2>
+                </div>
+                <p className="profiles-toolbar-copy">
+                  Espace de cadrage pour des requ&ecirc;tes contr&ocirc;l&eacute;es. Aucun SQL libre n&apos;est ex&eacute;cut&eacute; depuis l&apos;interface &agrave; ce stade.
+                </p>
+                <div className="tools-safety-banner">
+                  <strong>R&egrave;gles &agrave; verrouiller avant activation</strong>
+                  <span>Lecture seule, requ&ecirc;tes nomm&eacute;es, param&egrave;tres typ&eacute;s, journalisation et exclusion des secrets.</span>
+                </div>
+                <div className="tools-catalog-grid">
+                  {controlledSqlCatalog.map((query) => (
+                    <article className="tool-blueprint-card" key={query.code}>
+                      <header>
+                        <div>
+                          <span className="eyebrow">{query.scope}</span>
+                          <h3>{query.label}</h3>
+                        </div>
+                        <span className="profile-status-badge is-inactive">{query.status}</span>
+                      </header>
+                      <p>{query.output}</p>
+                      <div className="profile-summary-right">
+                        <span>Code technique</span>
+                        <strong>{query.code}</strong>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            ) : null}
+
+            {selectedToolsSection === 'RequÃƒÂªteur SQL' ? (
+              <article className="panel-card panel-card-wide tools-catalog-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Outils</span>
+                  <h2>RequÃƒÂªteur SQL</h2>
+                </div>
+                <p className="profiles-toolbar-copy">
+                  Espace de cadrage pour des requÃƒÂªtes contrÃƒÂ´lÃƒÂ©es. Aucun SQL libre nâ€™est exÃƒÂ©cutÃƒÂ© depuis lâ€™interface ÃƒÂ  ce stade.
+                </p>
+                <div className="tools-safety-banner">
+                  <strong>RÃƒÂ¨gles ÃƒÂ  verrouiller avant activation</strong>
+                  <span>Lecture seule, requÃƒÂªtes nommÃƒÂ©es, paramÃƒÂ¨tres typÃƒÂ©s, journalisation et exclusion des secrets.</span>
+                </div>
+                <div className="tools-catalog-grid">
+                  {controlledSqlQueries.map((query) => (
+                    <article className="tool-blueprint-card" key={query.code}>
+                      <header>
+                        <div>
+                          <span className="eyebrow">{query.scope}</span>
+                          <h3>{query.label}</h3>
+                        </div>
+                        <span className="profile-status-badge is-inactive">{query.status}</span>
+                      </header>
+                      <p>{query.output}</p>
+                      <div className="profile-summary-right">
+                        <span>Code technique</span>
+                        <strong>{query.code}</strong>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            ) : null}
+
+            {selectedToolsSection === toolsSubmenuEntries[4] ? (
+              <article className="panel-card panel-card-wide tools-catalog-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Outils</span>
+                  <h2>Traces</h2>
+                </div>
+                <p className="profiles-toolbar-copy">
+                  Pr&eacute;paration de la future consultation des journaux applicatifs et techniques, avec conservation ma&icirc;tris&eacute;e.
+                </p>
+                <div className="tools-catalog-grid">
+                  {traceCatalog.map((stream) => (
+                    <article className="tool-blueprint-card" key={stream.code}>
+                      <header>
+                        <div>
+                          <span className="eyebrow">{stream.scope}</span>
+                          <h3>{stream.label}</h3>
+                        </div>
+                        <span className="profile-status-badge is-inactive">&Agrave; raccorder</span>
+                      </header>
+                      <p>{stream.description}</p>
+                      <div className="profile-summary-rights">
+                        <div className="profile-summary-right">
+                          <span>R&eacute;tention</span>
+                          <strong>{stream.retention}</strong>
+                        </div>
+                        <div className="profile-summary-right">
+                          <span>Code technique</span>
+                          <strong>{stream.code}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="trace-retention-strip">
+                  <strong>Point de vigilance</strong>
+                  <span>Les traces devront masquer les secrets, filtrer les donn&eacute;es personnelles et conserver une piste d&apos;audit des consultations.</span>
+                </div>
+              </article>
+            ) : null}
+
+            {selectedToolsSection === 'Traces' && false ? (
+              <article className="panel-card panel-card-wide tools-catalog-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Outils</span>
+                  <h2>Traces</h2>
+                </div>
+                <p className="profiles-toolbar-copy">
+                  PrÃƒÂ©paration de la future consultation des journaux applicatifs et techniques, avec conservation maÃƒÂ®trisÃƒÂ©e.
+                </p>
+                <div className="tools-catalog-grid">
+                  {traceStreams.map((stream) => (
+                    <article className="tool-blueprint-card" key={stream.code}>
+                      <header>
+                        <div>
+                          <span className="eyebrow">{stream.scope}</span>
+                          <h3>{stream.label}</h3>
+                        </div>
+                        <span className="profile-status-badge is-inactive">Ãƒâ‚¬ raccorder</span>
+                      </header>
+                      <p>{stream.description}</p>
+                      <div className="profile-summary-rights">
+                        <div className="profile-summary-right">
+                          <span>RÃƒÂ©tention</span>
+                          <strong>{stream.retention}</strong>
+                        </div>
+                        <div className="profile-summary-right">
+                          <span>Code technique</span>
+                          <strong>{stream.code}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="trace-retention-strip">
+                  <strong>Point de vigilance</strong>
+                  <span>Les traces devront masquer les secrets, filtrer les donnÃƒÂ©es personnelles et conserver une piste dâ€™audit des consultations.</span>
+                </div>
+              </article>
+            ) : null}
+
             {selectedToolsSection !== 'Accueil' &&
+            selectedToolsSection !== toolsSubmenuEntries[3] &&
+            selectedToolsSection !== toolsSubmenuEntries[4] &&
             selectedToolsSection !== 'Clés API' &&
             selectedToolsSection !== 'Tâches planifiées' &&
+            selectedToolsSection !== 'RequÃƒÂªteur SQL' &&
+            selectedToolsSection !== 'Traces' &&
             selectedToolsSection !== 'Diagnostics' ? (
               <article className="panel-card panel-card-wide tool-placeholder-card">
                 <div className="panel-heading">
@@ -3838,7 +4126,7 @@ function getAdministrationSectionDescription(section: (typeof administrationSubm
   }
 }
 
-function getToolsSectionDescription(section: (typeof toolsSubmenuEntries)[number]) {
+function getToolsSectionDescription(section: string) {
   switch (section) {
     case 'Clés API':
       return 'Déclarer et maintenir les accès API par logiciel externe.'

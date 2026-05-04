@@ -1424,6 +1424,50 @@
   margin: 0;
 }
 
+.tools-catalog-card {
+  gap: 18px;
+}
+
+.tools-safety-banner,
+.trace-retention-strip {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid rgba(247, 217, 138, .20);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(247, 217, 138, .10), rgba(247, 217, 138, .035)),
+    rgba(0, 0, 0, .16);
+}
+
+.tools-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.tool-blueprint-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 220px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, .18);
+}
+
+.tool-blueprint-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tool-blueprint-card h3,
+.tool-blueprint-card p {
+  margin: 0;
+}
+
 .settings-list-section {
   align-content: start;
 }
@@ -3008,7 +3052,10 @@
 .nexus-main .settings-empty,
 .nexus-main .accounts-table-row,
 .nexus-main .account-lifecycle-panel,
-.nexus-main .scheduled-task-card {
+.nexus-main .scheduled-task-card,
+.nexus-main .tool-blueprint-card,
+.nexus-main .tools-safety-banner,
+.nexus-main .trace-retention-strip {
   color: var(--nexus-text);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .025)),

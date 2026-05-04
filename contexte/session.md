@@ -955,6 +955,7 @@ Ordre cible de construction:
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
 - validation publication:
@@ -1236,3 +1237,22 @@ Ordre cible de construction:
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+
+## 2026-05-04 - Suite Outils: requeteur et traces
+
+- corrections Administration / Outils:
+  - rubrique `Requeteur SQL` structuree en catalogue de requetes controlees, sans execution SQL libre
+  - regles de securite affichees avant raccordement: lecture seule, requetes nommees, parametres types, journalisation et exclusion des secrets
+  - rubrique `Traces` structuree par flux: authentification, actions administrateur, integrations et erreurs applicatives
+  - retention cible affichee par flux et rappel du masquage des secrets / donnees personnelles
+- backlog:
+  - chantiers `Requeteur SQL controle` et `Consultation des traces` ajoutes en `SCAFFOLDE`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-XOpaeaz0.css` et `index-BAfGQMLZ.js`

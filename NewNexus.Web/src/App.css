@@ -2386,6 +2386,7 @@
   width: 100%;
   height: 100%;
   overflow: visible;
+  animation: authRibbonFloat 14s ease-in-out infinite alternate;
 }
 
 .auth-brand-ribbons path {
@@ -2394,11 +2395,27 @@
   stroke-dasharray: 260 26;
   opacity: .48;
   filter: drop-shadow(0 0 7px rgba(255, 255, 255, .08)) drop-shadow(0 0 16px rgba(215, 164, 73, .05));
+  animation: authRibbonFlow 8.5s linear infinite, authRibbonPulse 6.5s ease-in-out infinite alternate;
 }
 
-.auth-brand-ribbons .r1 { stroke: rgba(247, 217, 138, .74); stroke-width: 4.6; }
-.auth-brand-ribbons .r2 { stroke: rgba(255, 255, 255, .72); stroke-width: 3.6; }
-.auth-brand-ribbons .r3 { stroke: rgba(108, 61, 255, .46); stroke-width: 3.6; }
+.auth-brand-ribbons .r1 { stroke: rgba(247, 217, 138, .74); stroke-width: 4.6; animation-duration: 9s, 6.8s; }
+.auth-brand-ribbons .r2 { stroke: rgba(255, 255, 255, .72); stroke-width: 3.6; animation-duration: 7.5s, 5.8s; }
+.auth-brand-ribbons .r3 { stroke: rgba(108, 61, 255, .46); stroke-width: 3.6; animation-duration: 8.6s, 6.3s; }
+
+@keyframes authRibbonFloat {
+  from { transform: translateX(0) translateY(0); }
+  to { transform: translateX(10px) translateY(-8px); }
+}
+
+@keyframes authRibbonFlow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -286; }
+}
+
+@keyframes authRibbonPulse {
+  from { opacity: .32; }
+  to { opacity: .62; }
+}
 
 .auth-brand-particles {
   display: none;
@@ -2459,6 +2476,15 @@
   position: relative;
   z-index: 1;
   max-width: 760px;
+}
+
+.auth-product-line {
+  margin: 0 auto 8px !important;
+  color: rgba(247, 217, 138, .86) !important;
+  font-size: 12px !important;
+  letter-spacing: .34em;
+  line-height: 1.2 !important;
+  text-transform: uppercase;
 }
 
 .auth-brand-copy-reference p:first-child,
@@ -2671,9 +2697,28 @@
 }
 
 .auth-card-reference .input-icon,
-.auth-card-reference .input-icon svg {
+.auth-card-reference .input-icon svg,
+.password-visibility-button svg {
   width: 20px;
   height: 20px;
+}
+
+.password-visibility-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, .72);
+  cursor: pointer;
+}
+
+.password-visibility-button:hover,
+.password-visibility-button:focus-visible {
+  color: var(--nexus-gold-soft);
+  outline: none;
 }
 
 .auth-card-reference .auth-form input {
@@ -2831,4 +2876,89 @@
     white-space: normal;
     line-height: 1.25;
   }
+}
+
+/* Dark application surfaces: no white content blocks outside authentication. */
+.nexus-main .hero-card,
+.nexus-main .panel-card,
+.nexus-main .metric-card,
+.nexus-main .group-card,
+.nexus-main .dashboard-action-card,
+.nexus-main .workspace-empty,
+.nexus-main .profile-summary-card,
+.nexus-main .profile-creation-card,
+.nexus-main .profile-editor-card,
+.nexus-main .account-form-card,
+.nexus-main .account-edit-card,
+.nexus-main .settings-row-card,
+.nexus-main .settings-edit-card,
+.nexus-main .settings-create-form,
+.nexus-main .credential-card,
+.nexus-main .credential-form,
+.nexus-main .settings-empty,
+.nexus-main .accounts-table-row {
+  color: var(--nexus-text);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .025)),
+    radial-gradient(circle at 0% 0%, rgba(247, 217, 138, .055), transparent 36%);
+  border-color: rgba(247, 217, 138, .18);
+  box-shadow: var(--nexus-shadow-card);
+}
+
+.nexus-main .hero-card {
+  min-height: 250px;
+}
+
+.nexus-main .hero-card-compact {
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, .5fr);
+  min-height: 220px;
+  padding: 24px 28px;
+}
+
+.nexus-main .hero-copy h1,
+.nexus-main .panel-heading h2 {
+  color: var(--nexus-text);
+}
+
+.nexus-main .hero-card-compact .hero-copy h1,
+.nexus-main .panel-heading h2 {
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1;
+}
+
+.nexus-main .group-card span,
+.nexus-main .profile-summary-card p,
+.nexus-main .settings-row-card small,
+.nexus-main .settings-edit-card small,
+.nexus-main .accounts-table-row small,
+.nexus-main .credential-card small,
+.nexus-main .profiles-toolbar-copy,
+.nexus-main .settings-note {
+  color: var(--nexus-text-muted);
+}
+
+.nexus-main .module-list li,
+.nexus-main .rights-list li {
+  border-color: rgba(255, 255, 255, .10);
+}
+
+.nexus-main input,
+.nexus-main select,
+.nexus-main textarea {
+  color: var(--nexus-text);
+  background: rgba(0, 0, 0, .20);
+  border-color: rgba(255, 255, 255, .10);
+}
+
+.nexus-main input:focus,
+.nexus-main select:focus,
+.nexus-main textarea:focus {
+  border-color: rgba(247, 217, 138, .48);
+  outline: 2px solid rgba(215, 164, 73, .18);
+}
+
+.brand-clock {
+  display: inline-flex;
+  color: var(--nexus-text-muted);
+  font-variant-numeric: tabular-nums;
 }

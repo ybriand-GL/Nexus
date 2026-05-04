@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import './post-login-brand-transition.css'
-import nexusIcon from '../../nexus-icon.svg'
-import nexusWordmark from '../../nexus-wordmark.svg'
+import nexusIcon from '../../nexus_icon_figma_clean.svg'
+import nexusWordmark from '../../nexus_wordmark_figma_clean.svg'
 
 type PostLoginBrandTransitionProps = {
   onComplete?: () => void
@@ -10,53 +10,36 @@ type PostLoginBrandTransitionProps = {
 
 export function PostLoginBrandTransition({
   onComplete,
-  label = 'Connexion réussie, chargement de Groupe Laure et Nexus',
+  label = 'Connexion reussie, chargement de Groupe Laure et Nexus',
 }: PostLoginBrandTransitionProps) {
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       onComplete?.()
-    }, 2800)
+    }, 3400)
 
     return () => window.clearTimeout(timeout)
   }, [onComplete])
 
   return (
     <div className="brand-transition-screen" role="status" aria-live="polite" aria-label={label}>
-      <main className="preview-stage">
-        <div className="preview-aura preview-aura-left" aria-hidden="true" />
-        <div className="preview-aura preview-aura-right" aria-hidden="true" />
-        <div className="preview-grain" aria-hidden="true" />
-
-        <div className="preview-content">
-          <div className="preview-brand-row">
-            <div className="preview-laure-wrap">
-              <div className="preview-laure-glow" aria-hidden="true" />
-              <div className="preview-laure-card">
-                <img src="./groupe-laure-symbole-selectionne.png" alt="Symbole Groupe Laure" />
-              </div>
-              <img className="preview-laure-wordmark" src="./groupe-laure-logo-complet.jpg" alt="Groupe Laure" />
-            </div>
-
-            <div className="preview-fusion-lane" aria-hidden="true">
-              <div className="preview-energy preview-energy-gold" />
-              <div className="preview-energy preview-energy-champagne" />
-              <div className="preview-energy preview-energy-cyan" />
-              <div className="preview-energy preview-energy-green" />
-              <div className="preview-spark" />
-            </div>
-
-            <div className="preview-nexus-wrap">
-              <img className="preview-nexus-icon" src={nexusIcon} alt="Icone Nexus" />
-              <img className="preview-nexus-logo" src={nexusWordmark} alt="Nexus" />
-            </div>
-          </div>
-
-          <div className="preview-final-loader" aria-hidden="true">
-            <span className="loader-dot loader-dot-muted" />
-            <span className="loader-dot loader-dot-active" />
-            <span className="loader-dot loader-dot-muted" />
-          </div>
+      <main className="post-auth-cinematic">
+        <div className="post-auth-grain" aria-hidden="true" />
+        <div className="post-auth-vignette" aria-hidden="true" />
+        <div className="post-auth-waves" aria-hidden="true">
+          <svg viewBox="0 0 1200 620" preserveAspectRatio="none">
+            <path className="thread t1" d="M20,250 C180,210 318,122 470,206 C640,300 730,350 892,248 C1018,168 1098,130 1182,138" />
+            <path className="thread t2" d="M80,320 C230,220 330,228 480,300 C640,378 745,312 860,198 C980,82 1090,104 1160,168" />
+            <path className="thread t3" d="M88,402 C260,396 350,326 510,304 C670,282 766,388 910,376 C1040,364 1102,276 1190,294" />
+            <path className="thread t4" d="M10,454 C174,488 330,430 476,322 C640,198 754,176 908,244 C1032,298 1112,284 1190,234" />
+            <path className="thread t5" d="M76,152 C250,78 376,136 514,246 C670,372 774,396 940,286 C1070,200 1134,150 1212,110" />
+          </svg>
         </div>
+        <div className="post-auth-fusion" aria-hidden="true" />
+        <section className="post-auth-final">
+          <img className="post-auth-icon" src={nexusIcon} alt="" aria-hidden="true" />
+          <img className="post-auth-wordmark" src={nexusWordmark} alt="Nexus" />
+          <p>GROUPE LAURE . NEXUS</p>
+        </section>
       </main>
     </div>
   )

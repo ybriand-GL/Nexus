@@ -442,6 +442,13 @@ Ordre cible de construction:
   - `docs\newnexus-brand-handoff-integration.md`
 - validation technique:
   - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundle publie: `index-CBrLA0Vs.css` et `index-_1Qy3qcp.js`
+  - controle source/publie sans `Vos acces sont proteges`, `Connexion securisee`, `Socle premium`, `Importer depuis Nexus`, `admin`/`NewNexus!2026` pre-remplis
   - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
   - publication IIS via `scripts\publish_newnexus_iis.ps1` OK
 - validation publiee:
@@ -1025,3 +1032,26 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundle publie: `index-DKGoUJhM.css` et `index-B9kJf1zI.js`
+
+## 2026-05-04 - Recette authentification, post-auth et surfaces internes
+
+- corrections authentification:
+  - login et mot de passe initialises vides, sans pre-remplissage applicatif
+  - ajout d'un bouton oeil pour afficher ou masquer le mot de passe
+  - suppression du bloc `Vos acces sont proteges` / `Connexion securisee au systeme d'information`
+  - ajout explicite de `GROUPE LAURE . NEXUS`
+  - vagues de la page d'authentification rendues animees
+  - dimensions et surfaces recalees vers la reference `preview_nexus_premium_v5_figma_sso.html`
+- corrections post-auth:
+  - transition post-auth remplacee par une scene sombre cinematique avec vagues animees, fusion et lockup Nexus final
+  - transition raccordee aux SVG propres `nexus_icon_figma_clean.svg` et `nexus_wordmark_figma_clean.svg`
+- corrections application:
+  - blocs blancs neutralises dans les surfaces principales administration, exploitation et gestion administrative
+  - numero de version conserve uniquement dans le contexte Administration
+  - texte sidebar `Socle premium...` remplace par date et heure temps reel
+  - titres des espaces Exploitation et Gestion administrative harmonises avec Administration
+- corrections outils:
+  - suppression du bouton `Importer depuis Nexus`
+  - liste des cles API regroupee par fournisseur logiciel, une carte par logiciel
+- validation technique:
+  - `npm run build` OK

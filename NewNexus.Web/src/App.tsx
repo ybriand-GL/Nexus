@@ -296,18 +296,24 @@ function App() {
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [credentialsError, setCredentialsError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
-  const [isImportingLegacyCredentials, setIsImportingLegacyCredentials] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
   const [credentials, setCredentials] = useState({
-    login: 'admin',
-    password: 'NewNexus!2026',
+    login: '',
+    password: '',
   })
 
   const isInformatique = currentUser?.profile?.code === 'INFORMATIQUE'
 
   useEffect(() => {
     void initialize()
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentDateTime(new Date()), 1000)
+    return () => window.clearInterval(timer)
   }, [])
 
   const rightsByModuleCode = useMemo(() => {
@@ -358,6 +364,42 @@ function App() {
     const providers = new Set(integrationCredentials.map((credential) => credential.providerCode)).size
 
     return { configured, secrets, providers }
+  }, [integrationCredentials])
+
+  const credentialsByProvider = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        providerCode: string
+        providerLabel: string
+        configuredCount: number
+        totalCount: number
+        secretCount: number
+        source: string | null
+        lastImportedAtUtc: string | null
+      }
+    >()
+
+    for (const credential of integrationCredentials) {
+      const current = grouped.get(credential.providerCode) ?? {
+        providerCode: credential.providerCode,
+        providerLabel: credential.providerLabel,
+        configuredCount: 0,
+        totalCount: 0,
+        secretCount: 0,
+        source: credential.source,
+        lastImportedAtUtc: credential.lastImportedAtUtc,
+      }
+
+      current.totalCount += 1
+      current.configuredCount += credential.hasValue ? 1 : 0
+      current.secretCount += credential.isSecret ? 1 : 0
+      current.source = current.source ?? credential.source
+      current.lastImportedAtUtc = getMostRecentDate(current.lastImportedAtUtc, credential.lastImportedAtUtc)
+      grouped.set(credential.providerCode, current)
+    }
+
+    return Array.from(grouped.values()).sort((left, right) => left.providerLabel.localeCompare(right.providerLabel))
   }, [integrationCredentials])
 
   useEffect(() => {
@@ -791,39 +833,6 @@ function App() {
         isSaving: false,
         error: saveError instanceof Error ? saveError.message : 'Erreur d enregistrement.',
       }))
-    }
-  }
-
-  async function handleImportLegacyCredentials() {
-    setIsImportingLegacyCredentials(true)
-    setCredentialsError(null)
-
-    try {
-      const response = await fetch(apiPath('api/admin/integrations/credentials/import-nexus'), { method: 'POST' })
-      if (!response.ok) {
-        throw new Error(await getRequestError(response, 'L import des cles Nexus a echoue.'))
-      }
-
-      const payload = (await response.json()) as {
-        importedCount: number
-        skippedCount: number
-        failedCount: number
-        messages: string[]
-        credentials: IntegrationCredentialItem[]
-      }
-      setIntegrationCredentials(payload.credentials)
-      setCredentialForm((current) =>
-        current.selectedKey ? current : buildCredentialFormFromItem(payload.credentials[0] ?? null),
-      )
-      setCredentialsError(
-        payload.failedCount > 0
-          ? `Import termine avec ${payload.failedCount} erreur(s): ${payload.messages.join(' ')}`
-          : `${payload.importedCount} valeur(s) importee(s), ${payload.skippedCount} ignoree(s).`,
-      )
-    } catch (importError) {
-      setCredentialsError(importError instanceof Error ? importError.message : 'Erreur d import Nexus.')
-    } finally {
-      setIsImportingLegacyCredentials(false)
     }
   }
 
@@ -1554,6 +1563,7 @@ function App() {
           </div>
           <span className="eyebrow">Groupe Laure</span>
           <div className="auth-brand-copy auth-brand-copy-reference">
+            <p className="auth-product-line">GROUPE LAURE . NEXUS</p>
             <p>Le syst&egrave;me d'information modulaire du Groupe Laure.</p>
           </div>
         </section>
@@ -1607,7 +1617,7 @@ function App() {
                   </svg>
                 </span>
                 <input
-                  autoComplete="username"
+                  autoComplete="off"
                   id="login"
                   name="login"
                   value={credentials.login}
@@ -1625,13 +1635,32 @@ function App() {
                   </svg>
                 </span>
                 <input
-                  autoComplete="current-password"
+                  autoComplete="off"
                   id="password"
                   name="password"
-                  type="password"
+                  type={isPasswordVisible ? 'text' : 'password'}
                   value={credentials.password}
                   onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
                 />
+                <button
+                  aria-label={isPasswordVisible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  className="password-visibility-button"
+                  onClick={() => setIsPasswordVisible((current) => !current)}
+                  type="button"
+                >
+                  {isPasswordVisible ? (
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 3l18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M10.7 5.2A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-3.2 4.2M6.6 6.6C3.6 8.4 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M9.9 9.9A3 3 0 0 0 14.1 14.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="3.2" fill="currentColor" opacity="0.9" />
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -1650,10 +1679,6 @@ function App() {
             </button>
           </form>
 
-          <div className="auth-trust-note auth-trust-note-reference">
-            <strong>Vos acc&egrave;s sont prot&eacute;g&eacute;s</strong>
-            <span>Connexion s&eacute;curis&eacute;e au syst&egrave;me d'information.</span>
-          </div>
         </section>
       </div>
     )
@@ -1723,9 +1748,9 @@ function App() {
         <div className="brand-panel">
           <img className="brand-icon" src={nexusIcon} alt="NewNexus" />
           <img className="brand-wordmark" src={nexusWordmark} alt="Nexus" />
-          <p className="brand-copy">
-            Socle premium NewNexus, conçu pour une lecture métier simple sous <code>/newNexus</code>.
-          </p>
+          <time className="brand-copy brand-clock" dateTime={currentDateTime.toISOString()}>
+            {currentDateTime.toLocaleDateString()} - {currentDateTime.toLocaleTimeString()}
+          </time>
         </div>
 
         <nav className="sidebar-nav" aria-label="Navigation principale">
@@ -1758,14 +1783,16 @@ function App() {
       </aside>
 
       <main className="nexus-main">
-        <section className={`hero-card ${selectedNavigation === 'Administration' ? 'hero-card-compact' : ''}`}>
+        <section className={`hero-card ${selectedNavigation !== 'Accueil' ? 'hero-card-compact' : ''}`}>
           <div className="hero-copy">
             <span className="eyebrow">{selectedNavigation}</span>
             <h1>{getWorkspaceTitle(selectedNavigation)}</h1>
             <p>{getWorkspaceDescription(selectedNavigation, isInformatique)}</p>
-            <div className="hero-actions">
-              <span className="primary-chip">Version {systemInfo?.version ?? '0.1.0'}</span>
-            </div>
+            {selectedNavigation === 'Administration' ? (
+              <div className="hero-actions">
+                <span className="primary-chip">Version {systemInfo?.version ?? '0.1.0'}</span>
+              </div>
+            ) : null}
           </div>
 
           <div className="hero-highlight">
@@ -2658,14 +2685,6 @@ function App() {
                 <button className="secondary-button" onClick={() => void loadIntegrationCredentials()} type="button">
                   Rafraichir les cles
                 </button>
-                <button
-                  className="primary-button"
-                  disabled={isImportingLegacyCredentials}
-                  onClick={() => void handleImportLegacyCredentials()}
-                  type="button"
-                >
-                  {isImportingLegacyCredentials ? 'Import en cours...' : 'Importer depuis Nexus'}
-                </button>
               </div>
 
               {credentialsError ? (
@@ -2750,27 +2769,53 @@ function App() {
                 </div>
               </form>
 
-              <div className="integration-credentials-grid">
-                {integrationCredentials.map((credential) => (
+              <div className="profiles-overview-grid integration-credentials-grid">
+                {credentialsByProvider.map((provider) => (
                   <article
-                    className={`credential-card ${credential.hasValue ? 'credential-card-configured' : ''}`}
-                    key={buildIntegrationCredentialKey(credential)}
+                    className={`profile-summary-card credential-card ${provider.configuredCount > 0 ? 'credential-card-configured accent-champagne' : 'accent-navy'}`}
+                    key={provider.providerCode}
                   >
-                    <span className="eyebrow">{credential.providerLabel}</span>
-                    <strong>{credential.displayName}</strong>
-                    <small>{credential.keyName}</small>
-                    <div className="credential-value">
-                      {credential.hasValue ? credential.maskedValue ?? credential.value ?? 'Valeur renseignee' : 'Non renseignee'}
-                    </div>
-                    <div className="settings-inline-actions">
-                      <span className={`profile-status-badge ${credential.hasValue ? 'is-active' : 'is-inactive'}`}>
-                        {credential.hasValue ? 'Configuree' : 'A declarer'}
+                    <header className="profile-summary-header">
+                      <div>
+                        <span className="eyebrow">{provider.providerCode}</span>
+                        <h3>{provider.providerLabel}</h3>
+                      </div>
+                      <span className={`profile-status-badge ${provider.configuredCount > 0 ? 'is-active' : 'is-inactive'}`}>
+                        {provider.configuredCount > 0 ? 'Configuree' : 'A declarer'}
                       </span>
-                      {credential.isSecret ? <small>Secret masque</small> : null}
+                    </header>
+                    <div className="profile-summary-rights">
+                      <div className="profile-summary-right">
+                        <span>Cle logiciel</span>
+                        <strong>{provider.configuredCount > 0 ? 'Renseignee' : 'Non renseignee'}</strong>
+                      </div>
+                      <div className="profile-summary-right">
+                        <span>Parametres techniques</span>
+                        <strong>{provider.totalCount}</strong>
+                      </div>
+                      <div className="profile-summary-right">
+                        <span>Secrets masques</span>
+                        <strong>{provider.secretCount}</strong>
+                      </div>
+                      <div className="profile-summary-right">
+                        <span>Source</span>
+                        <strong>{provider.source ?? 'Manuelle'}</strong>
+                      </div>
                     </div>
-                    {credential.source ? <small>Source: {credential.source}</small> : null}
-                    {credential.lastImportedAtUtc ? (
-                      <small>Import: {new Date(credential.lastImportedAtUtc).toLocaleString()}</small>
+                    <div className="profile-summary-actions">
+                      <button
+                        className="secondary-button"
+                        onClick={() => {
+                          const firstCredential = integrationCredentials.find((credential) => credential.providerCode === provider.providerCode) ?? null
+                          setCredentialForm(buildCredentialFormFromItem(firstCredential))
+                        }}
+                        type="button"
+                      >
+                        Configurer la cle
+                      </button>
+                    </div>
+                    {provider.lastImportedAtUtc ? (
+                      <small>Dernier import: {new Date(provider.lastImportedAtUtc).toLocaleString()}</small>
                     ) : null}
                   </article>
                 ))}
@@ -3200,6 +3245,18 @@ function buildIntegrationCredentialKey(credential: IntegrationCredentialItem) {
   return `${credential.providerCode}|${credential.keyName}`
 }
 
+function getMostRecentDate(left: string | null, right: string | null) {
+  if (!left) {
+    return right
+  }
+
+  if (!right) {
+    return left
+  }
+
+  return new Date(left).getTime() >= new Date(right).getTime() ? left : right
+}
+
 function buildCredentialFormFromItem(credential: IntegrationCredentialItem | null): IntegrationCredentialFormState {
   if (!credential) {
     return createEmptyIntegrationCredentialForm()
@@ -3304,10 +3361,10 @@ function getWorkspaceTitle(selectedNavigation: string) {
   }
 
   if (selectedNavigation === 'Gestion administrative') {
-    return 'Accès aux modules de gestion administrative.'
+    return 'Gestion administrative'
   }
 
-  return 'Accès aux modules d’exploitation.'
+  return 'Exploitation'
 }
 
 function getWorkspaceDescription(selectedNavigation: string, isInformatique: boolean) {

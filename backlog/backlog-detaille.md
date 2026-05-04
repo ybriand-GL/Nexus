@@ -42,6 +42,8 @@ Derniere mise a jour: 2026-05-04
 | UX | Authentification SSO visuelle | TERMINE | Bouton SSO entreprise Groupe Laure place en action principale; raccord technique SSO reel a traiter separement |
 | UX | Audit zero violet/parme | TERMINE | Sources frontend et assets publics Nexus nettoyes des anciens violets et couleurs saturees historiques |
 | UX | Reprise stricte maquette Figma SSO | TERMINE | Connexion recalee sur `preview_nexus_premium_v5_figma_sso.html` avec SVG `nexus_icon_figma_clean.svg` et `nexus_wordmark_figma_clean.svg` exacts |
+| UX | Corrections recette authentification et surfaces sombres | TERMINE | Champs vides, oeil mot de passe, vagues animees, transition post-auth, horloge sidebar et blocs internes sombres |
+| Transverse | Outils cles API par logiciel | TERMINE | Import manuel retire de l'UI; liste regroupee a une carte par fournisseur logiciel |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
 | UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |
 

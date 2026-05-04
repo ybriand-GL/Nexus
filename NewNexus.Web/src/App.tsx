@@ -223,6 +223,14 @@ type ChangePasswordState = {
   error: string | null
 }
 
+type ForgotPasswordState = {
+  identifier: string
+  isSubmitting: boolean
+  message: string | null
+  error: string | null
+  resetToken: string | null
+}
+
 type IntegrationCredentialFormState = {
   selectedKey: string
   providerCode: string
@@ -280,6 +288,7 @@ function App() {
   const [newAnalytic, setNewAnalytic] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
+  const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
   const [credentialForm, setCredentialForm] = useState<IntegrationCredentialFormState>(createEmptyIntegrationCredentialForm())
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
@@ -287,6 +296,7 @@ function App() {
   const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false)
   const [isCreateProfileModalOpen, setIsCreateProfileModalOpen] = useState(false)
   const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false)
+  const [isForgotPasswordModalOpen, setIsForgotPasswordModalOpen] = useState(false)
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
   const [selectedNavigation, setSelectedNavigation] = useState('Accueil')
@@ -732,6 +742,68 @@ function App() {
     resetSessionState()
   }
 
+  function openForgotPasswordModal() {
+    setForgotPassword({
+      ...createEmptyForgotPasswordForm(),
+      identifier: credentials.login,
+    })
+    setIsForgotPasswordModalOpen(true)
+  }
+
+  function closeForgotPasswordModal() {
+    if (forgotPassword.isSubmitting) {
+      return
+    }
+
+    setIsForgotPasswordModalOpen(false)
+    setForgotPassword(createEmptyForgotPasswordForm())
+  }
+
+  function handleForgotPasswordIdentifierChange(event: ChangeEvent<HTMLInputElement>) {
+    setForgotPassword((current) => ({
+      ...current,
+      identifier: event.target.value,
+      error: null,
+      message: null,
+      resetToken: null,
+    }))
+  }
+
+  async function handleForgotPasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setForgotPassword((current) => ({ ...current, isSubmitting: true, error: null, message: null, resetToken: null }))
+
+    try {
+      const response = await fetch(apiPath('api/auth/forgot-password'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginOrEmail: forgotPassword.identifier }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La demande de réinitialisation a échoué.'))
+      }
+
+      const payload = (await response.json()) as {
+        message?: string
+        resetToken?: string | null
+      }
+
+      setForgotPassword((current) => ({
+        ...current,
+        isSubmitting: false,
+        message: payload.message ?? 'Si un compte actif correspond, une demande de réinitialisation a été enregistrée.',
+        resetToken: payload.resetToken ?? null,
+      }))
+    } catch (requestError) {
+      setForgotPassword((current) => ({
+        ...current,
+        isSubmitting: false,
+        error: requestError instanceof Error ? requestError.message : 'Erreur de réinitialisation.',
+      }))
+    }
+  }
+
   async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setChangePassword((current) => ({ ...current, isSaving: true, error: null }))
@@ -789,6 +861,7 @@ function App() {
     setEditableAnalytics({})
     setEditableExploitations({})
     setChangePassword(createEmptyChangePasswordForm())
+    setForgotPassword(createEmptyForgotPasswordForm())
     setCredentialForm(createEmptyIntegrationCredentialForm())
     setDiagnosticsError(null)
     setCredentialsError(null)
@@ -1707,7 +1780,14 @@ function App() {
             </div>
 
             <div className="auth-form-meta">
-              <a className="auth-forgot-link" href="#!" onClick={(event) => event.preventDefault()}>
+              <a
+                className="auth-forgot-link"
+                href="#!"
+                onClick={(event) => {
+                  event.preventDefault()
+                  openForgotPasswordModal()
+                }}
+              >
                 Mot de passe oubli&eacute; ?
               </a>
             </div>
@@ -1722,6 +1802,55 @@ function App() {
           </form>
 
         </section>
+        {isForgotPasswordModalOpen ? (
+          <div className="modal-overlay" onClick={closeForgotPasswordModal} role="presentation">
+            <section
+              aria-labelledby="forgot-password-title"
+              className="modal-card profile-modal-card forgot-password-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">S&eacute;curit&eacute;</span>
+                  <h2 id="forgot-password-title">Mot de passe oubli&eacute;</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeForgotPasswordModal} type="button">
+                  Fermer
+                </button>
+              </div>
+              <form className="account-form-card forgot-password-form" onSubmit={handleForgotPasswordSubmit}>
+                <p className="profiles-toolbar-copy">
+                  Saisissez votre login ou votre email. Si un compte actif correspond, une demande de r&eacute;initialisation
+                  sera enregistr&eacute;e.
+                </p>
+                <label>
+                  <span>Login ou email</span>
+                  <input
+                    autoComplete="username"
+                    value={forgotPassword.identifier}
+                    onChange={handleForgotPasswordIdentifierChange}
+                  />
+                </label>
+
+                {forgotPassword.message ? <p className="form-success">{forgotPassword.message}</p> : null}
+                {forgotPassword.resetToken ? (
+                  <p className="form-success">
+                    Jeton de d&eacute;veloppement : <code>{forgotPassword.resetToken}</code>
+                  </p>
+                ) : null}
+                {forgotPassword.error ? <p className="form-error">{forgotPassword.error}</p> : null}
+
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={forgotPassword.isSubmitting} type="submit">
+                    {forgotPassword.isSubmitting ? 'Envoi...' : 'Envoyer la demande'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -3332,6 +3461,16 @@ function createEmptyChangePasswordForm(): ChangePasswordState {
     confirmPassword: '',
     isSaving: false,
     error: null,
+  }
+}
+
+function createEmptyForgotPasswordForm(): ForgotPasswordState {
+  return {
+    identifier: '',
+    isSubmitting: false,
+    message: null,
+    error: null,
+    resetToken: null,
   }
 }
 

@@ -14,6 +14,10 @@ public sealed class UserAccount
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? LastLoginAtUtc { get; set; }
     public DateTime? LastSyncedAtUtc { get; set; }
+    public string? PasswordResetTokenHash { get; set; }
+    public DateTime? PasswordResetRequestedAtUtc { get; set; }
+    public DateTime? PasswordResetExpiresAtUtc { get; set; }
+    public DateTime? PasswordResetConsumedAtUtc { get; set; }
 
     public SecurityProfile? SecurityProfile { get; set; }
 }

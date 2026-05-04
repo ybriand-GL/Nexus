@@ -29,8 +29,13 @@ internal sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAc
             .HasMaxLength(500)
             .IsRequired();
 
+        builder.Property(entity => entity.PasswordResetTokenHash)
+            .HasMaxLength(128);
+
         builder.HasIndex(entity => entity.Login)
             .IsUnique();
+
+        builder.HasIndex(entity => entity.PasswordResetTokenHash);
 
         builder.HasOne(entity => entity.SecurityProfile)
             .WithMany(profile => profile.UserAccounts)

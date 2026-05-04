@@ -2848,6 +2848,25 @@
   font-size: 14px;
 }
 
+.form-success {
+  margin: 0;
+  color: #c7d2bf;
+  font-weight: 650;
+}
+
+.forgot-password-modal-card {
+  max-width: 560px;
+}
+
+.forgot-password-form {
+  gap: 18px;
+}
+
+.forgot-password-form label {
+  display: grid;
+  gap: 8px;
+}
+
 .auth-trust-note-reference {
   margin-top: 18px;
   padding: 14px 16px;

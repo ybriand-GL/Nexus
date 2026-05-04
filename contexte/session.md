@@ -960,7 +960,32 @@ Ordre cible de construction:
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
+  - `POST /newNexus/api/auth/forgot-password` retourne `200 application/json`
+  - bundles publies: `index-B2l1X4SK.css` et `index-HJLcf-Gs.js`
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-D0NplWwd.css` et `index-BFn53tMu.js`
+
+## 2026-05-04 - Socle mot de passe oublie
+
+- correction domaine/base:
+  - ajout des champs de reinitialisation sur `UserAccount`: jeton hashe, date de demande, expiration et consommation
+  - migration EF `PasswordResetRequests` generee et appliquee sur PostgreSQL local
+- correction backend:
+  - ajout de `POST /api/auth/forgot-password` pour enregistrer une demande avec jeton temporaire expire au bout de 30 minutes
+  - ajout de `POST /api/auth/reset-password` pour consommer un jeton valide et definir un nouveau mot de passe
+  - le jeton n'est pas renvoye hors environnement Development; l'envoi du lien reste a raccorder au service mail/SSO
+- correction frontend:
+  - le lien `Mot de passe oublie ?` ouvre une modale de demande
+  - affichage d'un message generique pour eviter de reveler l'existence d'un compte
+- backlog:
+  - chantier `Mot de passe oublie` passe en `EN_COURS`
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
   - `dotnet ef database update` OK
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK

@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -407,6 +409,90 @@ app.MapPost("/api/auth/logout", async (HttpContext httpContext) =>
 {
     await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.NoContent();
+});
+
+app.MapPost("/api/auth/forgot-password", async (
+    ForgotPasswordRequest request,
+    NewNexusDbContext dbContext,
+    ILoggerFactory loggerFactory) =>
+{
+    var identifier = request.LoginOrEmail.Trim();
+    if (string.IsNullOrWhiteSpace(identifier))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["loginOrEmail"] = ["Le login ou l'adresse email est obligatoire."]
+        });
+    }
+
+    var normalizedEmail = identifier.ToLowerInvariant();
+    var account = await dbContext.UserAccounts
+        .SingleOrDefaultAsync(userAccount =>
+            userAccount.IsActive &&
+            (userAccount.Login == identifier ||
+                userAccount.Email != null && userAccount.Email.ToLower() == normalizedEmail));
+
+    string? resetToken = null;
+    if (account is not null)
+    {
+        resetToken = GeneratePasswordResetToken();
+        account.PasswordResetTokenHash = HashPasswordResetToken(resetToken);
+        account.PasswordResetRequestedAtUtc = DateTime.UtcNow;
+        account.PasswordResetExpiresAtUtc = DateTime.UtcNow.AddMinutes(30);
+        account.PasswordResetConsumedAtUtc = null;
+        await dbContext.SaveChangesAsync();
+
+        loggerFactory.CreateLogger("NewNexus.PasswordReset")
+            .LogInformation("Password reset requested for account {AccountId}.", account.Id);
+    }
+
+    return Results.Ok(new
+    {
+        Message = "Si un compte actif correspond, une demande de réinitialisation a été enregistrée. Le lien d'envoi sera raccordé au service mail/SSO.",
+        ResetToken = app.Environment.IsDevelopment() ? resetToken : null,
+        ExpiresAtUtc = app.Environment.IsDevelopment() && account is not null ? account.PasswordResetExpiresAtUtc : null
+    });
+});
+
+app.MapPost("/api/auth/reset-password", async (ResetPasswordRequest request, NewNexusDbContext dbContext) =>
+{
+    var errors = ValidateResetPasswordRequest(request);
+    if (errors.Count > 0)
+    {
+        return Results.ValidationProblem(errors);
+    }
+
+    var tokenHash = HashPasswordResetToken(request.Token.Trim());
+    var account = await dbContext.UserAccounts
+        .Include(userAccount => userAccount.SecurityProfile!)
+            .ThenInclude(profile => profile.ModuleRights)
+                .ThenInclude(right => right.SecurityModule)
+        .SingleOrDefaultAsync(userAccount =>
+            userAccount.IsActive &&
+            userAccount.PasswordResetTokenHash == tokenHash &&
+            userAccount.PasswordResetConsumedAtUtc == null &&
+            userAccount.PasswordResetExpiresAtUtc > DateTime.UtcNow);
+
+    if (account is null)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["token"] = ["Le lien de réinitialisation est invalide ou expiré."]
+        });
+    }
+
+    account.PasswordHash = PasswordHasher.HashPassword(request.NewPassword);
+    account.MustChangePassword = false;
+    account.PasswordResetTokenHash = null;
+    account.PasswordResetConsumedAtUtc = DateTime.UtcNow;
+    account.PasswordResetExpiresAtUtc = null;
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        Message = "Le mot de passe a été réinitialisé. Vous pouvez maintenant vous connecter."
+    });
 });
 
 app.MapGet("/api/auth/me", async (NewNexusDbContext dbContext, ClaimsPrincipal principal) =>
@@ -1807,6 +1893,38 @@ static Dictionary<string, string[]> ValidateChangePasswordRequest(ChangePassword
     return errors;
 }
 
+static Dictionary<string, string[]> ValidateResetPasswordRequest(ResetPasswordRequest request)
+{
+    var errors = new Dictionary<string, string[]>();
+
+    if (string.IsNullOrWhiteSpace(request.Token))
+    {
+        errors["token"] = ["Le jeton de réinitialisation est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 10)
+    {
+        errors["newPassword"] = ["Le nouveau mot de passe doit contenir au moins 10 caracteres."];
+    }
+
+    if (request.ConfirmPassword != request.NewPassword)
+    {
+        errors["confirmPassword"] = ["La confirmation ne correspond pas au nouveau mot de passe."];
+    }
+
+    return errors;
+}
+
+static string GeneratePasswordResetToken()
+{
+    return Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+}
+
+static string HashPasswordResetToken(string token)
+{
+    return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token.Trim())));
+}
+
 static string? GetJsonString(JsonElement element, string propertyName)
 {
     return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
@@ -2009,6 +2127,8 @@ static async Task<Dictionary<string, string[]>> ValidateExploitationRequestAsync
 }
 
 internal sealed record LoginRequest(string Login, string Password);
+internal sealed record ForgotPasswordRequest(string LoginOrEmail);
+internal sealed record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
 internal sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
 internal sealed record UpdateAccountProfileRequest(Guid? SecurityProfileId);
 internal sealed record UpdateAccountStatusRequest(bool IsActive);

@@ -65,7 +65,7 @@ Derniere mise a jour: 2026-05-04
 | Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
 | Securite | Gestion des profils | EN_COURS | Creation, edition et suppression backend en place, finalisation UI a poursuivre |
 | Securite | Gestion des comptes | EN_COURS | Lecture, creation, edition complete et changement de mot de passe utilisateur disponibles; recuperation mot de passe oublie a cadrer |
-| Securite | Mot de passe oublie | A_FAIRE | Prevoir le parcours de demande, generation de jeton temporaire, expiration, renouvellement et message utilisateur |
+| Securite | Mot de passe oublie | EN_COURS | Demande utilisateur, jeton temporaire hashe, expiration, endpoint de reset et modale auth en place; envoi du lien a raccorder au service mail/SSO |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
 | Securite | Endpoints creation / edition comptes | TERMINE | `POST /api/security/accounts` et `PUT /api/security/accounts/{id}` exposes |

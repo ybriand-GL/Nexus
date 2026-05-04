@@ -39,7 +39,7 @@ export function PostLoginBrandTransition({
 
             <div className="preview-fusion-lane" aria-hidden="true">
               <div className="preview-energy preview-energy-gold" />
-              <div className="preview-energy preview-energy-purple" />
+              <div className="preview-energy preview-energy-champagne" />
               <div className="preview-energy preview-energy-cyan" />
               <div className="preview-energy preview-energy-green" />
               <div className="preview-spark" />

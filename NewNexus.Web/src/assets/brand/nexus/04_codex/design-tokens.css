@@ -2,7 +2,7 @@
   --nexus-navy: #090D15;
   --nexus-gold: #D7A449;
   --nexus-orange: #B87A37;
-  --nexus-purple: #D7A449;
+  --nexus-accent: #D7A449;
   --nexus-cyan: #F2D28A;
   --nexus-green: #7F8F78;
 
@@ -31,7 +31,7 @@
 }
 
 .nexus-sidebar {
-  background: linear-gradient(180deg, #08185F 0%, var(--nexus-navy) 100%);
+  background: linear-gradient(180deg, #090D15 0%, var(--nexus-navy) 100%);
   color: white;
 }
 
@@ -63,4 +63,4 @@
 .nexus-badge-success { background: rgba(127, 143, 120, .16); color: #C7D2BF; }
 .nexus-badge-info { background: rgba(247, 217, 138, .12); color: #F2D28A; }
 .nexus-badge-warning { background: rgba(184, 122, 55, .16); color: #F2D28A; }
-.nexus-badge-purple { background: rgba(247, 217, 138, .12); color: var(--nexus-gold-soft); }
+.nexus-badge-champagne { background: rgba(247, 217, 138, .12); color: var(--nexus-gold-soft); }

@@ -2,21 +2,21 @@
   "brand": "Nexus",
   "selectedDirection": "Concept 4C",
   "colors": {
-    "navy": "#0B1E75",
-    "gold": "#F7B500",
-    "orange": "#FF8A00",
-    "purple": "#D7A449",
-    "cyan": "#18BCEB",
-    "green": "#24B05A",
+    "navy": "#090D15",
+    "gold": "#D7A449",
+    "orange": "#B87A37",
+    "accent": "#D7A449",
+    "cyan": "#F2D28A",
+    "green": "#7F8F78",
     "white": "#FFFFFF",
-    "background": "#F7F9FC",
-    "border": "#E5EAF3",
-    "text": "#0B1E75",
-    "mutedText": "#62708A",
-    "successBg": "#E8F7EE",
-    "warningBg": "#FFF3E0",
-    "infoBg": "#E7F8FE",
-    "purpleBg": "#1A1510"
+    "background": "#04060A",
+    "border": "rgba(255,255,255,.10)",
+    "text": "#F3F5F7",
+    "mutedText": "rgba(255,255,255,.68)",
+    "successBg": "rgba(127,143,120,.16)",
+    "warningBg": "rgba(184,122,55,.16)",
+    "infoBg": "rgba(247,217,138,.12)",
+    "accentBg": "#1A1510"
   },
   "typography": {
     "heading": "Sora, Inter, system-ui, sans-serif",
@@ -30,7 +30,7 @@
     "xl": "24px"
   },
   "shadows": {
-    "card": "0 10px 30px rgba(11, 30, 117, 0.08)",
-    "icon": "0 14px 35px rgba(11, 30, 117, 0.16)"
+    "card": "0 10px 30px rgba(0, 0, 0, 0.08)",
+    "icon": "0 14px 35px rgba(0, 0, 0, 0.16)"
   }
 }

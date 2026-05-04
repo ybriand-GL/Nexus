@@ -249,7 +249,7 @@ const profileAccentClass: Record<string, string> = {
   Administratif: 'accent-orange',
   Direction: 'accent-cyan',
   Exploitation: 'accent-green',
-  Informatique: 'accent-purple',
+  Informatique: 'accent-champagne',
 }
 
 function App() {
@@ -1832,7 +1832,7 @@ function App() {
                 <span className="metric-label">Modules visibles</span>
                 <strong>{visibleModules.length}</strong>
               </article>
-              <article className="metric-card metric-card-purple">
+              <article className="metric-card metric-card-champagne">
                 <span className="metric-label">Profils actifs</span>
                 <strong>{profiles.filter((profile) => profile.isActive).length}</strong>
               </article>
@@ -2152,7 +2152,7 @@ function App() {
                     <span className="metric-label">Sociétés</span>
                     <strong>{companies.length}</strong>
                   </div>
-                  <div className="metric-card metric-card-purple">
+                  <div className="metric-card metric-card-champagne">
                     <span className="metric-label">Analytiques</span>
                     <strong>{analytics.length}</strong>
                   </div>
@@ -2576,7 +2576,7 @@ function App() {
                       <span className="metric-label">Application</span>
                       <strong>{adminDiagnostics.application.product}</strong>
                     </article>
-                    <article className="metric-card metric-card-purple">
+                    <article className="metric-card metric-card-champagne">
                       <span className="metric-label">Version</span>
                       <strong>{adminDiagnostics.application.version}</strong>
                     </article>
@@ -2652,7 +2652,7 @@ function App() {
                   <span className="metric-label">Fournisseurs</span>
                   <strong>{credentialSummary.providers}</strong>
                 </article>
-                <article className="metric-card metric-card-purple">
+                <article className="metric-card metric-card-champagne">
                   <span className="metric-label">Valeurs</span>
                   <strong>{credentialSummary.configured}</strong>
                 </article>

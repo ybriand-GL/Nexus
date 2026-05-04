@@ -38,8 +38,9 @@ Derniere mise a jour: 2026-05-04
 | UX | Tokens officiels du handoff | TERMINE | `nexus-theme.css`, `design-tokens.css` et `design-tokens.json` alignes sur l'identite Nexus sombre |
 | UX | Animation post-authentification | TERMINE | Transition `Groupe Laure × Nexus` integree, affichage unique après login |
 | UX | Favicon et identite navigateur | TERMINE | Icônes 16/32/180/192/512 et manifest publies |
-| UX | Page d'authentification premium | EN_COURS | Lockup Groupe Laure × Nexus intégré, finitions à confirmer |
-| UX | Authentification SSO visuelle | EN_COURS | Bouton SSO entreprise Groupe Laure place en action principale; raccord technique SSO reel a cadrer sans modifier la logique existante |
+| UX | Page d'authentification premium | TERMINE | Auth sombre Nexus officielle, SVG propres, SSO visuel principal et acces exceptionnel publies |
+| UX | Authentification SSO visuelle | TERMINE | Bouton SSO entreprise Groupe Laure place en action principale; raccord technique SSO reel a traiter separement |
+| UX | Audit zero violet/parme | TERMINE | Sources frontend et assets publics Nexus nettoyes des anciens violets et couleurs saturees historiques |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
 | UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |
 

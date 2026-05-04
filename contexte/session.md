@@ -982,3 +982,24 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - `GET /newNexus/api/auth/me` sans session retourne `401`
+
+## 2026-05-04 - Finalisation identite visuelle Nexus
+
+- finalisation frontend:
+  - remplacement des anciens assets publics Nexus par les SVG officiels sombres/champagne
+  - suppression des anciens PNG/ICO Nexus publics non conformes et non references
+  - manifest et meta theme-color alignes sur le fond officiel `#04060A`
+  - renommage des classes et tokens residuels `purple` vers des variantes champagne
+  - neutralisation des dernieres couleurs historiques saturees dans la navigation, les cartes, les badges et l'animation post-authentification
+- controle charte:
+  - scan source `NewNexus.Web/src`, `NewNexus.Web/public` et `NewNexus.Web/index.html` sans violet/parme ni anciennes couleurs saturees historiques
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - scan strict source, dist et `NewNexus.Api/wwwroot` sans violet/parme ni anciennes couleurs saturees historiques
+  - `NewNexus.Api/wwwroot` ne contient plus les anciens PNG/ICO Nexus publics non conformes

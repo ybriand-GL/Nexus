@@ -1344,3 +1344,24 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-DXVLchaD.css` et `index-e1zWj7qJ.js`
+
+## 2026-05-04 - Qualite accents et libelles visibles
+
+- contexte:
+  - poursuite du backlog sur `UX | Qualite accents et libelles UTF-8`
+  - le fichier React principal contient encore des chaines historiques mojibake, a nettoyer progressivement sans casser les comparaisons existantes
+- corrections UX:
+  - ajout d'une normalisation d'affichage des noeuds texte React pour corriger les sequences mojibake connues
+  - couverture des libelles visibles d'administration, parametres, outils, accents courants et apostrophes typographiques cassees
+  - aucune cle metier, endpoint ou logique de droits n'a ete modifiee
+- backlog:
+  - commentaire du chantier `Qualite accents et libelles UTF-8` mis a jour
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-DXVLchaD.css` et `index-PJT7jn-U.js`

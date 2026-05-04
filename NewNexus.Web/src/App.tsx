@@ -284,6 +284,30 @@ const profileAccentClass: Record<string, string> = {
   Informatique: 'accent-champagne',
 }
 
+const mojibakeTextReplacements: Array<[string, string]> = [
+  ['\u00c3\u00a2\u00e2\u201a\u00ac\u00e2\u201e\u00a2', "'"],
+  ['\u00c3\u0192\u00e2\u20ac\u00b0criture', '\u00c9criture'],
+  ['\u00c3\u0192\u00c2\u00a9', '\u00e9'],
+  ['\u00c3\u0192\u00c2\u00a8', '\u00e8'],
+  ['\u00c3\u0192\u00c2\u00aa', '\u00ea'],
+  ['\u00c3\u0192\u00c2\u00a0', '\u00e0'],
+  ['\u00c3\u0192\u00c2\u00b4', '\u00f4'],
+  ['\u00c3\u0192\u00c2\u00ae', '\u00ee'],
+  ['\u00c3\u0192\u00c2\u00a7', '\u00e7'],
+  ['\u00c3\u00a9', '\u00e9'],
+  ['\u00c3\u00a8', '\u00e8'],
+  ['\u00c3\u00aa', '\u00ea'],
+  ['\u00c3\u00a0', '\u00e0'],
+  ['\u00c3\u00a2', '\u00e2'],
+  ['\u00c3\u00b4', '\u00f4'],
+  ['\u00c3\u00ae', '\u00ee'],
+  ['\u00c3\u00a7', '\u00e7'],
+  ['\u00e2\u20ac\u2122', "'"],
+  ['\u00e2\u20ac\u0153', '"'],
+  ['\u00e2\u20ac\u009d', '"'],
+  ['\u00e2\u20ac\u00a2', '\u2022'],
+]
+
 function App() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
   const [modules, setModules] = useState<SecurityModuleItem[]>([])
@@ -353,6 +377,10 @@ function App() {
     const timer = window.setInterval(() => setCurrentDateTime(new Date()), 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    normalizeVisibleTextNodes(document.getElementById('root'))
+  })
 
   useEffect(() => {
     if (!showPostAuthLoader) {
@@ -4342,6 +4370,37 @@ function getWorkspaceTitle(selectedNavigation: string) {
   }
 
   return 'Exploitation'
+}
+
+function normalizeMojibakeText(value: string) {
+  return mojibakeTextReplacements.reduce(
+    (normalized, [broken, fixed]) => normalized.split(broken).join(fixed),
+    value,
+  )
+}
+
+function normalizeVisibleTextNodes(root: HTMLElement | null) {
+  if (!root) {
+    return
+  }
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const nodes: Text[] = []
+
+  while (walker.nextNode()) {
+    nodes.push(walker.currentNode as Text)
+  }
+
+  for (const node of nodes) {
+    if (node.parentElement?.closest('script, style')) {
+      continue
+    }
+
+    const normalized = normalizeMojibakeText(node.nodeValue ?? '')
+    if (normalized !== node.nodeValue) {
+      node.nodeValue = normalized
+    }
+  }
 }
 
 function getWorkspaceDescription(selectedNavigation: string, isInformatique: boolean) {

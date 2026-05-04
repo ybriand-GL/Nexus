@@ -50,7 +50,7 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Outils cles API par logiciel | TERMINE | Import manuel retire de l'UI; liste regroupee a une carte par fournisseur logiciel |
 | Transverse | Outils cles API en modal | TERMINE | Fonctionnement aligne sur Profils: liste des logiciels, bouton ajouter une cle et configuration en modale |
 | UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
-| UX | Design system NewNexus | A_FAIRE | A concevoir apres scaffold |
+| UX | Design system NewNexus | SCAFFOLDE | Document V1 cree dans `docs/newnexus-design-system-v1.md`; a enrichir avec composants et captures |
 
 ## 3. Securite et droits
 

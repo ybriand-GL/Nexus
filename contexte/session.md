@@ -1365,3 +1365,24 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-DXVLchaD.css` et `index-PJT7jn-U.js`
+
+## 2026-05-04 - Reprise contexte et design system V1
+
+- contexte:
+  - reprise apres la passe `Qualite accents et libelles visibles`
+  - prochain item backlog traite: `UX | Design system NewNexus`
+- livrable:
+  - creation de `docs/newnexus-design-system-v1.md`
+  - cadrage des sources de verite: SVG officiels, tokens CSS/JSON et reference auth validee
+  - regles posees pour couleurs, typographie, layout, cartes, boutons, formulaires, modales, administration, outils, responsive et etats
+- backlog:
+  - `Design system NewNexus` passe de `A_FAIRE` a `SCAFFOLDE`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-DXVLchaD.css` et `index-PJT7jn-U.js`

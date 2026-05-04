@@ -1298,3 +1298,27 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundle publie: `index-CBJymuku.js`
+
+## 2026-05-04 - Scaffold tiers et materiels
+
+- corrections Administration / Parametres:
+  - ajout d'une entree `Tiers`
+  - cadrage affiche: types de tiers, limites SIRENE, rattachement multi-analytiques
+  - les cas particuliers et entreprises etrangeres restent explicitement a arbitrer
+  - ajout d'une entree `Materiels`
+  - cadrage affiche: numero de parc unique, source TruckOnline et telematique YellowBox
+- corrections Administration / Outils:
+  - ajout d'une tache planifiee cible `MATERIALS_IMPORT`
+  - la tache reste au statut de cadrage, sans import reel active
+- backlog:
+  - `Tiers`, `Rattachement multi-analytiques des tiers` et `Materiels` passent en `SCAFFOLDE`
+  - les interfaces TruckOnline et YellowBox sont precisees avec le scaffold materiels
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundle publie: `index-Cj1r3Kwj.js`

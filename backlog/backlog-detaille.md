@@ -96,12 +96,12 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Salaries | SCAFFOLDE | Entree `Parametres > Salaries` preparee: source unique Lucca, aucun import reel active |
 | Transverse | Distinction conducteurs | SCAFFOLDE | Regle de qualification conducteur cadree dans l'ecran Salaries; modele local a developper |
 | Transverse | Creation auto des comptes depuis salaries | SCAFFOLDE | Regle cadree: compte cree depuis Lucca sans droit tant qu'un profil NewNexus n'est pas affecte |
-| Transverse | Tiers | CADRE | Multi-types, details a completer plus tard |
-| Transverse | Rattachement multi-analytiques des tiers | CADRE | Table de liaison prevue |
-| Transverse | Materiels | CADRE | Import, numero de parc unique |
+| Transverse | Tiers | SCAFFOLDE | Entree `Parametres > Tiers` preparee: multi-types, limites SIRENE et cas particuliers a arbitrer |
+| Transverse | Rattachement multi-analytiques des tiers | SCAFFOLDE | Cadrage affiche dans `Tiers`; table de liaison tiers/societes/analytiques a developper |
+| Transverse | Materiels | SCAFFOLDE | Entree `Parametres > Materiels` preparee: numero de parc unique, TruckOnline et YellowBox a raccorder |
 | Transverse | Parametrage des interfaces | EN_COURS | Table `IntegrationCredential`, UI Outils et import des cles Nexus legacy en place |
 | Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
-| Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
+| Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
 | Transverse | Requeteur SQL controle | SCAFFOLDE | Catalogue de requetes nommees prepare; execution SQL libre exclue, lecture seule et journalisation a developper avant activation |
 | Transverse | Consultation des traces | SCAFFOLDE | Flux Authentification, Actions administrateur, Integrations et Erreurs applicatives prepares; collecte, stockage et masquage des secrets a developper |
 | UX | Bandeaux titres applicatifs | TERMINE | Bloc lateral Session active retire visuellement et gabarit titre uniformise |
@@ -112,8 +112,8 @@ Derniere mise a jour: 2026-05-04
 |---|---|---|---|
 | Interfaces | SIRENE | EN_COURS | Creation societes active; client ID legacy importe dans les cles API |
 | Interfaces | LUCCA | EN_COURS | Parametres legacy importes; ecran Salaries et tache provisioning comptes prepares, integration metier a developper |
-| Interfaces | Truckonline | EN_COURS | Parametres et secrets legacy importes; integration metier a porter |
-| Interfaces | YellowBox | EN_COURS | Parametres et secrets legacy importes; integration metier a porter |
+| Interfaces | Truckonline | EN_COURS | Parametres et secrets legacy importes; ecran Materiels prepare, integration metier a developper |
+| Interfaces | YellowBox | EN_COURS | Parametres et secrets legacy importes; ecran Materiels prepare, integration metier a developper |
 | Interfaces | Geocodage | EN_COURS | Emplacements Geoapify/Google disponibles dans Outils; aucune valeur legacy renseignee detectee |
 | Interfaces | Cartographie | EN_COURS | OpenStreetMap/Nominatim reference dans Outils; pas de cle legacy requise detectee |
 

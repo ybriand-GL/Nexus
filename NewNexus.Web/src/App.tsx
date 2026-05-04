@@ -264,7 +264,14 @@ const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profil
 const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
 const hiddenIntegrationProviderCodes = new Set(['LEGACY_NEXUS', 'TRACTOR_TRACKING'])
 const employeeSettingsSection = 'Salari\u00e9s'
-const settingsNavigationEntries = [...settingsSubmenuEntries, employeeSettingsSection] as const
+const thirdPartySettingsSection = 'Tiers'
+const materialSettingsSection = 'Mat\u00e9riels'
+const settingsNavigationEntries = [
+  ...settingsSubmenuEntries,
+  employeeSettingsSection,
+  thirdPartySettingsSection,
+  materialSettingsSection,
+] as const
 const toolsSubmenuEntries = ['Accueil', 'Clés API', 'Tâches planifiées', 'Requêteur SQL', 'Traces', 'Diagnostics'] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
@@ -489,6 +496,14 @@ function App() {
         description: 'Préparer la récupération des données télématiques YellowBox.',
       },
       {
+        code: 'MATERIALS_IMPORT',
+        label: 'Import mat\u00e9riels',
+        scope: 'Exploitation',
+        cadence: 'Apr\u00e8s cadrage parc',
+        status: '\u00c0 cadrer',
+        description: 'Pr\u00e9parer le r\u00e9f\u00e9rentiel mat\u00e9riels avec num\u00e9ro de parc unique.',
+      },
+      {
         code: 'AUDIT_LOG_RETENTION',
         label: 'Purge contrôlée des traces',
         scope: 'Technique',
@@ -655,6 +670,54 @@ function App() {
         label: 'Cr\u00e9ation auto des comptes',
         status: '\u00c0 cadrer',
         description: 'Les comptes cr\u00e9\u00e9s depuis les salari\u00e9s devront d\u00e9marrer sans droit applicatif.',
+      },
+    ],
+    [],
+  )
+
+  const thirdPartyReadinessItems = useMemo(
+    () => [
+      {
+        code: 'THIRD_PARTY_TYPES',
+        label: 'Types de tiers',
+        status: '\u00c0 cadrer',
+        description: 'Pr\u00e9parer les cat\u00e9gories: client, fournisseur, partenaire, particulier et entreprise \u00e9trang\u00e8re.',
+      },
+      {
+        code: 'SIRENE_LIMITS',
+        label: 'Limites SIRENE',
+        status: '\u00c0 arbitrer',
+        description: 'Identifier les cas non couverts par SIRENE: particuliers et entreprises \u00e9trang\u00e8res.',
+      },
+      {
+        code: 'MULTI_ANALYTICS',
+        label: 'Rattachement multi-analytiques',
+        status: '\u00c0 mod\u00e9liser',
+        description: 'Pr\u00e9parer la table de liaison entre tiers, soci\u00e9t\u00e9s et analytiques.',
+      },
+    ],
+    [],
+  )
+
+  const materialReadinessItems = useMemo(
+    () => [
+      {
+        code: 'FLEET_REFERENCE',
+        label: 'R\u00e9f\u00e9rentiel parc',
+        status: '\u00c0 cadrer',
+        description: 'Pr\u00e9parer le mod\u00e8le local des mat\u00e9riels et le num\u00e9ro de parc unique.',
+      },
+      {
+        code: 'TRUCKONLINE_SOURCE',
+        label: 'Source TruckOnline',
+        status: '\u00c0 raccorder',
+        description: 'Rattacher les statuts techniques et informations tracteurs au fournisseur TruckOnline.',
+      },
+      {
+        code: 'YELLOWBOX_TELEMATICS',
+        label: 'T\u00e9l\u00e9matique YellowBox',
+        status: '\u00c0 raccorder',
+        description: 'Pr\u00e9parer les donn\u00e9es t\u00e9l\u00e9matiques utiles aux indicateurs tracteurs.',
       },
     ],
     [],
@@ -3131,6 +3194,58 @@ function App() {
                   </div>
                 </section>
                 ) : null}
+
+                {selectedSettingsSection === thirdPartySettingsSection ? (
+                <section className="settings-list-section">
+                  <div className="settings-list-header">
+                    <h3>Tiers</h3>
+                    <small>Multi-types et analytiques</small>
+                  </div>
+                  <p className="profiles-toolbar-copy">
+                    Premier cadrage du r&eacute;f&eacute;rentiel tiers. Les cas particuliers et entreprises &eacute;trang&egrave;res restent &agrave; arbitrer car ils ne sont pas couverts par SIRENE.
+                  </p>
+                  <div className="tools-catalog-grid">
+                    {thirdPartyReadinessItems.map((item) => (
+                      <article className="tool-blueprint-card" key={item.code}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{item.code}</span>
+                            <h3>{item.label}</h3>
+                          </div>
+                          <span className="profile-status-badge is-inactive">{item.status}</span>
+                        </header>
+                        <p>{item.description}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+                ) : null}
+
+                {selectedSettingsSection === materialSettingsSection ? (
+                <section className="settings-list-section">
+                  <div className="settings-list-header">
+                    <h3>Mat&eacute;riels</h3>
+                    <small>Parc et imports exploitation</small>
+                  </div>
+                  <p className="profiles-toolbar-copy">
+                    Premier cadrage du r&eacute;f&eacute;rentiel mat&eacute;riels. Le num&eacute;ro de parc unique est la r&egrave;gle structurante avant import.
+                  </p>
+                  <div className="tools-catalog-grid">
+                    {materialReadinessItems.map((item) => (
+                      <article className="tool-blueprint-card" key={item.code}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{item.code}</span>
+                            <h3>{item.label}</h3>
+                          </div>
+                          <span className="profile-status-badge is-inactive">{item.status}</span>
+                        </header>
+                        <p>{item.description}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+                ) : null}
               </div>
               ) : null}
             </article>
@@ -4287,6 +4402,10 @@ function getSettingsSectionDescription(section: string) {
       return 'Créer et maintenir les codes analytiques rattachés aux sociétés.'
     case employeeSettingsSection:
       return 'Pr\u00e9parer le r\u00e9f\u00e9rentiel salari\u00e9s Lucca, la qualification conducteur et la cr\u00e9ation de comptes sans droit.'
+    case thirdPartySettingsSection:
+      return 'Pr\u00e9parer les tiers multi-types et leur rattachement multi-analytiques.'
+    case materialSettingsSection:
+      return 'Pr\u00e9parer le r\u00e9f\u00e9rentiel mat\u00e9riels, le num\u00e9ro de parc unique et les imports exploitation.'
     case 'Exploitations':
       return 'Créer et maintenir les exploitations rattachées aux sociétés.'
     default:

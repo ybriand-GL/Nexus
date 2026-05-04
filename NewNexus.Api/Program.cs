@@ -887,6 +887,52 @@ app.MapPut("/api/security/accounts/{accountId:guid}", async (
     return Results.NoContent();
 }).RequireAuthorization("RequireInformatique");
 
+app.MapPost("/api/security/accounts/{accountId:guid}/reset-password", async (
+    Guid accountId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    var currentUserId = GetUserId(principal);
+    var account = await dbContext.UserAccounts.SingleOrDefaultAsync(userAccount => userAccount.Id == accountId);
+    if (account is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (currentUserId == account.Id)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["account"] = ["Utilisez le changement de mot de passe personnel pour votre propre compte."]
+        });
+    }
+
+    if (!account.IsActive)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["account"] = ["Le compte doit etre actif avant de reinitialiser son mot de passe."]
+        });
+    }
+
+    var temporaryPassword = GenerateTemporaryPassword();
+    account.PasswordHash = PasswordHasher.HashPassword(temporaryPassword);
+    account.MustChangePassword = true;
+    account.PasswordResetTokenHash = null;
+    account.PasswordResetRequestedAtUtc = null;
+    account.PasswordResetExpiresAtUtc = null;
+    account.PasswordResetConsumedAtUtc = null;
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        account.Id,
+        TemporaryPassword = temporaryPassword,
+        Message = "Mot de passe temporaire genere. L'utilisateur devra le changer a la prochaine connexion."
+    });
+}).RequireAuthorization("RequireInformatique");
+
 app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
 {
     var companies = await dbContext.Companies
@@ -1918,6 +1964,20 @@ static Dictionary<string, string[]> ValidateResetPasswordRequest(ResetPasswordRe
 static string GeneratePasswordResetToken()
 {
     return Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+}
+
+static string GenerateTemporaryPassword()
+{
+    const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#%";
+    var bytes = RandomNumberGenerator.GetBytes(18);
+    var password = new StringBuilder("Nx-");
+
+    foreach (var item in bytes)
+    {
+        password.Append(alphabet[item % alphabet.Length]);
+    }
+
+    return password.ToString();
 }
 
 static string HashPasswordResetToken(string token)

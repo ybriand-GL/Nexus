@@ -64,7 +64,7 @@ Derniere mise a jour: 2026-05-04
 | Securite | Connexion SSO reelle | A_FAIRE | Brancher le bouton SSO sur le fournisseur d'identite Groupe Laure, gerer le retour d'authentification et le rattachement au compte NewNexus |
 | Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
 | Securite | Gestion des profils | EN_COURS | Creation, edition et suppression backend en place, finalisation UI a poursuivre |
-| Securite | Gestion des comptes | EN_COURS | Lecture, creation, edition complete et changement de mot de passe utilisateur disponibles; recuperation mot de passe oublie a cadrer |
+| Securite | Gestion des comptes | EN_COURS | Lecture, creation, edition complete, changement de mot de passe utilisateur et reinitialisation admin par mot de passe temporaire disponibles; recuperation mot de passe oublie par email a raccorder |
 | Securite | Mot de passe oublie | EN_COURS | Demande utilisateur, jeton temporaire hashe, expiration, endpoint de reset et modale auth en place; envoi du lien a raccorder au service mail/SSO |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
@@ -74,13 +74,13 @@ Derniere mise a jour: 2026-05-04
 | Securite | Protection frontend par droits | TERMINE | Navigation et dashboard filtres selon les droits reels |
 | Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
 | Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
-| Securite | Ecran administration des comptes | EN_COURS | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: cartes, configuration, creation, modales corrigees, etats vides et alerte sans profil |
+| Securite | Ecran administration des comptes | EN_COURS | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: cartes, configuration, creation, modales corrigees, cycle de vie du compte et reset admin temporaire |
 | Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
 | Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, creation via modale, edition directe et etat vide en place |
 | Securite | Ecran administration des parametres | EN_COURS | Mini-accueil Parametres, entrees separees et recherche SIRENE par SIREN pour pre-remplir les societes |
-| Securite | Ecran administration des outils | EN_COURS | Diagnostics application, PostgreSQL, securite, parametres, SIRENE et gestion des cles API en place |
+| Securite | Ecran administration des outils | EN_COURS | Diagnostics application, PostgreSQL, securite, parametres, SIRENE, gestion des cles API et premiere vue Taches planifiees en place |
 | UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes; Administration et Parametres disposent maintenant d'accueils de choix |
 | UX | Accueil par profil | EN_COURS | Entree `Accueil` retablie comme page d'arrivee; personnalisation par profil a approfondir |
 | UX | Responsive tablette / smartphone / PC | A_PLANIFIER | Base responsive presente, passe de finition multi-format a planifier avant finalisation des modules |
@@ -101,6 +101,7 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Materiels | CADRE | Import, numero de parc unique |
 | Transverse | Parametrage des interfaces | EN_COURS | Table `IntegrationCredential`, UI Outils et import des cles Nexus legacy en place |
 | Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
+| Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
 | UX | Bandeaux titres applicatifs | TERMINE | Bloc lateral Session active retire visuellement et gabarit titre uniformise |
 
 ## 5. Interfaces

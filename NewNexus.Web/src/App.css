@@ -1361,6 +1361,69 @@
   gap: 12px;
 }
 
+.account-lifecycle-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(247, 217, 138, .18);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .025)),
+    radial-gradient(circle at 0% 0%, rgba(247, 217, 138, .055), transparent 36%);
+}
+
+.account-lifecycle-grid,
+.scheduled-tasks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.account-lifecycle-grid > div,
+.scheduled-task-card {
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(0, 0, 0, .18);
+}
+
+.account-lifecycle-grid strong,
+.scheduled-task-card strong {
+  display: block;
+}
+
+.account-reset-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.temporary-password-code {
+  border-radius: 12px;
+}
+
+.scheduled-tasks-card {
+  gap: 18px;
+}
+
+.scheduled-task-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.scheduled-task-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scheduled-task-card h3,
+.scheduled-task-card p {
+  margin: 0;
+}
+
 .settings-list-section {
   align-content: start;
 }
@@ -2943,7 +3006,9 @@
 .nexus-main .credential-card,
 .nexus-main .credential-form,
 .nexus-main .settings-empty,
-.nexus-main .accounts-table-row {
+.nexus-main .accounts-table-row,
+.nexus-main .account-lifecycle-panel,
+.nexus-main .scheduled-task-card {
   color: var(--nexus-text);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .025)),

@@ -78,6 +78,14 @@ type AccountItem = {
   } | null
 }
 
+type AccountPasswordResetState = {
+  accountId: string | null
+  isResetting: boolean
+  temporaryPassword: string | null
+  message: string | null
+  error: string | null
+}
+
 type CompanyItem = {
   id: string
   siren: string
@@ -289,6 +297,7 @@ function App() {
   const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
   const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
+  const [accountPasswordReset, setAccountPasswordReset] = useState<AccountPasswordResetState>(createEmptyAccountPasswordResetState())
   const [credentialForm, setCredentialForm] = useState<IntegrationCredentialFormState>(createEmptyIntegrationCredentialForm())
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
@@ -428,6 +437,52 @@ function App() {
 
     return Array.from(grouped.values()).sort((left, right) => left.providerLabel.localeCompare(right.providerLabel))
   }, [visibleIntegrationCredentials])
+
+  const scheduledTasks = useMemo(
+    () => [
+      {
+        code: 'SIRENE_COMPANY_SYNC',
+        label: 'Synchronisation SIRENE',
+        scope: 'Sociétés',
+        cadence: 'À planifier',
+        status: 'À raccorder',
+        description: 'Préparer la mise à jour périodique des informations sociétés depuis SIRENE.',
+      },
+      {
+        code: 'LUCCA_EMPLOYEES_IMPORT',
+        label: 'Import salariés Lucca',
+        scope: 'Ressources humaines',
+        cadence: 'Quotidienne cible',
+        status: 'À raccorder',
+        description: 'Importer les salariés, puis qualifier les conducteurs selon le mapping retenu.',
+      },
+      {
+        code: 'TRUCKONLINE_FLEET_SYNC',
+        label: 'Synchronisation TruckOnline',
+        scope: 'Exploitation',
+        cadence: 'Horaire cible',
+        status: 'À raccorder',
+        description: 'Synchroniser les informations tracteurs et statuts techniques TruckOnline.',
+      },
+      {
+        code: 'YELLOWBOX_TELEMATICS_SYNC',
+        label: 'Synchronisation YellowBox',
+        scope: 'Exploitation',
+        cadence: 'Horaire cible',
+        status: 'À raccorder',
+        description: 'Préparer la récupération des données télématiques YellowBox.',
+      },
+      {
+        code: 'AUDIT_LOG_RETENTION',
+        label: 'Purge contrôlée des traces',
+        scope: 'Technique',
+        cadence: 'Mensuelle cible',
+        status: 'À cadrer',
+        description: 'Préparer la politique de conservation des journaux applicatifs et techniques.',
+      },
+    ],
+    [],
+  )
 
   useEffect(() => {
     if (visibleNavigationEntries.length === 0) {
@@ -862,6 +917,7 @@ function App() {
     setEditableExploitations({})
     setChangePassword(createEmptyChangePasswordForm())
     setForgotPassword(createEmptyForgotPasswordForm())
+    setAccountPasswordReset(createEmptyAccountPasswordResetState())
     setCredentialForm(createEmptyIntegrationCredentialForm())
     setDiagnosticsError(null)
     setCredentialsError(null)
@@ -1085,6 +1141,48 @@ function App() {
 
     updateEditableAccount(accountId, (current) => ({ ...current, isSaving: false, error: null }))
     setEditingAccountId(null)
+  }
+
+  async function handleResetAccountPassword(accountId: string) {
+    setAccountPasswordReset({
+      accountId,
+      isResetting: true,
+      temporaryPassword: null,
+      message: null,
+      error: null,
+    })
+
+    try {
+      const response = await fetch(apiPath(`api/security/accounts/${accountId}/reset-password`), {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La réinitialisation du mot de passe a échoué.'))
+      }
+
+      const payload = (await response.json()) as {
+        temporaryPassword: string
+        message?: string
+      }
+
+      await loadAdminSecurityData()
+      setAccountPasswordReset({
+        accountId,
+        isResetting: false,
+        temporaryPassword: payload.temporaryPassword,
+        message: payload.message ?? 'Mot de passe temporaire généré.',
+        error: null,
+      })
+    } catch (resetError) {
+      setAccountPasswordReset({
+        accountId,
+        isResetting: false,
+        temporaryPassword: null,
+        message: null,
+        error: resetError instanceof Error ? resetError.message : 'Erreur de réinitialisation.',
+      })
+    }
   }
 
   function updateEditableProfile(profileId: string, updater: (current: EditableProfileState) => EditableProfileState) {
@@ -2330,6 +2428,10 @@ function App() {
                           <span>Mot de passe</span>
                           <strong>{account.mustChangePassword ? 'Changement requis' : 'À jour'}</strong>
                         </div>
+                        <div className="profile-summary-right">
+                          <span>Créé le</span>
+                          <strong>{new Date(account.createdAtUtc).toLocaleDateString()}</strong>
+                        </div>
                       </div>
                       <div className="profile-summary-actions">
                         <button className="secondary-button" onClick={() => openEditAccountModal(account.id)} type="button">
@@ -2965,8 +3067,45 @@ function App() {
             </article>
             ) : null}
 
+            {selectedToolsSection === 'Tâches planifiées' ? (
+              <article className="panel-card panel-card-wide scheduled-tasks-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Outils</span>
+                  <h2>Tâches planifiées</h2>
+                </div>
+                <p className="profiles-toolbar-copy">
+                  Première vue de pilotage des traitements à automatiser. Les connecteurs restent à raccorder avant activation.
+                </p>
+                <div className="scheduled-tasks-grid">
+                  {scheduledTasks.map((task) => (
+                    <article className="scheduled-task-card" key={task.code}>
+                      <header>
+                        <div>
+                          <span className="eyebrow">{task.scope}</span>
+                          <h3>{task.label}</h3>
+                        </div>
+                        <span className="profile-status-badge is-inactive">{task.status}</span>
+                      </header>
+                      <p>{task.description}</p>
+                      <div className="profile-summary-rights">
+                        <div className="profile-summary-right">
+                          <span>Cadence</span>
+                          <strong>{task.cadence}</strong>
+                        </div>
+                        <div className="profile-summary-right">
+                          <span>Code technique</span>
+                          <strong>{task.code}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            ) : null}
+
             {selectedToolsSection !== 'Accueil' &&
             selectedToolsSection !== 'Clés API' &&
+            selectedToolsSection !== 'Tâches planifiées' &&
             selectedToolsSection !== 'Diagnostics' ? (
               <article className="panel-card panel-card-wide tool-placeholder-card">
                 <div className="panel-heading">
@@ -3174,6 +3313,54 @@ function App() {
                     {editingEditableAccount.isActive ? 'Actif' : 'Inactif'}
                   </span>
                 </header>
+                <div className="account-lifecycle-panel">
+                  <div className="account-lifecycle-grid">
+                    <div>
+                      <span className="eyebrow">Dernière connexion</span>
+                      <strong>{editingAccount.lastLoginAtUtc ? new Date(editingAccount.lastLoginAtUtc).toLocaleString() : 'Jamais'}</strong>
+                    </div>
+                    <div>
+                      <span className="eyebrow">Création</span>
+                      <strong>{new Date(editingAccount.createdAtUtc).toLocaleString()}</strong>
+                    </div>
+                    <div>
+                      <span className="eyebrow">Import</span>
+                      <strong>{editingAccount.lastSyncedAtUtc ? new Date(editingAccount.lastSyncedAtUtc).toLocaleString() : 'Aucun'}</strong>
+                    </div>
+                    <div>
+                      <span className="eyebrow">Mot de passe oublié</span>
+                      <strong>{editingAccount.email ? 'Email disponible' : 'Email manquant'}</strong>
+                    </div>
+                  </div>
+                  {!editingAccount.email ? (
+                    <p className="settings-note">
+                      Renseignez un email pour permettre le futur envoi automatique des liens de réinitialisation.
+                    </p>
+                  ) : null}
+                  <div className="account-reset-actions">
+                    <button
+                      className="secondary-button"
+                      disabled={
+                        accountPasswordReset.isResetting && accountPasswordReset.accountId === editingAccount.id
+                      }
+                      onClick={() => void handleResetAccountPassword(editingAccount.id)}
+                      type="button"
+                    >
+                      {accountPasswordReset.isResetting && accountPasswordReset.accountId === editingAccount.id
+                        ? 'Réinitialisation...'
+                        : 'Réinitialiser le mot de passe'}
+                    </button>
+                    {accountPasswordReset.accountId === editingAccount.id && accountPasswordReset.message ? (
+                      <small className="form-success">{accountPasswordReset.message}</small>
+                    ) : null}
+                    {accountPasswordReset.accountId === editingAccount.id && accountPasswordReset.temporaryPassword ? (
+                      <code className="temporary-password-code">{accountPasswordReset.temporaryPassword}</code>
+                    ) : null}
+                    {accountPasswordReset.accountId === editingAccount.id && accountPasswordReset.error ? (
+                      <small className="account-error">{accountPasswordReset.error}</small>
+                    ) : null}
+                  </div>
+                </div>
                 <div className="account-form-grid">
                   <label>
                     <span>Login</span>
@@ -3471,6 +3658,16 @@ function createEmptyForgotPasswordForm(): ForgotPasswordState {
     message: null,
     error: null,
     resetToken: null,
+  }
+}
+
+function createEmptyAccountPasswordResetState(): AccountPasswordResetState {
+  return {
+    accountId: null,
+    isResetting: false,
+    temporaryPassword: null,
+    message: null,
+    error: null,
   }
 }
 

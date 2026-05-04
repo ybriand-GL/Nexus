@@ -960,6 +960,12 @@ Ordre cible de construction:
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-D8p7XazW.css` et `index-DYVrJOdu.js`
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
   - `POST /newNexus/api/auth/forgot-password` retourne `200 application/json`
   - bundles publies: `index-B2l1X4SK.css` et `index-HJLcf-Gs.js`
 - publication IIS:
@@ -1207,6 +1213,26 @@ Ordre cible de construction:
   - conservation des messages de validation metier existants
 - backlog:
   - passage du chantier `Message base de donnees inaccessible` en `TERMINE`
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+
+## 2026-05-04 - Comptes utilisateurs et taches planifiees
+
+- corrections Administration / Comptes utilisateurs:
+  - ajout d'une reinitialisation administrateur du mot de passe par mot de passe temporaire
+  - le compte cible passe en `MustChangePassword` afin d'imposer le changement au prochain login
+  - refus du reset sur son propre compte et sur les comptes inactifs
+  - ajout d'un panneau cycle de vie dans la modale compte: derniere connexion, creation, dernier import et etat email
+  - affichage du mot de passe temporaire uniquement apres l'action de reset admin
+- corrections Administration / Outils:
+  - rubrique `Taches planifiees` remplacee par une vraie vue de cadrage
+  - traitements prepares: SIRENE, Lucca, TruckOnline, YellowBox et retention des traces
+  - les traitements restent au statut de raccordement, sans execution automatique pour l'instant
+- backlog:
+  - gestion des comptes precisee avec le reset admin temporaire
+  - ecran des outils precise avec la premiere vue `Taches planifiees`
+  - chantier transverse `Taches planifiees` ajoute en `SCAFFOLDE`
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK

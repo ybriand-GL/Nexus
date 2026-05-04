@@ -1256,3 +1256,22 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-XOpaeaz0.css` et `index-BAfGQMLZ.js`
+
+## 2026-05-04 - Scaffold modules fonctionnels V1
+
+- corrections modules:
+  - ajout de cartes de cadrage dans `Exploitation` pour la carte des points, les indicateurs conducteurs et les indicateurs tracteurs
+  - ajout d'une carte de cadrage dans `Gestion administrative` pour la gestion des contraventions
+  - chaque carte affiche objectif, donnees attendues, droit courant et prochaine etape
+  - aucune logique metier ni table module n'a ete ajoutee a ce stade
+- backlog:
+  - les quatre modules fonctionnels V1 passent de `CADRE` a `SCAFFOLDE`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-q2G_L207.css` et `index-BDs32zol.js`

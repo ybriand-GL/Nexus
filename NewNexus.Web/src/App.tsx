@@ -45,6 +45,12 @@ type SecurityModuleItem = {
   isActive: boolean
 }
 
+type FunctionalModuleBlueprint = {
+  intent: string
+  primaryData: string
+  nextStep: string
+}
+
 type SecurityProfileItem = {
   id: string
   code: string
@@ -2371,6 +2377,39 @@ function App() {
                   </ul>
                 </section>
               </div>
+              <div className="functional-module-grid">
+                {(modulesByGroup.Exploitation ?? []).map((module) => {
+                  const blueprint = getFunctionalModuleBlueprint(module.code)
+                  const accessLevel = rightsByModuleCode.get(module.code) ?? 'None'
+
+                  return (
+                    <article className="functional-module-card" key={`workspace-${module.code}`}>
+                      <header>
+                        <div>
+                          <span className="eyebrow">{module.code}</span>
+                          <h3>{module.label}</h3>
+                        </div>
+                        <span className="profile-status-badge is-inactive">Scaffold</span>
+                      </header>
+                      <p>{blueprint.intent}</p>
+                      <div className="functional-module-details">
+                        <div>
+                          <span>Donn&eacute;es attendues</span>
+                          <strong>{blueprint.primaryData}</strong>
+                        </div>
+                        <div>
+                          <span>Droit courant</span>
+                          <strong>{translateAccessLevel(accessLevel)}</strong>
+                        </div>
+                        <div>
+                          <span>Prochaine &eacute;tape</span>
+                          <strong>{blueprint.nextStep}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
             </article>
           </section>
         ) : null}
@@ -2397,6 +2436,39 @@ function App() {
                     ))}
                   </ul>
                 </section>
+              </div>
+              <div className="functional-module-grid">
+                {(modulesByGroup['Gestion administrative'] ?? []).map((module) => {
+                  const blueprint = getFunctionalModuleBlueprint(module.code)
+                  const accessLevel = rightsByModuleCode.get(module.code) ?? 'None'
+
+                  return (
+                    <article className="functional-module-card" key={`workspace-${module.code}`}>
+                      <header>
+                        <div>
+                          <span className="eyebrow">{module.code}</span>
+                          <h3>{module.label}</h3>
+                        </div>
+                        <span className="profile-status-badge is-inactive">Scaffold</span>
+                      </header>
+                      <p>{blueprint.intent}</p>
+                      <div className="functional-module-details">
+                        <div>
+                          <span>Donn&eacute;es attendues</span>
+                          <strong>{blueprint.primaryData}</strong>
+                        </div>
+                        <div>
+                          <span>Droit courant</span>
+                          <strong>{translateAccessLevel(accessLevel)}</strong>
+                        </div>
+                        <div>
+                          <span>Prochaine &eacute;tape</span>
+                          <strong>{blueprint.nextStep}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
               </div>
             </article>
           </section>
@@ -4153,6 +4225,41 @@ function getSettingsSectionDescription(section: (typeof settingsSubmenuEntries)[
       return 'Créer et maintenir les exploitations rattachées aux sociétés.'
     default:
       return 'Synthèse des référentiels transverses.'
+  }
+}
+
+function getFunctionalModuleBlueprint(moduleCode: string): FunctionalModuleBlueprint {
+  switch (moduleCode) {
+    case 'GESTION_CONTRAVENTIONS':
+      return {
+        intent: 'Suivre les contraventions, leur statut de traitement et les rattachements conducteurs ou vehicules.',
+        primaryData: 'Infractions, conducteurs, vehicules, echeances et justificatifs.',
+        nextStep: 'Definir le schema metier et le workflow de traitement.',
+      }
+    case 'CARTE_POINTS_CHARGEMENT_DECHARGEMENT':
+      return {
+        intent: 'Visualiser les points de chargement et de dechargement utiles aux equipes exploitation.',
+        primaryData: 'Sites, adresses, coordonnees, societes et exploitations rattachees.',
+        nextStep: 'Raccorder Geoapify / OpenStreetMap et cadrer le modele des points.',
+      }
+    case 'INDICATEURS_CONDUCTEURS':
+      return {
+        intent: 'Preparer les indicateurs de suivi conducteurs issus des donnees RH et exploitation.',
+        primaryData: 'Salaries Lucca, qualification conducteur, activite et donnees d exploitation.',
+        nextStep: 'Importer les salaries Lucca et definir les indicateurs prioritaires.',
+      }
+    case 'INDICATEURS_TRACTEURS':
+      return {
+        intent: 'Preparer les indicateurs de suivi du parc tracteurs pour le pilotage exploitation.',
+        primaryData: 'Materiels, parc, statuts TruckOnline, telematique YellowBox et exploitations.',
+        nextStep: 'Raccorder TruckOnline puis cadrer le modele materiel local.',
+      }
+    default:
+      return {
+        intent: 'Module visible par droits, en attente de specification metier detaillee.',
+        primaryData: 'Perimetre fonctionnel a confirmer.',
+        nextStep: 'Cadrer les donnees, les actions et les droits fins du module.',
+      }
   }
 }
 

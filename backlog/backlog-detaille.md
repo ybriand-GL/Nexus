@@ -121,10 +121,10 @@ Derniere mise a jour: 2026-05-04
 
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
-| Module | Gestion des contraventions | CADRE | Navigation `Gestion administrative` |
-| Module | Carte des points chargements/dechargements | CADRE | Navigation `Exploitation` |
-| Module | Les indicateurs conducteurs | CADRE | Navigation `Exploitation` |
-| Module | Les indicateurs des tracteurs | CADRE | Navigation `Exploitation` |
+| Module | Gestion des contraventions | SCAFFOLDE | Carte de cadrage visible dans `Gestion administrative`: objectif, donnees attendues, droit courant et prochaine etape |
+| Module | Carte des points chargements/dechargements | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: points, geocodage, rattachements societes/exploitations et prochaine etape |
+| Module | Les indicateurs conducteurs | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: donnees Lucca, qualification conducteur et indicateurs a definir |
+| Module | Les indicateurs des tracteurs | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: donnees materiels, TruckOnline, YellowBox et modele parc a definir |
 
 ## 7. Technique
 

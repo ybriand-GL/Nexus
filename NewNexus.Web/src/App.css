@@ -735,6 +735,54 @@
   border-top: 1px solid var(--nexus-border);
 }
 
+.functional-module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.functional-module-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 300px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 22px;
+  background: rgba(0, 0, 0, .18);
+}
+
+.functional-module-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.functional-module-card h3,
+.functional-module-card p {
+  margin: 0;
+}
+
+.functional-module-details {
+  display: grid;
+  gap: 10px;
+}
+
+.functional-module-details > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, .14);
+}
+
+.functional-module-details span {
+  color: var(--nexus-muted);
+  font-size: .82rem;
+  font-weight: 700;
+}
+
 .profile-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -3054,6 +3102,7 @@
 .nexus-main .account-lifecycle-panel,
 .nexus-main .scheduled-task-card,
 .nexus-main .tool-blueprint-card,
+.nexus-main .functional-module-card,
 .nexus-main .tools-safety-banner,
 .nexus-main .trace-retention-strip {
   color: var(--nexus-text);

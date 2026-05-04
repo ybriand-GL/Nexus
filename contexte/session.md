@@ -921,3 +921,40 @@ Ordre cible de construction:
   - `POST /newNexus/api/auth/login` avec `admin / NewNexus!2026` retourne `200 application/json`
   - `GET /newNexus/api/admin/diagnostics` avec cookie de session retourne `200 application/json`
   - `GET /newNexus/api/security/accounts` avec cookie de session retourne `200 application/json`
+
+## 2026-05-04 - Outils cles API et import Nexus legacy
+
+- evolution backend:
+  - ajout de l'entite `IntegrationCredential` dans le schema PostgreSQL `transverse`
+  - migration `IntegrationCredentials` generee et appliquee
+  - stockage des valeurs avec DataProtection NewNexus
+  - ajout de `GET /api/admin/integrations/credentials`
+  - ajout de `POST /api/admin/integrations/credentials`
+  - ajout de `POST /api/admin/integrations/credentials/import-nexus`
+  - ajout du mode CLI local `--import-legacy-credentials` pour executer l'import sans dependance a une session web
+- import legacy:
+  - lecture de `LOCATIF_DEV.app.ParametreSysteme`
+  - trousseau legacy lu depuis `C:\inetpub\locatif-backend\App_Data\DataProtection-Keys`
+  - deprotection legacy avec l'application DataProtection `Locatif`
+  - fournisseurs couverts: SIRENE, Lucca, TruckOnline, YellowBox, suivi tracteurs, cles admin legacy
+  - placeholders visibles pour Geoapify, Google Maps et OpenStreetMap lorsque la configuration legacy ne contient pas de valeur
+  - import effectue depuis le binaire publie IIS pour rechiffrer avec le trousseau `C:\inetpub\newnexus\App_Data\DataProtection-Keys`
+  - resultat import: 22 valeur(s) importee(s), 10 ignoree(s), 0 echec
+- evolution frontend:
+  - ajout d'un bloc `Cles API & acces externes` dans `Administration > Outils`
+  - bouton `Importer depuis Nexus`
+  - liste des fournisseurs connus avec valeurs masquees pour les secrets
+  - formulaire de declaration / mise a jour d'une cle ou d'une valeur d'integration
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+  - `dotnet ef database update` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200`
+  - `GET /newNexus/api` retourne `200`
+  - `GET /newNexus/api/admin/integrations/credentials` sans session retourne `401`
+  - `POST /newNexus/api/admin/integrations/credentials/import-nexus` sans session retourne `401`
+- limite de validation:
+  - le compte `admin` n'accepte plus les mots de passe documentes `NewNexus!2026` et `legri00`; aucun reset de mot de passe utilisateur n'a ete effectue

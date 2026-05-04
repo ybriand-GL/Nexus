@@ -124,6 +124,25 @@ type AdminDiagnostics = {
   }
 }
 
+type IntegrationCredentialItem = {
+  id: string | null
+  providerCode: string
+  providerLabel: string
+  keyName: string
+  displayName: string
+  isSecret: boolean
+  hasValue: boolean
+  maskedValue: string | null
+  value: string | null
+  isActive: boolean
+  source: string | null
+  notes: string | null
+  createdAtUtc: string | null
+  updatedAtUtc: string | null
+  lastImportedAtUtc: string | null
+  isConfigured: boolean
+}
+
 type AnalyticItem = {
   id: string
   code: string
@@ -203,6 +222,20 @@ type ChangePasswordState = {
   error: string | null
 }
 
+type IntegrationCredentialFormState = {
+  selectedKey: string
+  providerCode: string
+  providerLabel: string
+  keyName: string
+  displayName: string
+  value: string
+  isSecret: boolean
+  isActive: boolean
+  notes: string
+  isSaving: boolean
+  error: string | null
+}
+
 const navigationEntries = ['Accueil', 'Administration', 'Exploitation', 'Gestion administrative']
 const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
 const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
@@ -226,6 +259,7 @@ function App() {
   const [analytics, setAnalytics] = useState<AnalyticItem[]>([])
   const [exploitations, setExploitations] = useState<ExploitationItem[]>([])
   const [adminDiagnostics, setAdminDiagnostics] = useState<AdminDiagnostics | null>(null)
+  const [integrationCredentials, setIntegrationCredentials] = useState<IntegrationCredentialItem[]>([])
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
   const [editableProfiles, setEditableProfiles] = useState<Record<string, EditableProfileState>>({})
   const [editableCompanies, setEditableCompanies] = useState<Record<string, CompanyFormState>>({})
@@ -243,6 +277,7 @@ function App() {
   const [newAnalytic, setNewAnalytic] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
+  const [credentialForm, setCredentialForm] = useState<IntegrationCredentialFormState>(createEmptyIntegrationCredentialForm())
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
   const [isLookingUpNewCompany, setIsLookingUpNewCompany] = useState(false)
@@ -257,7 +292,9 @@ function App() {
     useState<(typeof settingsSubmenuEntries)[number]>('Accueil')
   const [error, setError] = useState<string | null>(null)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
+  const [credentialsError, setCredentialsError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
+  const [isImportingLegacyCredentials, setIsImportingLegacyCredentials] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [credentials, setCredentials] = useState({
@@ -312,6 +349,14 @@ function App() {
       ),
     [modulesByGroup],
   )
+
+  const credentialSummary = useMemo(() => {
+    const configured = integrationCredentials.filter((credential) => credential.hasValue).length
+    const secrets = integrationCredentials.filter((credential) => credential.hasValue && credential.isSecret).length
+    const providers = new Set(integrationCredentials.map((credential) => credential.providerCode)).size
+
+    return { configured, secrets, providers }
+  }, [integrationCredentials])
 
   useEffect(() => {
     if (visibleNavigationEntries.length === 0) {
@@ -452,7 +497,7 @@ function App() {
 
   useEffect(() => {
     if (selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Outils') {
-      void loadAdminDiagnostics()
+      void loadAdminToolsData()
     }
   }, [isInformatique, selectedAdministrationSection, selectedNavigation])
 
@@ -503,6 +548,7 @@ function App() {
     setAnalytics([])
     setExploitations([])
     setAdminDiagnostics(null)
+    setIntegrationCredentials([])
     setEditableAccounts({})
     setEditableProfiles({})
     setEditableCompanies({})
@@ -541,6 +587,10 @@ function App() {
     setExploitations(settingsPayload.exploitations)
   }
 
+  async function loadAdminToolsData() {
+    await Promise.all([loadAdminDiagnostics(), loadIntegrationCredentials()])
+  }
+
   async function loadAdminDiagnostics() {
     setDiagnosticsError(null)
 
@@ -554,6 +604,27 @@ function App() {
     } catch (diagnosticsLoadError) {
       setDiagnosticsError(
         diagnosticsLoadError instanceof Error ? diagnosticsLoadError.message : 'Erreur de chargement des diagnostics.',
+      )
+    }
+  }
+
+  async function loadIntegrationCredentials() {
+    setCredentialsError(null)
+
+    try {
+      const response = await fetch(apiPath('api/admin/integrations/credentials'))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de charger les cles API.'))
+      }
+
+      const payload = (await response.json()) as IntegrationCredentialItem[]
+      setIntegrationCredentials(payload)
+      setCredentialForm((current) =>
+        current.selectedKey ? current : buildCredentialFormFromItem(payload[0] ?? null),
+      )
+    } catch (credentialsLoadError) {
+      setCredentialsError(
+        credentialsLoadError instanceof Error ? credentialsLoadError.message : 'Erreur de chargement des cles API.',
       )
     }
   }
@@ -647,13 +718,111 @@ function App() {
     setCompanies([])
     setAnalytics([])
     setExploitations([])
+    setIntegrationCredentials([])
     setEditableAccounts({})
     setEditableProfiles({})
     setEditableCompanies({})
     setEditableAnalytics({})
     setEditableExploitations({})
     setChangePassword(createEmptyChangePasswordForm())
+    setCredentialForm(createEmptyIntegrationCredentialForm())
     setDiagnosticsError(null)
+    setCredentialsError(null)
+  }
+
+  function handleCredentialSelectionChange(event: ChangeEvent<HTMLSelectElement>) {
+    const selectedKey = event.target.value
+    const credential = integrationCredentials.find((item) => buildIntegrationCredentialKey(item) === selectedKey) ?? null
+    setCredentialForm(buildCredentialFormFromItem(credential))
+  }
+
+  function handleCredentialFormFieldChange(
+    field: 'providerCode' | 'providerLabel' | 'keyName' | 'displayName' | 'value' | 'notes',
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) {
+    setCredentialForm((current) => ({
+      ...current,
+      [field]: event.target.value,
+      selectedKey: field === 'providerCode' || field === 'keyName' ? '' : current.selectedKey,
+      error: null,
+    }))
+  }
+
+  function handleCredentialFormBooleanChange(field: 'isSecret' | 'isActive', event: ChangeEvent<HTMLInputElement>) {
+    setCredentialForm((current) => ({
+      ...current,
+      [field]: event.target.checked,
+      error: null,
+    }))
+  }
+
+  async function handleCredentialFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setCredentialForm((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/admin/integrations/credentials'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerCode: credentialForm.providerCode,
+          providerLabel: credentialForm.providerLabel,
+          keyName: credentialForm.keyName,
+          displayName: credentialForm.displayName,
+          value: credentialForm.value,
+          isSecret: credentialForm.isSecret,
+          isActive: credentialForm.isActive,
+          source: 'Manuel',
+          notes: credentialForm.notes,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'L enregistrement de la cle API a echoue.'))
+      }
+
+      await loadIntegrationCredentials()
+      setCredentialForm((current) => ({ ...current, value: '', isSaving: false, error: null }))
+    } catch (saveError) {
+      setCredentialForm((current) => ({
+        ...current,
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur d enregistrement.',
+      }))
+    }
+  }
+
+  async function handleImportLegacyCredentials() {
+    setIsImportingLegacyCredentials(true)
+    setCredentialsError(null)
+
+    try {
+      const response = await fetch(apiPath('api/admin/integrations/credentials/import-nexus'), { method: 'POST' })
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'L import des cles Nexus a echoue.'))
+      }
+
+      const payload = (await response.json()) as {
+        importedCount: number
+        skippedCount: number
+        failedCount: number
+        messages: string[]
+        credentials: IntegrationCredentialItem[]
+      }
+      setIntegrationCredentials(payload.credentials)
+      setCredentialForm((current) =>
+        current.selectedKey ? current : buildCredentialFormFromItem(payload.credentials[0] ?? null),
+      )
+      setCredentialsError(
+        payload.failedCount > 0
+          ? `Import termine avec ${payload.failedCount} erreur(s): ${payload.messages.join(' ')}`
+          : `${payload.importedCount} valeur(s) importee(s), ${payload.skippedCount} ignoree(s).`,
+      )
+    } catch (importError) {
+      setCredentialsError(importError instanceof Error ? importError.message : 'Erreur d import Nexus.')
+    } finally {
+      setIsImportingLegacyCredentials(false)
+    }
   }
 
   function updateEditableAccount(accountId: string, updater: (current: EditableAccountState) => EditableAccountState) {
@@ -2426,6 +2595,136 @@ function App() {
                 <div className="settings-empty">Chargement des diagnostics...</div>
               )}
             </article>
+            <article className="panel-card panel-card-wide integration-credentials-card">
+              <div className="panel-heading">
+                <span className="eyebrow">Integrations</span>
+                <h2>Cles API & acces externes</h2>
+              </div>
+              <p className="profiles-toolbar-copy">
+                Centralisation des acces SIRENE, Lucca, TruckOnline, YellowBox, Geoapify, OpenStreetMap et anciens secrets Nexus. Les secrets restent masques.
+              </p>
+              <div className="administration-synthesis-actions">
+                <button className="secondary-button" onClick={() => void loadIntegrationCredentials()} type="button">
+                  Rafraichir les cles
+                </button>
+                <button
+                  className="primary-button"
+                  disabled={isImportingLegacyCredentials}
+                  onClick={() => void handleImportLegacyCredentials()}
+                  type="button"
+                >
+                  {isImportingLegacyCredentials ? 'Import en cours...' : 'Importer depuis Nexus'}
+                </button>
+              </div>
+
+              {credentialsError ? (
+                <div className={`status-banner ${credentialsError.includes('erreur') ? 'status-banner-warning' : ''}`}>
+                  <strong>Etat des cles API</strong>
+                  <span>{credentialsError}</span>
+                </div>
+              ) : null}
+
+              <div className="metrics-grid">
+                <article className="metric-card metric-card-navy">
+                  <span className="metric-label">Fournisseurs</span>
+                  <strong>{credentialSummary.providers}</strong>
+                </article>
+                <article className="metric-card metric-card-purple">
+                  <span className="metric-label">Valeurs</span>
+                  <strong>{credentialSummary.configured}</strong>
+                </article>
+                <article className="metric-card metric-card-gold">
+                  <span className="metric-label">Secrets</span>
+                  <strong>{credentialSummary.secrets}</strong>
+                </article>
+                <article className="metric-card metric-card-cyan">
+                  <span className="metric-label">Legacy</span>
+                  <strong>{integrationCredentials.some((item) => item.source?.includes('legacy')) ? 'Importe' : 'A importer'}</strong>
+                </article>
+              </div>
+
+              <form className="credential-form" onSubmit={handleCredentialFormSubmit}>
+                <label>
+                  <span>Cle connue</span>
+                  <select value={credentialForm.selectedKey} onChange={handleCredentialSelectionChange}>
+                    {integrationCredentials.map((credential) => (
+                      <option key={buildIntegrationCredentialKey(credential)} value={buildIntegrationCredentialKey(credential)}>
+                        {credential.providerLabel} - {credential.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Fournisseur</span>
+                  <input value={credentialForm.providerCode} onChange={(event) => handleCredentialFormFieldChange('providerCode', event)} />
+                </label>
+                <label>
+                  <span>Libelle fournisseur</span>
+                  <input value={credentialForm.providerLabel} onChange={(event) => handleCredentialFormFieldChange('providerLabel', event)} />
+                </label>
+                <label>
+                  <span>Nom technique</span>
+                  <input value={credentialForm.keyName} onChange={(event) => handleCredentialFormFieldChange('keyName', event)} />
+                </label>
+                <label>
+                  <span>Libelle</span>
+                  <input value={credentialForm.displayName} onChange={(event) => handleCredentialFormFieldChange('displayName', event)} />
+                </label>
+                <label>
+                  <span>Valeur</span>
+                  <input
+                    placeholder={credentialForm.isSecret ? 'Laisser vide pour conserver le secret existant' : 'URL, chemin ou valeur'}
+                    type={credentialForm.isSecret ? 'password' : 'text'}
+                    value={credentialForm.value}
+                    onChange={(event) => handleCredentialFormFieldChange('value', event)}
+                  />
+                </label>
+                <label className="credential-notes-field">
+                  <span>Notes</span>
+                  <textarea value={credentialForm.notes} onChange={(event) => handleCredentialFormFieldChange('notes', event)} />
+                </label>
+                <label className="toggle-label settings-toggle">
+                  <input checked={credentialForm.isSecret} onChange={(event) => handleCredentialFormBooleanChange('isSecret', event)} type="checkbox" />
+                  <span>Valeur secrete</span>
+                </label>
+                <label className="toggle-label settings-toggle">
+                  <input checked={credentialForm.isActive} onChange={(event) => handleCredentialFormBooleanChange('isActive', event)} type="checkbox" />
+                  <span>{credentialForm.isActive ? 'Active' : 'Inactive'}</span>
+                </label>
+                <div className="profile-action-row credential-form-actions">
+                  <button className="primary-button" disabled={credentialForm.isSaving} type="submit">
+                    {credentialForm.isSaving ? 'Enregistrement...' : 'Enregistrer la cle'}
+                  </button>
+                  {credentialForm.error ? <small className="account-error">{credentialForm.error}</small> : null}
+                </div>
+              </form>
+
+              <div className="integration-credentials-grid">
+                {integrationCredentials.map((credential) => (
+                  <article
+                    className={`credential-card ${credential.hasValue ? 'credential-card-configured' : ''}`}
+                    key={buildIntegrationCredentialKey(credential)}
+                  >
+                    <span className="eyebrow">{credential.providerLabel}</span>
+                    <strong>{credential.displayName}</strong>
+                    <small>{credential.keyName}</small>
+                    <div className="credential-value">
+                      {credential.hasValue ? credential.maskedValue ?? credential.value ?? 'Valeur renseignee' : 'Non renseignee'}
+                    </div>
+                    <div className="settings-inline-actions">
+                      <span className={`profile-status-badge ${credential.hasValue ? 'is-active' : 'is-inactive'}`}>
+                        {credential.hasValue ? 'Configuree' : 'A declarer'}
+                      </span>
+                      {credential.isSecret ? <small>Secret masque</small> : null}
+                    </div>
+                    {credential.source ? <small>Source: {credential.source}</small> : null}
+                    {credential.lastImportedAtUtc ? (
+                      <small>Import: {new Date(credential.lastImportedAtUtc).toLocaleString()}</small>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            </article>
           </section>
         ) : null}
 
@@ -2825,6 +3124,46 @@ function createEmptyChangePasswordForm(): ChangePasswordState {
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
+    isSaving: false,
+    error: null,
+  }
+}
+
+function createEmptyIntegrationCredentialForm(): IntegrationCredentialFormState {
+  return {
+    selectedKey: '',
+    providerCode: '',
+    providerLabel: '',
+    keyName: '',
+    displayName: '',
+    value: '',
+    isSecret: true,
+    isActive: true,
+    notes: '',
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildIntegrationCredentialKey(credential: IntegrationCredentialItem) {
+  return `${credential.providerCode}|${credential.keyName}`
+}
+
+function buildCredentialFormFromItem(credential: IntegrationCredentialItem | null): IntegrationCredentialFormState {
+  if (!credential) {
+    return createEmptyIntegrationCredentialForm()
+  }
+
+  return {
+    selectedKey: buildIntegrationCredentialKey(credential),
+    providerCode: credential.providerCode,
+    providerLabel: credential.providerLabel,
+    keyName: credential.keyName,
+    displayName: credential.displayName,
+    value: '',
+    isSecret: credential.isSecret,
+    isActive: credential.isConfigured ? credential.isActive : true,
+    notes: credential.notes ?? '',
     isSaving: false,
     error: null,
   }

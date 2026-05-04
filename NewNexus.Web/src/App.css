@@ -1229,6 +1229,99 @@
   gap: 14px;
 }
 
+.integration-credentials-card {
+  gap: 20px;
+}
+
+.credential-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(11, 30, 117, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(24, 188, 235, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.94));
+}
+
+.credential-form label,
+.credential-notes-field {
+  display: grid;
+  gap: 8px;
+}
+
+.credential-form label span {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--nexus-text);
+}
+
+.credential-form input,
+.credential-form select,
+.credential-form textarea {
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid var(--nexus-border);
+  background: white;
+  color: var(--nexus-text);
+  font: inherit;
+}
+
+.credential-form textarea {
+  min-height: 86px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.credential-notes-field,
+.credential-form-actions {
+  grid-column: span 2;
+}
+
+.integration-credentials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.credential-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--nexus-border);
+  background: linear-gradient(180deg, rgba(247, 249, 252, 0.9), #fff);
+}
+
+.credential-card-configured {
+  border-color: rgba(36, 176, 90, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(36, 176, 90, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(247, 249, 252, 0.96), #fff);
+}
+
+.credential-card strong,
+.credential-card small {
+  display: block;
+}
+
+.credential-card small {
+  color: var(--nexus-muted);
+}
+
+.credential-value {
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(11, 30, 117, 0.04);
+  color: var(--nexus-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
 .settings-list,
 .settings-list-section,
 .settings-form,
@@ -1396,10 +1489,17 @@
   .settings-reference-grid,
   .settings-kpis,
   .admin-tools-grid,
+  .integration-credentials-grid,
+  .credential-form,
   .settings-form,
   .settings-edit-grid,
   .account-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .credential-notes-field,
+  .credential-form-actions {
+    grid-column: auto;
   }
 }
 

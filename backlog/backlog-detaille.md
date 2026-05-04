@@ -68,7 +68,7 @@ Derniere mise a jour: 2026-05-04
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
 | Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, creation via modale, edition directe et etat vide en place |
 | Securite | Ecran administration des parametres | EN_COURS | Mini-accueil Parametres, entrees separees et recherche SIRENE par SIREN pour pre-remplir les societes |
-| Securite | Ecran administration des outils | EN_COURS | Diagnostics application, PostgreSQL, securite, parametres et SIRENE en place |
+| Securite | Ecran administration des outils | EN_COURS | Diagnostics application, PostgreSQL, securite, parametres, SIRENE et gestion des cles API en place |
 | UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes; Administration et Parametres disposent maintenant d'accueils de choix |
 | UX | Accueil par profil | EN_COURS | Entree `Accueil` retablie comme page d'arrivee; personnalisation par profil a approfondir |
 | UX | Responsive tablette / smartphone / PC | A_PLANIFIER | Base responsive presente, passe de finition multi-format a planifier avant finalisation des modules |
@@ -87,18 +87,18 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Tiers | CADRE | Multi-types, details a completer plus tard |
 | Transverse | Rattachement multi-analytiques des tiers | CADRE | Table de liaison prevue |
 | Transverse | Materiels | CADRE | Import, numero de parc unique |
-| Transverse | Parametrage des interfaces | CADRE | Toutes les interfaces Nexus a reprendre |
+| Transverse | Parametrage des interfaces | EN_COURS | Table `IntegrationCredential`, UI Outils et import des cles Nexus legacy en place |
 
 ## 5. Interfaces
 
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
-| Interfaces | SIRENE | CADRE | Creation societes, partie tiers |
-| Interfaces | LUCCA | CADRE | Source unique salaries |
-| Interfaces | Truckonline | CADRE | A reutiliser/selectivement porter |
-| Interfaces | YellowBox | CADRE | A reutiliser/selectivement porter |
-| Interfaces | Geocodage | CADRE | A reprendre |
-| Interfaces | Cartographie | CADRE | A reprendre |
+| Interfaces | SIRENE | EN_COURS | Creation societes active; client ID legacy importe dans les cles API |
+| Interfaces | LUCCA | EN_COURS | Parametres legacy importes; integration metier salaries a porter |
+| Interfaces | Truckonline | EN_COURS | Parametres et secrets legacy importes; integration metier a porter |
+| Interfaces | YellowBox | EN_COURS | Parametres et secrets legacy importes; integration metier a porter |
+| Interfaces | Geocodage | EN_COURS | Emplacements Geoapify/Google disponibles dans Outils; aucune valeur legacy renseignee detectee |
+| Interfaces | Cartographie | EN_COURS | OpenStreetMap/Nominatim reference dans Outils; pas de cle legacy requise detectee |
 
 ## 6. Modules fonctionnels V1
 
@@ -131,8 +131,10 @@ Derniere mise a jour: 2026-05-04
 | Technique | Script de publication IIS NewNexus | TERMINE | Script `publish_newnexus_iis.ps1` en place |
 | Technique | Migration authentification | TERMINE | `AuthenticationBootstrap` generee et appliquee |
 | Technique | Migration transverse Parametres | TERMINE | `TransverseSettingsSocle` generee et appliquee |
+| Technique | Migration cles integrations | TERMINE | `IntegrationCredentials` generee et appliquee |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 | Technique | Endpoint diagnostics administration | TERMINE | `GET /api/admin/diagnostics` publie pour le profil Informatique |
+| Technique | Import cles Nexus legacy | TERMINE | 22 valeurs importees depuis `LOCATIF_DEV` et rechiffrees avec le trousseau IIS NewNexus |
 
 ## 9. Hebergement et acces
 

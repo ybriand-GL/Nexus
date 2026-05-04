@@ -2,8 +2,10 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using NewNexus.Data.Postgres;
 using NewNexus.Domain.Security;
 using NewNexus.Domain.Transverse;
@@ -11,6 +13,9 @@ using NewNexus.Domain.Transverse;
 var builder = WebApplication.CreateBuilder(args);
 
 var basePath = NormalizeBasePath(builder.Configuration["App:BasePath"]);
+var dataProtectionKeysPath = ResolveConfiguredPath(
+    builder.Environment.ContentRootPath,
+    builder.Configuration["DataProtection:KeysPath"]);
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()?
@@ -72,6 +77,10 @@ builder.Services.AddAuthorization(options =>
             .RequireClaim("profile_code", "INFORMATIQUE"));
 });
 
+builder.Services
+    .AddDataProtection()
+    .SetApplicationName("NewNexus")
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
 builder.Services.AddNewNexusPostgres(builder.Configuration);
 builder.Services.AddHttpClient("Sirene", client =>
 {
@@ -81,6 +90,24 @@ builder.Services.AddHttpClient("Sirene", client =>
 });
 
 var app = builder.Build();
+
+if (args.Contains("--import-legacy-credentials", StringComparer.OrdinalIgnoreCase))
+{
+    using var scope = app.Services.CreateScope();
+    var result = await ImportLegacyNexusCredentialsAsync(
+        scope.ServiceProvider.GetRequiredService<NewNexusDbContext>(),
+        scope.ServiceProvider.GetRequiredService<IConfiguration>(),
+        scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>(),
+        CancellationToken.None);
+
+    Console.WriteLine($"Legacy credentials import: imported={result.ImportedCount}, skipped={result.SkippedCount}, failed={result.FailedCount}");
+    foreach (var message in result.Messages)
+    {
+        Console.WriteLine(message);
+    }
+
+    return;
+}
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
@@ -190,6 +217,110 @@ app.MapGet("/api/admin/diagnostics", async (NewNexusDbContext dbContext, HttpCon
                 Provider = "API Recherche d'Entreprises"
             }
         }
+    });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapGet("/api/admin/integrations/credentials", async (
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider) =>
+{
+    var credentials = await dbContext.IntegrationCredentials
+        .AsNoTracking()
+        .OrderBy(credential => credential.ProviderLabel)
+        .ThenBy(credential => credential.DisplayName)
+        .ToListAsync();
+
+    return Results.Ok(BuildCredentialResponses(credentials, dataProtectionProvider));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/admin/integrations/credentials", async (
+    UpsertIntegrationCredentialRequest request,
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider) =>
+{
+    var providerCode = NormalizeTechnicalCode(request.ProviderCode);
+    var keyName = NormalizeTechnicalCode(request.KeyName);
+
+    if (string.IsNullOrWhiteSpace(providerCode) || string.IsNullOrWhiteSpace(keyName))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["credential"] = ["Le fournisseur et le nom technique de la cle sont obligatoires."]
+        });
+    }
+
+    var definition = GetKnownCredentialDefinitions()
+        .FirstOrDefault(item =>
+            string.Equals(item.ProviderCode, providerCode, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(item.KeyName, keyName, StringComparison.OrdinalIgnoreCase));
+    var existing = await dbContext.IntegrationCredentials
+        .SingleOrDefaultAsync(item => item.ProviderCode == providerCode && item.KeyName == keyName);
+    var incomingValue = NormalizeOptionalText(request.Value);
+
+    if (existing is null && string.IsNullOrWhiteSpace(incomingValue))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["value"] = ["La valeur est obligatoire pour declarer une nouvelle cle."]
+        });
+    }
+
+    existing ??= new IntegrationCredential
+    {
+        Id = Guid.NewGuid(),
+        ProviderCode = providerCode,
+        KeyName = keyName,
+        CreatedAtUtc = DateTime.UtcNow
+    };
+
+    existing.ProviderLabel = FirstNonEmpty(request.ProviderLabel, definition?.ProviderLabel, providerCode) ?? providerCode;
+    existing.DisplayName = FirstNonEmpty(request.DisplayName, definition?.DisplayName, keyName) ?? keyName;
+    existing.IsSecret = definition?.IsSecret ?? request.IsSecret;
+    existing.IsActive = request.IsActive;
+    existing.Source = FirstNonEmpty(request.Source, existing.Source, "Manuel");
+    existing.Notes = NormalizeOptionalText(request.Notes);
+    existing.UpdatedAtUtc = DateTime.UtcNow;
+
+    if (!string.IsNullOrWhiteSpace(incomingValue))
+    {
+        existing.ProtectedValue = ProtectCredentialValue(incomingValue, dataProtectionProvider);
+    }
+
+    if (dbContext.Entry(existing).State == EntityState.Detached)
+    {
+        dbContext.IntegrationCredentials.Add(existing);
+    }
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(BuildCredentialResponse(existing, dataProtectionProvider, definition));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/admin/integrations/credentials/import-nexus", async (
+    NewNexusDbContext dbContext,
+    IConfiguration configuration,
+    IDataProtectionProvider dataProtectionProvider,
+    HttpContext httpContext) =>
+{
+    var importResult = await ImportLegacyNexusCredentialsAsync(
+        dbContext,
+        configuration,
+        dataProtectionProvider,
+        httpContext.RequestAborted);
+
+    var credentials = await dbContext.IntegrationCredentials
+        .AsNoTracking()
+        .OrderBy(credential => credential.ProviderLabel)
+        .ThenBy(credential => credential.DisplayName)
+        .ToListAsync(httpContext.RequestAborted);
+
+    return Results.Ok(new
+    {
+        importResult.ImportedCount,
+        importResult.SkippedCount,
+        importResult.FailedCount,
+        importResult.Messages,
+        Credentials = BuildCredentialResponses(credentials, dataProtectionProvider)
     });
 }).RequireAuthorization("RequireInformatique");
 
@@ -973,6 +1104,15 @@ app.MapFallbackToFile("index.html");
 
 app.Run();
 
+static string ResolveConfiguredPath(string contentRootPath, string? configuredPath)
+{
+    var path = string.IsNullOrWhiteSpace(configuredPath)
+        ? Path.Combine(contentRootPath, "App_Data", "DataProtection-Keys")
+        : configuredPath.Trim();
+
+    return Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(contentRootPath, path));
+}
+
 static string NormalizeBasePath(string? value)
 {
     if (string.IsNullOrWhiteSpace(value))
@@ -988,6 +1128,456 @@ static string NormalizeBasePath(string? value)
 
     return trimmed.TrimEnd('/');
 }
+
+static IReadOnlyList<object> BuildCredentialResponses(
+    IReadOnlyCollection<IntegrationCredential> credentials,
+    IDataProtectionProvider dataProtectionProvider)
+{
+    var definitions = GetKnownCredentialDefinitions();
+    var definitionsByKey = definitions.ToDictionary(
+        item => BuildCredentialKey(item.ProviderCode, item.KeyName),
+        StringComparer.OrdinalIgnoreCase);
+    var credentialsByKey = credentials.ToDictionary(
+        item => BuildCredentialKey(item.ProviderCode, item.KeyName),
+        StringComparer.OrdinalIgnoreCase);
+    var responses = new List<object>();
+
+    foreach (var definition in definitions)
+    {
+        credentialsByKey.TryGetValue(BuildCredentialKey(definition.ProviderCode, definition.KeyName), out var credential);
+        responses.Add(BuildCredentialResponse(credential, dataProtectionProvider, definition));
+    }
+
+    foreach (var credential in credentials)
+    {
+        if (!definitionsByKey.ContainsKey(BuildCredentialKey(credential.ProviderCode, credential.KeyName)))
+        {
+            responses.Add(BuildCredentialResponse(credential, dataProtectionProvider, null));
+        }
+    }
+
+    return responses;
+}
+
+static object BuildCredentialResponse(
+    IntegrationCredential? credential,
+    IDataProtectionProvider dataProtectionProvider,
+    IntegrationCredentialDefinition? definition)
+{
+    var clearValue = credential is null ? null : UnprotectCredentialValue(credential.ProtectedValue, dataProtectionProvider);
+    var providerCode = credential?.ProviderCode ?? definition?.ProviderCode ?? string.Empty;
+    var keyName = credential?.KeyName ?? definition?.KeyName ?? string.Empty;
+    var isSecret = credential?.IsSecret ?? definition?.IsSecret ?? true;
+
+    return new
+    {
+        Id = credential?.Id,
+        ProviderCode = providerCode,
+        ProviderLabel = credential?.ProviderLabel ?? definition?.ProviderLabel ?? providerCode,
+        KeyName = keyName,
+        DisplayName = credential?.DisplayName ?? definition?.DisplayName ?? keyName,
+        IsSecret = isSecret,
+        HasValue = !string.IsNullOrWhiteSpace(credential?.ProtectedValue),
+        MaskedValue = isSecret ? MaskSecret(clearValue) : null,
+        Value = isSecret ? null : clearValue,
+        IsActive = credential?.IsActive ?? false,
+        Source = credential?.Source,
+        Notes = credential?.Notes ?? definition?.Notes,
+        CreatedAtUtc = credential?.CreatedAtUtc,
+        UpdatedAtUtc = credential?.UpdatedAtUtc,
+        LastImportedAtUtc = credential?.LastImportedAtUtc,
+        IsConfigured = credential is not null
+    };
+}
+
+static async Task<LegacyImportResult> ImportLegacyNexusCredentialsAsync(
+    NewNexusDbContext dbContext,
+    IConfiguration configuration,
+    IDataProtectionProvider dataProtectionProvider,
+    CancellationToken cancellationToken)
+{
+    var connectionString = configuration["LegacyNexus:ConnectionString"];
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        return new LegacyImportResult(0, 0, 1, ["La chaine de connexion LegacyNexus est absente."]);
+    }
+
+    var legacyKeysPath = configuration["LegacyNexus:DataProtectionKeysPath"];
+    if (string.IsNullOrWhiteSpace(legacyKeysPath) || !Directory.Exists(legacyKeysPath))
+    {
+        return new LegacyImportResult(0, 0, 1, ["Le trousseau DataProtection legacy est introuvable."]);
+    }
+
+    using var legacyProvider = BuildLegacyDataProtectionProvider(legacyKeysPath);
+    var legacyIntegrationProtector = legacyProvider
+        .GetRequiredService<IDataProtectionProvider>()
+        .CreateProtector("Locatif.Api.SireneSecret.v1");
+    var legacyAdminProtector = legacyProvider
+        .GetRequiredService<IDataProtectionProvider>()
+        .CreateProtector("Locatif.Api.AdminApiKeys.v1");
+    var definitions = GetKnownCredentialDefinitions()
+        .Where(item => !string.IsNullOrWhiteSpace(item.LegacyParameterKey))
+        .ToList();
+    var legacyRows = await ReadLegacyParameterRowsAsync(
+        connectionString,
+        definitions.Select(item => item.LegacyParameterKey!).Append("admin.api-keys.v1").Distinct().ToList(),
+        cancellationToken);
+
+    var imported = 0;
+    var skipped = 0;
+    var failed = 0;
+    var messages = new List<string>();
+
+    foreach (var definition in definitions)
+    {
+        if (!legacyRows.TryGetValue(definition.LegacyParameterKey!, out var storedValue) || string.IsNullOrWhiteSpace(storedValue))
+        {
+            skipped++;
+            continue;
+        }
+
+        var clearValue = TryUnprotectLegacyValue(storedValue, legacyIntegrationProtector);
+        if (string.IsNullOrWhiteSpace(clearValue))
+        {
+            failed++;
+            messages.Add($"{definition.ProviderLabel} / {definition.DisplayName}: valeur legacy non dechiffrable.");
+            continue;
+        }
+
+        await UpsertImportedCredentialAsync(dbContext, dataProtectionProvider, definition, clearValue, cancellationToken);
+        imported++;
+    }
+
+    var appSettingsImports = ReadLegacyAppSettingsCredentials(configuration);
+    foreach (var import in appSettingsImports)
+    {
+        if (string.IsNullOrWhiteSpace(import.Value))
+        {
+            skipped++;
+            continue;
+        }
+
+        await UpsertImportedCredentialAsync(dbContext, dataProtectionProvider, import.Definition, import.Value, cancellationToken);
+        imported++;
+    }
+
+    if (legacyRows.TryGetValue("admin.api-keys.v1", out var adminApiKeysRaw) && !string.IsNullOrWhiteSpace(adminApiKeysRaw))
+    {
+        var adminImport = await ImportLegacyAdminApiKeysAsync(
+            dbContext,
+            dataProtectionProvider,
+            legacyAdminProtector,
+            adminApiKeysRaw,
+            cancellationToken);
+        imported += adminImport.ImportedCount;
+        skipped += adminImport.SkippedCount;
+        failed += adminImport.FailedCount;
+        messages.AddRange(adminImport.Messages);
+    }
+
+    if (imported > 0)
+    {
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    return new LegacyImportResult(imported, skipped, failed, messages);
+}
+
+static ServiceProvider BuildLegacyDataProtectionProvider(string legacyKeysPath)
+{
+    var services = new ServiceCollection();
+    services
+        .AddDataProtection()
+        .SetApplicationName("Locatif")
+        .PersistKeysToFileSystem(new DirectoryInfo(legacyKeysPath));
+#pragma warning disable ASP0000
+    return services.BuildServiceProvider();
+#pragma warning restore ASP0000
+}
+
+static async Task<Dictionary<string, string?>> ReadLegacyParameterRowsAsync(
+    string connectionString,
+    IReadOnlyCollection<string> keys,
+    CancellationToken cancellationToken)
+{
+    if (keys.Count == 0)
+    {
+        return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    var parameterNames = keys.Select((_, index) => $"@p{index}").ToArray();
+    await using var connection = new SqlConnection(connectionString);
+    await using var command = connection.CreateCommand();
+    command.CommandText = $"SELECT Cle, Valeur FROM app.ParametreSysteme WHERE Cle IN ({string.Join(", ", parameterNames)})";
+
+    var index = 0;
+    foreach (var key in keys)
+    {
+        command.Parameters.AddWithValue(parameterNames[index], key);
+        index++;
+    }
+
+    await connection.OpenAsync(cancellationToken);
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    var rows = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    while (await reader.ReadAsync(cancellationToken))
+    {
+        rows[reader.GetString(0)] = reader.IsDBNull(1) ? null : reader.GetString(1);
+    }
+
+    return rows;
+}
+
+static async Task<LegacyImportResult> ImportLegacyAdminApiKeysAsync(
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider,
+    IDataProtector legacyAdminProtector,
+    string rawJson,
+    CancellationToken cancellationToken)
+{
+    var imported = 0;
+    var skipped = 0;
+    var failed = 0;
+    var messages = new List<string>();
+
+    try
+    {
+        var rows = JsonSerializer.Deserialize<List<LegacyAdminApiKeyRow>>(rawJson, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        }) ?? [];
+
+        foreach (var row in rows)
+        {
+            var providerName = NormalizeOptionalText(row.ProviderName);
+            if (string.IsNullOrWhiteSpace(providerName))
+            {
+                skipped++;
+                continue;
+            }
+
+            var clearValue = TryUnprotectLegacyValue(row.KeyValue, legacyAdminProtector);
+            if (string.IsNullOrWhiteSpace(clearValue))
+            {
+                failed++;
+                messages.Add($"Cle API legacy {providerName}: valeur non dechiffrable.");
+                continue;
+            }
+
+            var definition = new IntegrationCredentialDefinition(
+                "LEGACY_NEXUS",
+                "Nexus legacy",
+                NormalizeTechnicalCode(providerName),
+                providerName,
+                true,
+                null,
+                "Importee depuis admin.api-keys.v1");
+
+            await UpsertImportedCredentialAsync(dbContext, dataProtectionProvider, definition, clearValue, cancellationToken);
+            imported++;
+        }
+    }
+    catch
+    {
+        failed++;
+        messages.Add("admin.api-keys.v1: JSON legacy illisible.");
+    }
+
+    return new LegacyImportResult(imported, skipped, failed, messages);
+}
+
+static IReadOnlyList<(IntegrationCredentialDefinition Definition, string? Value)> ReadLegacyAppSettingsCredentials(IConfiguration configuration)
+{
+    var files = new[]
+    {
+        configuration["LegacyNexus:AppSettingsPath"],
+        configuration["LegacyNexus:AppSettingsDevelopmentPath"]
+    }.Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path)).Distinct().ToList();
+
+    var imports = new List<(IntegrationCredentialDefinition Definition, string? Value)>();
+    foreach (var file in files)
+    {
+        imports.Add((FindCredentialDefinition("GEOAPIFY", "GEOAPIFY_API_KEY"), ReadJsonConfigurationValue(file!, "Geocoding:GeoapifyApiKey")));
+        imports.Add((FindCredentialDefinition("GOOGLE_MAPS", "GOOGLE_GEOCODING_API_KEY"), ReadJsonConfigurationValue(file!, "Geocoding:GoogleApiKey")));
+    }
+
+    return imports;
+}
+
+static string? ReadJsonConfigurationValue(string filePath, string path)
+{
+    using var document = JsonDocument.Parse(File.ReadAllText(filePath));
+    var current = document.RootElement;
+    foreach (var segment in path.Split(':', StringSplitOptions.RemoveEmptyEntries))
+    {
+        if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(segment, out current))
+        {
+            return null;
+        }
+    }
+
+    return current.ValueKind == JsonValueKind.String ? NormalizeOptionalText(current.GetString()) : null;
+}
+
+static async Task UpsertImportedCredentialAsync(
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider,
+    IntegrationCredentialDefinition definition,
+    string value,
+    CancellationToken cancellationToken)
+{
+    var providerCode = NormalizeTechnicalCode(definition.ProviderCode);
+    var keyName = NormalizeTechnicalCode(definition.KeyName);
+    var credential = await dbContext.IntegrationCredentials
+        .SingleOrDefaultAsync(item => item.ProviderCode == providerCode && item.KeyName == keyName, cancellationToken);
+    var now = DateTime.UtcNow;
+
+    if (credential is null)
+    {
+        credential = new IntegrationCredential
+        {
+            Id = Guid.NewGuid(),
+            ProviderCode = providerCode,
+            KeyName = keyName,
+            CreatedAtUtc = now
+        };
+        dbContext.IntegrationCredentials.Add(credential);
+    }
+
+    credential.ProviderLabel = definition.ProviderLabel;
+    credential.DisplayName = definition.DisplayName;
+    credential.ProtectedValue = ProtectCredentialValue(value, dataProtectionProvider);
+    credential.IsSecret = definition.IsSecret;
+    credential.IsActive = true;
+    credential.Source = "Import Nexus legacy";
+    credential.Notes = definition.Notes;
+    credential.UpdatedAtUtc = now;
+    credential.LastImportedAtUtc = now;
+}
+
+static IntegrationCredentialDefinition FindCredentialDefinition(string providerCode, string keyName)
+{
+    return GetKnownCredentialDefinitions().Single(item =>
+        string.Equals(item.ProviderCode, providerCode, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(item.KeyName, keyName, StringComparison.OrdinalIgnoreCase));
+}
+
+static string? TryUnprotectLegacyValue(string? storedValue, IDataProtector protector)
+{
+    var raw = NormalizeOptionalText(storedValue);
+    if (string.IsNullOrWhiteSpace(raw))
+    {
+        return null;
+    }
+
+    if (!raw.StartsWith("enc:", StringComparison.Ordinal))
+    {
+        return raw;
+    }
+
+    try
+    {
+        return protector.Unprotect(raw[4..]);
+    }
+    catch
+    {
+        return null;
+    }
+}
+
+static string ProtectCredentialValue(string value, IDataProtectionProvider dataProtectionProvider)
+{
+    return dataProtectionProvider
+        .CreateProtector("NewNexus.Api.IntegrationCredentials.v1")
+        .Protect(value.Trim());
+}
+
+static string? UnprotectCredentialValue(string protectedValue, IDataProtectionProvider dataProtectionProvider)
+{
+    if (string.IsNullOrWhiteSpace(protectedValue))
+    {
+        return null;
+    }
+
+    try
+    {
+        return dataProtectionProvider
+            .CreateProtector("NewNexus.Api.IntegrationCredentials.v1")
+            .Unprotect(protectedValue);
+    }
+    catch
+    {
+        return null;
+    }
+}
+
+static string MaskSecret(string? value)
+{
+    var clean = NormalizeOptionalText(value);
+    if (string.IsNullOrWhiteSpace(clean))
+    {
+        return string.Empty;
+    }
+
+    if (clean.Length <= 4)
+    {
+        return new string('*', clean.Length);
+    }
+
+    return $"{new string('*', Math.Min(12, clean.Length - 4))}{clean[^4..]}";
+}
+
+static string NormalizeTechnicalCode(string? value)
+{
+    var normalized = string.Concat((value ?? string.Empty)
+        .Trim()
+        .ToUpperInvariant()
+        .Select(character => char.IsLetterOrDigit(character) ? character : '_'))
+        .Trim('_');
+
+    return string.IsNullOrWhiteSpace(normalized) ? string.Empty : normalized;
+}
+
+static string BuildCredentialKey(string providerCode, string keyName)
+{
+    return $"{NormalizeTechnicalCode(providerCode)}|{NormalizeTechnicalCode(keyName)}";
+}
+
+static IReadOnlyList<IntegrationCredentialDefinition> GetKnownCredentialDefinitions()
+{
+    return
+    [
+        new("SIRENE", "SIRENE", "SIRENE_CLIENT_ID", "Client ID", false, "SIRENE_CLIENT_ID", "Identifiant INSEE/API SIRENE legacy."),
+        new("SIRENE", "SIRENE", "SIRENE_CLIENT_SECRET", "Client secret", true, "SIRENE_CLIENT_SECRET", "Secret INSEE/API SIRENE si utilise."),
+        new("LUCCA", "Lucca", "LUCCA_BASE_URL", "URL de base", false, "LUCCA_BASE_URL", null),
+        new("LUCCA", "Lucca", "LUCCA_API_KEY", "Cle API", true, "LUCCA_API_KEY", null),
+        new("LUCCA", "Lucca", "LUCCA_USERS_PATH", "Chemin utilisateurs", false, "LUCCA_USERS_PATH", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_BASE_URL", "URL de base", false, "TRUCKONLINE_BASE_URL", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_API_KEY", "Cle API", true, "TRUCKONLINE_API_KEY", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_PRIVATE_KEY", "Cle privee", true, "TRUCKONLINE_PRIVATE_KEY", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_DRIVER_STATUS_PATH_TEMPLATE", "Chemin statut conducteur", false, "TRUCKONLINE_DRIVER_STATUS_PATH_TEMPLATE", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_GPS_WINDOW_BEFORE_MINUTES", "Fenetre GPS avant", false, "TRUCKONLINE_GPS_WINDOW_BEFORE_MINUTES", null),
+        new("TRUCKONLINE", "TruckOnline", "TRUCKONLINE_GPS_WINDOW_AFTER_MINUTES", "Fenetre GPS apres", false, "TRUCKONLINE_GPS_WINDOW_AFTER_MINUTES", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_BASE_URL", "URL de base", false, "YELLOWBOX_BASE_URL", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_API_KEY", "Cle API", true, "YELLOWBOX_API_KEY", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_BASIC_LOGIN", "Login basic", false, "YELLOWBOX_BASIC_LOGIN", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_BASIC_PASSWORD", "Mot de passe basic", true, "YELLOWBOX_BASIC_PASSWORD", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_AUTH_MODE", "Mode authentification", false, "YELLOWBOX_AUTH_MODE", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_AUTHORIZE_URL", "URL autorisation", false, "YELLOWBOX_AUTHORIZE_URL", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_CALLBACK_MODE", "Mode callback", false, "YELLOWBOX_CALLBACK_MODE", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_CLIENT_ID", "Client ID OAuth", false, "YELLOWBOX_CLIENT_ID", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_REDIRECT_URI", "URI de redirection", false, "YELLOWBOX_REDIRECT_URI", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_SCOPE", "Scope OAuth", false, "YELLOWBOX_SCOPE", null),
+        new("YELLOWBOX", "YellowBox", "YELLOWBOX_TOKEN_URL", "URL token", false, "YELLOWBOX_TOKEN_URL", null),
+        new("TRACTOR_TRACKING", "Suivi tracteurs", "TRACTOR_TRACKING_REFRESH_INTERVAL_MINUTES", "Rafraichissement", false, "TRACTOR_TRACKING_REFRESH_INTERVAL_MINUTES", null),
+        new("TRACTOR_TRACKING", "Suivi tracteurs", "TRACTOR_TRACKING_RETENTION_MONTHS", "Retention historique", false, "TRACTOR_TRACKING_RETENTION_MONTHS", null),
+        new("TRACTOR_TRACKING", "Suivi tracteurs", "TRACTOR_TRACKING_FUEL_INCREASE_THRESHOLD_PERCENT", "Seuil hausse carburant", false, "TRACTOR_TRACKING_FUEL_INCREASE_THRESHOLD_PERCENT", null),
+        new("GEOAPIFY", "Geoapify", "GEOAPIFY_API_KEY", "Cle API", true, null, "Importee depuis appsettings legacy si renseignee."),
+        new("GOOGLE_MAPS", "Google Maps", "GOOGLE_GEOCODING_API_KEY", "Cle geocoding", true, null, "Importee depuis appsettings legacy si renseignee."),
+        new("OPENSTREETMAP", "OpenStreetMap", "OPENSTREETMAP_NOMINATIM_BASE_URL", "URL Nominatim", false, null, "OpenStreetMap/Nominatim ne necessite pas de cle API dans Nexus legacy.")
+    ];
+}
+
 
 static Guid? GetUserId(ClaimsPrincipal principal)
 {
@@ -1396,3 +1986,23 @@ internal sealed record UpsertCompanyRequest(string Siren, string DisplayName, st
 internal sealed record UpsertAnalyticRequest(string Code, string Label, Guid CompanyId, bool IsActive);
 internal sealed record UpsertExploitationRequest(string Code, string Label, Guid CompanyId, bool IsActive);
 internal sealed record ProfileRightsBuildResult(bool IsValid, Dictionary<string, string[]> Errors, Dictionary<Guid, ModuleAccessLevel> RightsByModuleId);
+internal sealed record UpsertIntegrationCredentialRequest(
+    string ProviderCode,
+    string? ProviderLabel,
+    string KeyName,
+    string? DisplayName,
+    string? Value,
+    bool IsSecret,
+    bool IsActive,
+    string? Source,
+    string? Notes);
+internal sealed record IntegrationCredentialDefinition(
+    string ProviderCode,
+    string ProviderLabel,
+    string KeyName,
+    string DisplayName,
+    bool IsSecret,
+    string? LegacyParameterKey,
+    string? Notes);
+internal sealed record LegacyAdminApiKeyRow(int ApiKeyId, string KeyValue, string ProviderName, string CreatedOn);
+internal sealed record LegacyImportResult(int ImportedCount, int SkippedCount, int FailedCount, List<string> Messages);

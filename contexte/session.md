@@ -447,7 +447,30 @@ Ordre cible de construction:
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-B60YdiUg.css` et `index-DnQ12cYL.js`
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-CR47EbIp.css` et `index-NGWJKcpM.js`
+
+## 2026-05-05 - Accordéon de navigation latérale
+
+- demande:
+  - les sous-menus lateraux doivent etre masques par defaut
+  - le clic sur un menu mere ouvre uniquement son accordéon
+  - le clic sur un autre menu mere replie l'accordéon precedent
+- correction:
+  - ajout de l'etat `expandedSidebarMenu`
+  - les sous-menus ne sont rendus que lorsque leur menu mere est ouvert
+  - clic sur un parent avec sous-menu: ouvre ce parent ou le replie si deja ouvert
+  - clic sur un parent sans sous-menu: replie tous les accordéons
+  - attributs `aria-expanded` et `aria-controls` ajoutes aux menus parents
+- backlog:
+  - item `Navigation alphabetique absolue` precise avec accordéon ferme par defaut
+- validation technique:
+  - `npm run build` OK
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
 - validation publication:

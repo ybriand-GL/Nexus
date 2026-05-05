@@ -550,6 +550,7 @@ function App() {
   const [selectedToolsSection, setSelectedToolsSection] =
     useState<string>('Accueil')
   const [selectedWorkspaceSection, setSelectedWorkspaceSection] = useState('Accueil')
+  const [expandedSidebarMenu, setExpandedSidebarMenu] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [credentialsError, setCredentialsError] = useState<string | null>(null)
@@ -1248,6 +1249,8 @@ function App() {
   }
 
   function activateMainNavigation(entry: string) {
+    const submenuEntries = sidebarSubmenus[entry] ?? []
+    setExpandedSidebarMenu((current) => (submenuEntries.length > 0 && current !== entry ? entry : null))
     setSelectedNavigation(entry)
     if (entry === 'Administration') {
       setSelectedAdministrationSection('Accueil')
@@ -1263,6 +1266,7 @@ function App() {
   }
 
   function activateSidebarSubmenu(parentEntry: string, submenuEntry: string) {
+    setExpandedSidebarMenu(parentEntry)
     setSelectedNavigation(parentEntry)
 
     if (parentEntry === 'Administration' && administrationSubmenuEntries.includes(submenuEntry as (typeof administrationSubmenuEntries)[number])) {
@@ -2882,19 +2886,22 @@ function App() {
         <nav className="sidebar-nav" aria-label="Navigation principale">
           {visibleNavigationEntries.map((entry) => {
             const submenuEntries = sidebarSubmenus[entry] ?? []
+            const isExpanded = expandedSidebarMenu === entry
 
             return (
               <div className="sidebar-nav-group" key={entry}>
                 <button
-                  className={`sidebar-link ${selectedNavigation === entry ? 'sidebar-link-active' : ''}`}
+                  aria-controls={submenuEntries.length > 0 ? `sidebar-submenu-${entry}` : undefined}
+                  aria-expanded={submenuEntries.length > 0 ? isExpanded : undefined}
+                  className={`sidebar-link ${selectedNavigation === entry ? 'sidebar-link-active' : ''} ${isExpanded ? 'sidebar-link-expanded' : ''}`}
                   onClick={() => activateMainNavigation(entry)}
                   type="button"
                 >
                   <span>{entry}</span>
-                  {submenuEntries.length > 0 ? <span className="sidebar-link-chevron" aria-hidden="true">›</span> : null}
+                  {submenuEntries.length > 0 ? <span className="sidebar-link-chevron" aria-hidden="true">{isExpanded ? '\u2303' : '\u2304'}</span> : null}
                 </button>
-                {submenuEntries.length > 0 ? (
-                  <div className="sidebar-subnav" aria-label={`Sous-menu ${entry}`}>
+                {submenuEntries.length > 0 && isExpanded ? (
+                  <div className="sidebar-subnav" id={`sidebar-submenu-${entry}`} aria-label={`Sous-menu ${entry}`}>
                     {submenuEntries.map((submenuEntry) => (
                       <button
                         className={`sidebar-subnav-link ${isSidebarSubmenuActive(entry, submenuEntry) ? 'sidebar-subnav-link-active' : ''}`}

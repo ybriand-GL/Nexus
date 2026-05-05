@@ -91,7 +91,7 @@ Derniere mise a jour: 2026-05-05
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Donnees Communes | Schema donnees communes V1 | TERMINE | Document redige |
-| Donnees Communes | Navigation alphabetique absolue | A_TESTER | Entrees principales et sous-menus tries alphabetiquement; sous-menus visibles dans la navigation laterale et dans les espaces Administration, Parametres, Donnees Communes, Outils, Exploitation et Gestion administrative |
+| Donnees Communes | Navigation alphabetique absolue | A_TESTER | Entrees principales et sous-menus tries alphabetiquement; sous-menus lateraux en accordeon fermes par defaut, ouverts uniquement au clic du menu mere |
 | Donnees Communes | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, liste + modale ajout/modification, recherche SIRENE obligatoire avant creation et validation backend SIRENE en place |
 | Donnees Communes | Analytiques | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
 | Donnees Communes | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |

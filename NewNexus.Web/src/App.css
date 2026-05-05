@@ -349,6 +349,10 @@
   border-color: rgba(247, 217, 138, 0.4);
 }
 
+.sidebar-link-expanded {
+  border-color: rgba(247, 217, 138, 0.46);
+}
+
 .sidebar-link:hover {
   transform: translateX(3px);
   background: rgba(255, 255, 255, 0.11);

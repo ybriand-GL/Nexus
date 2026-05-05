@@ -20,7 +20,7 @@ Derniere mise a jour: 2026-05-05
 | Gouvernance | Contexte vivant de session | TERMINE | Fichier `contexte/session.md` cree |
 | Gouvernance | Backlog detaille | TERMINE | Fichier backlog initialise |
 | Gouvernance | Strategie de versionnement | TERMINE | Definie dans le contexte |
-| Gouvernance | Strategie de branches socle/transverse/modules | TERMINE | Definie dans le contexte |
+| Gouvernance | Strategie de branches socle/donnees-communes/modules | TERMINE | Definie dans le contexte |
 | Architecture | Architecture cible solution | CADRE | Projets cibles identifies |
 | Architecture | Scaffold solution technique | TERMINE | Depot Git, solution .NET et frontend crees |
 | Architecture | Compatibilite hebergement `/newNexus` | SCAFFOLDE | Base path backend/frontend deja prepare |
@@ -48,8 +48,8 @@ Derniere mise a jour: 2026-05-05
 | UX | Verrouillage bandeaux titres | TERMINE | Hauteur et grille interne des titres de pages uniformisees entre Accueil, Administration, Exploitation et Gestion administrative |
 | UX | Stabilisation cartes et textes | TERMINE | Regles anti-debordement ajoutees sur cartes, grilles et modales pour eviter chevauchements et textes sortants |
 | UX | Corrections ergonomiques administration | TERMINE | Boutons de fermeture modales sombres, badges `Aucun` rouges et favicon Nexus verifie apres publication |
-| Transverse | Outils cles API par logiciel | TERMINE | Import manuel retire de l'UI; liste regroupee a une carte par fournisseur logiciel |
-| Transverse | Outils cles API en modal | TERMINE | Fonctionnement aligne sur Profils: liste des logiciels, bouton ajouter une cle et configuration en modale |
+| Donnees Communes | Outils cles API par logiciel | TERMINE | Import manuel retire de l'UI; liste regroupee a une carte par fournisseur logiciel |
+| Donnees Communes | Outils cles API en modal | TERMINE | Fonctionnement aligne sur Profils: liste des logiciels, bouton ajouter une cle et configuration en modale |
 | UX | Maquettes UI haute fidelite | CADRE | Design system V1 et readiness diagnostics posent le cadre; captures haute fidelite a produire ensuite |
 | UX | Design system NewNexus | A_TESTER | Document V1 enrichi avec inventaire composants et liste des captures de recette a produire |
 
@@ -86,25 +86,26 @@ Derniere mise a jour: 2026-05-05
 | UX | Accueil par profil | A_TESTER | Entree `Accueil` retablie comme page d'arrivee; personnalisation fine par profil a approfondir apres recette |
 | UX | Responsive tablette / smartphone / PC | A_TESTER | Passe CSS responsive initiale appliquee sur shell, menus, grilles, formulaires et modales; recette multi-format a effectuer |
 
-## 4. Transverse
+## 4. Donnees Communes
 
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
-| Transverse | Schema transverse V1 | TERMINE | Document redige |
-| Transverse | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, liste + modale ajout/modification, recherche SIRENE obligatoire avant creation et validation backend SIRENE en place |
-| Transverse | Analytiques | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
-| Transverse | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
-| Transverse | Salaries | A_TESTER | Table enrichie telephone, endpoints create/update, liste avec modales ajout/modification et import Lucca disponibles |
-| Transverse | Distinction conducteurs | A_TESTER | Champ local `IsDriver` ajoute au referentiel salaries; mapping definitif Lucca a arbitrer |
-| Transverse | Creation auto des comptes depuis salaries | A_TESTER | Endpoint et action UI disponibles dans `Transverse > Salaries`: creation des comptes actifs sans profil depuis les salaries actifs, avec mot de passe temporaire et rattachement matricule |
-| Transverse | Tiers | A_TESTER | Table, endpoints create/update, UI de creation/liste deplacee dans `Transverse > Tiers`; cas hors SIRENE a arbitrer |
-| Transverse | Rattachement multi-analytiques des tiers | A_TESTER | Table de liaison tiers/analytiques et selection multiple UI disponibles |
-| Transverse | Materiels | A_TESTER | Table, endpoints create/update, UI de creation/liste deplacee dans `Transverse > Materiels`, numero de parc unique et rattachement exploitation disponibles |
-| Transverse | Parametrage des interfaces | A_TESTER | Table `IntegrationCredential`, UI Outils, import des cles Nexus legacy et readiness par fournisseur disponibles |
-| Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Sessions, Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
-| Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
-| Transverse | Requeteur SQL controle | SCAFFOLDE | Catalogue de requetes nommees prepare; execution SQL libre exclue, lecture seule et journalisation a developper avant activation |
-| Transverse | Consultation des traces | SCAFFOLDE | Flux Authentification, Actions administrateur, Integrations et Erreurs applicatives prepares; collecte, stockage et masquage des secrets a developper |
+| Donnees Communes | Schema donnees communes V1 | TERMINE | Document redige |
+| Donnees Communes | Navigation alphabetique absolue | A_TESTER | Entrees principales et sous-menus tries alphabetiquement; sous-menus ajoutes dans Administration, Parametres, Donnees Communes, Outils, Exploitation et Gestion administrative |
+| Donnees Communes | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, liste + modale ajout/modification, recherche SIRENE obligatoire avant creation et validation backend SIRENE en place |
+| Donnees Communes | Analytiques | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
+| Donnees Communes | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
+| Donnees Communes | Salaries | A_TESTER | Table enrichie telephone, endpoints create/update, liste avec modales ajout/modification et import Lucca disponibles |
+| Donnees Communes | Distinction conducteurs | A_TESTER | Champ local `IsDriver` ajoute au referentiel salaries; mapping definitif Lucca a arbitrer |
+| Donnees Communes | Creation auto des comptes depuis salaries | A_TESTER | Endpoint et action UI disponibles dans `Donnees Communes > Salaries`: creation des comptes actifs sans profil depuis les salaries actifs, avec mot de passe temporaire et rattachement matricule |
+| Donnees Communes | Tiers | A_TESTER | Table, endpoints create/update, liste + modales ajout/modification disponibles dans `Donnees Communes > Tiers`; cas hors SIRENE a arbitrer |
+| Donnees Communes | Rattachement multi-analytiques des tiers | A_TESTER | Table de liaison tiers/analytiques et selection multiple UI disponibles |
+| Donnees Communes | Materiels | A_TESTER | Table, endpoints create/update, liste + modales ajout/modification disponibles dans `Donnees Communes > Materiels`, numero de parc unique et rattachement exploitation disponibles |
+| Donnees Communes | Parametrage des interfaces | A_TESTER | Table `IntegrationCredential`, UI Outils, import des cles Nexus legacy et readiness par fournisseur disponibles |
+| Donnees Communes | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Diagnostics, Requeteur SQL, Sessions, Taches planifiees et Traces prepares |
+| Donnees Communes | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
+| Donnees Communes | Requeteur SQL controle | SCAFFOLDE | Catalogue de requetes nommees prepare; execution SQL libre exclue, lecture seule et journalisation a developper avant activation |
+| Donnees Communes | Consultation des traces | SCAFFOLDE | Flux Authentification, Actions administrateur, Integrations et Erreurs applicatives prepares; collecte, stockage et masquage des secrets a developper |
 | UX | Bandeaux titres applicatifs | TERMINE | Bloc lateral Session active retire visuellement et gabarit titre uniformise |
 
 ## 5. Interfaces
@@ -149,9 +150,9 @@ Derniere mise a jour: 2026-05-05
 | Technique | Message base de donnees inaccessible | TERMINE | Middleware API `503 DATABASE_UNAVAILABLE` et affichage front du message serveur lorsque PostgreSQL est indisponible |
 | Technique | Script de publication IIS NewNexus | TERMINE | Script `publish_newnexus_iis.ps1` en place |
 | Technique | Migration authentification | TERMINE | `AuthenticationBootstrap` generee et appliquee |
-| Technique | Migration transverse Parametres | TERMINE | `TransverseSettingsSocle` generee et appliquee |
+| Technique | Migration Donnees Communes Parametres | TERMINE | Migration technique `TransverseSettingsSocle` generee et appliquee |
 | Technique | Migration cles integrations | TERMINE | `IntegrationCredentials` generee et appliquee |
-| Technique | Migration referentiels metier transverses | TERMINE | `TransverseBusinessReferentials` generee et appliquee localement |
+| Technique | Migration referentiels metier Donnees Communes | TERMINE | Migration technique `TransverseBusinessReferentials` generee et appliquee localement |
 | Technique | Migration sessions utilisateurs | TERMINE | `UserSessionsAndTimeouts` generee et appliquee localement |
 | Technique | Migration telephone salaries | TERMINE | `EmployeePhoneAndLuccaImport` generee et appliquee localement |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |

@@ -409,16 +409,33 @@ type IntegrationCredentialFormState = {
   error: string | null
 }
 
-const navigationEntries = ['Accueil', 'Administration', 'Transverse', 'Exploitation', 'Gestion administrative']
-const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Transverse', 'Outils'] as const
-const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
+const commonDataNavigationLabel = 'Donn\u00e9es Communes'
+const navigationEntries = ['Accueil', 'Administration', commonDataNavigationLabel, 'Exploitation', 'Gestion administrative']
+const administrationSettingsSection = 'Param\u00e8tres'
+const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Outils', administrationSettingsSection, 'Profils'] as const
+const settingsCompaniesSection = 'Soci\u00e9t\u00e9s'
+const toolsApiKeysSection = 'Cl\u00e9s API'
+const toolsDiagnosticsSection = 'Diagnostics'
+const toolsSqlSection = 'Requ\u00eateur SQL'
+const toolsSessionsSection = 'Sessions'
+const toolsScheduledTasksSection = 'T\u00e2ches planifi\u00e9es'
+const toolsTracesSection = 'Traces'
+const settingsSubmenuEntries = ['Accueil', 'Analytiques', 'Exploitations', settingsCompaniesSection] as const
 const hiddenIntegrationProviderCodes = new Set(['LEGACY_NEXUS', 'TRACTOR_TRACKING'])
 const employeeSettingsSection = 'Salari\u00e9s'
 const thirdPartySettingsSection = 'Tiers'
 const materialSettingsSection = 'Mat\u00e9riels'
 const settingsNavigationEntries = [...settingsSubmenuEntries] as const
-const transverseNavigationEntries = ['Accueil', employeeSettingsSection, thirdPartySettingsSection, materialSettingsSection] as const
-const toolsSubmenuEntries = ['Accueil', 'Clés API', 'Tâches planifiées', 'Requêteur SQL', 'Traces', 'Diagnostics'] as const
+const commonDataNavigationEntries = ['Accueil', materialSettingsSection, employeeSettingsSection, thirdPartySettingsSection] as const
+const toolsSubmenuEntries = [
+  'Accueil',
+  toolsApiKeysSection,
+  toolsDiagnosticsSection,
+  toolsSqlSection,
+  toolsSessionsSection,
+  toolsScheduledTasksSection,
+  toolsTracesSection,
+] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
 const apiBasePath = import.meta.env.BASE_URL || '/'
@@ -486,10 +503,14 @@ function App() {
   const [newMaterial, setNewMaterial] = useState<MaterialFormState>(createEmptyMaterialForm())
   const [editingEmployee, setEditingEmployee] = useState<EmployeeItem | null>(null)
   const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null)
+  const [editingThirdParty, setEditingThirdParty] = useState<ThirdPartyItem | null>(null)
+  const [editingMaterial, setEditingMaterial] = useState<MaterialItem | null>(null)
   const [employeeForm, setEmployeeForm] = useState<EmployeeFormState>(createEmptyEmployeeForm())
   const [companyForm, setCompanyForm] = useState<CompanyFormState>(createEmptyCompanyForm())
   const [isCreateCompanyModalOpen, setIsCreateCompanyModalOpen] = useState(false)
   const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false)
+  const [isThirdPartyModalOpen, setIsThirdPartyModalOpen] = useState(false)
+  const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false)
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
   const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
   const [accountPasswordReset, setAccountPasswordReset] = useState<AccountPasswordResetState>(createEmptyAccountPasswordResetState())
@@ -528,6 +549,7 @@ function App() {
     useState<string>('Accueil')
   const [selectedToolsSection, setSelectedToolsSection] =
     useState<string>('Accueil')
+  const [selectedWorkspaceSection, setSelectedWorkspaceSection] = useState('Accueil')
   const [error, setError] = useState<string | null>(null)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [credentialsError, setCredentialsError] = useState<string | null>(null)
@@ -607,7 +629,7 @@ function App() {
   const visibleNavigationEntries = useMemo(
     () =>
       navigationEntries.filter(
-        (entry) => entry === 'Accueil' || (isInformatique && entry === 'Transverse') || (modulesByGroup[entry] ?? []).length > 0,
+        (entry) => entry === 'Accueil' || (isInformatique && entry === commonDataNavigationLabel) || (modulesByGroup[entry] ?? []).length > 0,
       ),
     [isInformatique, modulesByGroup],
   )
@@ -657,9 +679,16 @@ function App() {
   }, [visibleIntegrationCredentials])
 
   const activeReferenceNavigationEntries =
-    selectedAdministrationSection === 'Transverse' || selectedNavigation === 'Transverse'
-      ? transverseNavigationEntries
+    selectedNavigation === commonDataNavigationLabel
+      ? commonDataNavigationEntries
       : settingsNavigationEntries
+
+  const currentWorkspaceModules = selectedNavigation === 'Exploitation' || selectedNavigation === 'Gestion administrative'
+    ? modulesByGroup[selectedNavigation] ?? []
+    : []
+  const visibleWorkspaceModules = selectedWorkspaceSection === 'Accueil'
+    ? currentWorkspaceModules
+    : currentWorkspaceModules.filter((module) => module.label === selectedWorkspaceSection)
 
   const scheduledTasks = useMemo(
     () => [
@@ -740,9 +769,9 @@ function App() {
         output: 'Lecture des droits par profil, module et niveau d’accès.',
       },
       {
-        code: 'TRANSVERSE_REFERENTIALS',
+        code: 'COMMON_DATA_REFERENTIALS',
         scope: 'Paramètres',
-        label: 'Référentiels transverses',
+        label: 'Données communes',
         status: 'À cadrer',
         output: 'Sociétés, analytiques et exploitations avec état actif.',
       },
@@ -808,9 +837,9 @@ function App() {
         output: 'Lecture des droits par profil, module et niveau d\u2019acc\u00e8s.',
       },
       {
-        code: 'TRANSVERSE_REFERENTIALS',
+        code: 'COMMON_DATA_REFERENTIALS',
         scope: 'Param\u00e8tres',
-        label: 'R\u00e9f\u00e9rentiels transverses',
+        label: 'Donn\u00e9es communes',
         status: '\u00c0 cadrer',
         output: 'Soci\u00e9t\u00e9s, analytiques et exploitations avec \u00e9tat actif.',
       },
@@ -1331,6 +1360,12 @@ function App() {
     setIsCreateCompanyModalOpen(false)
     setEditingEmployee(null)
     setEmployeeForm(createEmptyEmployeeForm())
+    setEditingThirdParty(null)
+    setNewThirdParty(createEmptyThirdPartyForm())
+    setIsThirdPartyModalOpen(false)
+    setEditingMaterial(null)
+    setNewMaterial(createEmptyMaterialForm())
+    setIsMaterialModalOpen(false)
     setIsCreateEmployeeModalOpen(false)
     setEmployeeProvisioning({ isProvisioning: false, result: null, error: null })
     setLuccaEmployeeImport({ isImporting: false, result: null, error: null })
@@ -2315,7 +2350,7 @@ function App() {
       }
 
       await loadAdminSecurityData()
-      setNewThirdParty(createEmptyThirdPartyForm())
+      closeThirdPartyModal()
     } catch (createError) {
       setNewThirdParty((current) => ({
         ...current,
@@ -2323,6 +2358,58 @@ function App() {
         error: createError instanceof Error ? createError.message : 'Erreur de creation.',
       }))
     }
+  }
+
+  async function handleSaveThirdParty(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingThirdParty) {
+      return
+    }
+
+    setNewThirdParty((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath(`api/settings/third-parties/${editingThirdParty.id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newThirdParty),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La mise a jour du tiers a echoue.'))
+      }
+
+      await loadAdminSecurityData()
+      closeThirdPartyModal()
+    } catch (saveError) {
+      setNewThirdParty((current) => ({
+        ...current,
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur de mise a jour.',
+      }))
+    }
+  }
+
+  function openCreateThirdPartyModal() {
+    setEditingThirdParty(null)
+    setNewThirdParty(createEmptyThirdPartyForm())
+    setIsThirdPartyModalOpen(true)
+  }
+
+  function openEditThirdPartyModal(thirdParty: ThirdPartyItem) {
+    setEditingThirdParty(thirdParty)
+    setNewThirdParty(buildThirdPartyFormFromItem(thirdParty))
+    setIsThirdPartyModalOpen(true)
+  }
+
+  function closeThirdPartyModal() {
+    if (newThirdParty.isSaving) {
+      return
+    }
+
+    setEditingThirdParty(null)
+    setIsThirdPartyModalOpen(false)
+    setNewThirdParty(createEmptyThirdPartyForm())
   }
 
   function handleNewMaterialFieldChange(
@@ -2360,7 +2447,7 @@ function App() {
       }
 
       await loadAdminSecurityData()
-      setNewMaterial(createEmptyMaterialForm())
+      closeMaterialModal()
     } catch (createError) {
       setNewMaterial((current) => ({
         ...current,
@@ -2368,6 +2455,62 @@ function App() {
         error: createError instanceof Error ? createError.message : 'Erreur de creation.',
       }))
     }
+  }
+
+  async function handleSaveMaterial(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingMaterial) {
+      return
+    }
+
+    setNewMaterial((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath(`api/settings/materials/${editingMaterial.id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newMaterial,
+          exploitationId: newMaterial.exploitationId || null,
+          lastSyncedAtUtc: editingMaterial.lastSyncedAtUtc,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La mise a jour du materiel a echoue.'))
+      }
+
+      await loadAdminSecurityData()
+      closeMaterialModal()
+    } catch (saveError) {
+      setNewMaterial((current) => ({
+        ...current,
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur de mise a jour.',
+      }))
+    }
+  }
+
+  function openCreateMaterialModal() {
+    setEditingMaterial(null)
+    setNewMaterial(createEmptyMaterialForm())
+    setIsMaterialModalOpen(true)
+  }
+
+  function openEditMaterialModal(material: MaterialItem) {
+    setEditingMaterial(material)
+    setNewMaterial(buildMaterialFormFromItem(material))
+    setIsMaterialModalOpen(true)
+  }
+
+  function closeMaterialModal() {
+    if (newMaterial.isSaving) {
+      return
+    }
+
+    setEditingMaterial(null)
+    setIsMaterialModalOpen(false)
+    setNewMaterial(createEmptyMaterialForm())
   }
 
   function handlePostAuthLoaderComplete() {
@@ -2674,8 +2817,11 @@ function App() {
                   setSelectedSettingsSection('Accueil')
                   setSelectedToolsSection('Accueil')
                 }
-                if (entry === 'Transverse') {
+                if (entry === commonDataNavigationLabel) {
                   setSelectedSettingsSection('Accueil')
+                }
+                if (entry === 'Exploitation' || entry === 'Gestion administrative') {
+                  setSelectedWorkspaceSection('Accueil')
                 }
               }}
               type="button"
@@ -2724,7 +2870,7 @@ function App() {
                   if (entry === 'Outils') {
                     setSelectedToolsSection('Accueil')
                   }
-                  if (entry === 'Paramètres' || entry === 'Transverse') {
+                  if (entry === administrationSettingsSection) {
                     setSelectedSettingsSection('Accueil')
                   }
                 }}
@@ -2865,6 +3011,18 @@ function App() {
                 <span className="eyebrow">Exploitation</span>
                 <h2>Modules de travail</h2>
               </div>
+              <section className="admin-subnav" aria-label="Sous-menu exploitation">
+                {['Accueil', ...currentWorkspaceModules.map((module) => module.label).sort((left, right) => left.localeCompare(right, 'fr'))].map((entry) => (
+                  <button
+                    key={`exploitation-${entry}`}
+                    className={`admin-subnav-link ${selectedWorkspaceSection === entry ? 'admin-subnav-link-active' : ''}`}
+                    onClick={() => setSelectedWorkspaceSection(entry)}
+                    type="button"
+                  >
+                    {entry}
+                  </button>
+                ))}
+              </section>
               <div className="group-stack">
                 <section className="group-card">
                   <header>
@@ -2872,7 +3030,7 @@ function App() {
                     <span>{modulesByGroup.Exploitation?.length ?? 0} module(s)</span>
                   </header>
                   <ul className="module-list">
-                    {(modulesByGroup.Exploitation ?? []).map((module) => (
+                    {visibleWorkspaceModules.map((module) => (
                       <li key={module.code}>
                         <span>{module.label}</span>
                         <code>{translateAccessLevel(rightsByModuleCode.get(module.code) ?? 'None')}</code>
@@ -2882,7 +3040,7 @@ function App() {
                 </section>
               </div>
               <div className="functional-module-grid">
-                {(modulesByGroup.Exploitation ?? []).map((module) => {
+                {visibleWorkspaceModules.map((module) => {
                   const blueprint = getFunctionalModuleBlueprint(module.code)
                   const accessLevel = rightsByModuleCode.get(module.code) ?? 'None'
 
@@ -2925,6 +3083,18 @@ function App() {
                 <span className="eyebrow">Gestion administrative</span>
                 <h2>Modules de travail</h2>
               </div>
+              <section className="admin-subnav" aria-label="Sous-menu gestion administrative">
+                {['Accueil', ...currentWorkspaceModules.map((module) => module.label).sort((left, right) => left.localeCompare(right, 'fr'))].map((entry) => (
+                  <button
+                    key={`gestion-${entry}`}
+                    className={`admin-subnav-link ${selectedWorkspaceSection === entry ? 'admin-subnav-link-active' : ''}`}
+                    onClick={() => setSelectedWorkspaceSection(entry)}
+                    type="button"
+                  >
+                    {entry}
+                  </button>
+                ))}
+              </section>
               <div className="group-stack">
                 <section className="group-card">
                   <header>
@@ -2932,7 +3102,7 @@ function App() {
                     <span>{modulesByGroup['Gestion administrative']?.length ?? 0} module(s)</span>
                   </header>
                   <ul className="module-list">
-                    {(modulesByGroup['Gestion administrative'] ?? []).map((module) => (
+                    {visibleWorkspaceModules.map((module) => (
                       <li key={module.code}>
                         <span>{module.label}</span>
                         <code>{translateAccessLevel(rightsByModuleCode.get(module.code) ?? 'None')}</code>
@@ -2942,7 +3112,7 @@ function App() {
                 </section>
               </div>
               <div className="functional-module-grid">
-                {(modulesByGroup['Gestion administrative'] ?? []).map((module) => {
+                {visibleWorkspaceModules.map((module) => {
                   const blueprint = getFunctionalModuleBlueprint(module.code)
                   const accessLevel = rightsByModuleCode.get(module.code) ?? 'None'
 
@@ -3158,44 +3328,44 @@ function App() {
           </section>
         ) : null}
 
-        {((selectedNavigation === 'Administration' && isInformatique && (selectedAdministrationSection === 'Paramètres' || selectedAdministrationSection === 'Transverse')) ||
-          (selectedNavigation === 'Transverse' && isInformatique)) ? (
+        {((selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === administrationSettingsSection) ||
+          (selectedNavigation === commonDataNavigationLabel && isInformatique)) ? (
           <section className="workspace-grid">
             <article className="panel-card panel-card-wide settings-card">
               <div className="panel-heading">
-                <span className="eyebrow">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Transverse' : 'Paramètres'}</span>
-                <h2>{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Socle transverse' : 'Socle de paramétrage'}</h2>
+                <span className="eyebrow">{activeReferenceNavigationEntries === commonDataNavigationEntries ? commonDataNavigationLabel : administrationSettingsSection}</span>
+                <h2>{activeReferenceNavigationEntries === commonDataNavigationEntries ? 'Donn\u00e9es Communes' : 'Socle de paramétrage'}</h2>
               </div>
               <div className="settings-intro-grid">
                 <div className="settings-intro-copy">
                   <p>
-                    {activeReferenceNavigationEntries === transverseNavigationEntries
-                      ? 'Cette vue centralise les référentiels transverses opérationnels de NewNexus.'
+                    {activeReferenceNavigationEntries === commonDataNavigationEntries
+                      ? 'Cette vue centralise les données communes opérationnelles de NewNexus.'
                       : 'Cette vue centralise les paramètres de structure de NewNexus.'}
                   </p>
                   <p>
-                    {activeReferenceNavigationEntries === transverseNavigationEntries
+                    {activeReferenceNavigationEntries === commonDataNavigationEntries
                       ? `${employees.length} salarié(s), ${thirdParties.length} tiers et ${materials.length} matériel(s) actuellement chargé(s).`
                       : `${companies.length} société(s), ${analytics.length} analytique(s) et ${exploitations.length} exploitation(s) actuellement chargée(s).`}
                   </p>
                   <p className="settings-note">
-                    {activeReferenceNavigationEntries === transverseNavigationEntries
-                      ? 'Les salariés, tiers et matériels ne sont pas des paramètres: ils restent dans le socle transverse.'
+                    {activeReferenceNavigationEntries === commonDataNavigationEntries
+                      ? 'Les salariés, tiers et matériels ne sont pas des paramètres: ils restent dans Données Communes.'
                       : 'Les sociétés Groupe Laure sont alimentées via SIRENE. Les analytiques et exploitations sont rattachés aux sociétés validées.'}
                   </p>
                 </div>
                 <div className="settings-kpis">
                   <div className="metric-card metric-card-navy">
-                    <span className="metric-label">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Salariés' : 'Sociétés'}</span>
-                    <strong>{activeReferenceNavigationEntries === transverseNavigationEntries ? employees.length : companies.length}</strong>
+                    <span className="metric-label">{activeReferenceNavigationEntries === commonDataNavigationEntries ? 'Salariés' : 'Sociétés'}</span>
+                    <strong>{activeReferenceNavigationEntries === commonDataNavigationEntries ? employees.length : companies.length}</strong>
                   </div>
                   <div className="metric-card metric-card-champagne">
-                    <span className="metric-label">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Tiers' : 'Analytiques'}</span>
-                    <strong>{activeReferenceNavigationEntries === transverseNavigationEntries ? thirdParties.length : analytics.length}</strong>
+                    <span className="metric-label">{activeReferenceNavigationEntries === commonDataNavigationEntries ? 'Tiers' : 'Analytiques'}</span>
+                    <strong>{activeReferenceNavigationEntries === commonDataNavigationEntries ? thirdParties.length : analytics.length}</strong>
                   </div>
                   <div className="metric-card metric-card-cyan">
-                    <span className="metric-label">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Matériels' : 'Exploitations'}</span>
-                    <strong>{activeReferenceNavigationEntries === transverseNavigationEntries ? materials.length : exploitations.length}</strong>
+                    <span className="metric-label">{activeReferenceNavigationEntries === commonDataNavigationEntries ? 'Matériels' : 'Exploitations'}</span>
+                    <strong>{activeReferenceNavigationEntries === commonDataNavigationEntries ? materials.length : exploitations.length}</strong>
                   </div>
                 </div>
               </div>
@@ -3231,7 +3401,7 @@ function App() {
                         onClick={() => setSelectedSettingsSection(entry)}
                         type="button"
                       >
-                        <span className="eyebrow">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Transverse' : 'Paramètres'}</span>
+                        <span className="eyebrow">{activeReferenceNavigationEntries === commonDataNavigationEntries ? commonDataNavigationLabel : administrationSettingsSection}</span>
                         <strong>{entry}</strong>
                         <p>{getSettingsSectionDescription(entry)}</p>
                       </button>
@@ -3241,7 +3411,7 @@ function App() {
 
               {selectedSettingsSection !== 'Accueil' ? (
               <div className="settings-reference-grid settings-reference-grid-single">
-                {selectedSettingsSection === 'Sociétés' ? (
+                {selectedSettingsSection === settingsCompaniesSection ? (
                 <section className="settings-list-section">
                   <div className="settings-list-header">
                     <div>
@@ -3628,64 +3798,21 @@ function App() {
                 {selectedSettingsSection === thirdPartySettingsSection ? (
                 <section className="settings-list-section">
                   <div className="settings-list-header">
-                    <h3>Tiers</h3>
-                    <small>{thirdParties.length} tiers - multi-analytiques</small>
+                    <div>
+                      <h3>Tiers</h3>
+                      <small>{thirdParties.length} tiers - multi-analytiques</small>
+                    </div>
+                    <button className="primary-button" onClick={openCreateThirdPartyModal} type="button">
+                      Ajouter un tiers
+                    </button>
                   </div>
                   <p className="profiles-toolbar-copy">
                     R&eacute;f&eacute;rentiel tiers multi-types avec rattachement possible &agrave; plusieurs analytiques. Les particuliers et entreprises &eacute;trang&egrave;res restent &agrave; arbitrer hors SIRENE.
                   </p>
-                  <form className="settings-form settings-create-form" onSubmit={handleCreateThirdParty}>
-                    <label>
-                      <span>Type</span>
-                      <select value={newThirdParty.typeCode} onChange={(event) => handleNewThirdPartyFieldChange('typeCode', event)}>
-                        <option value="CLIENT">Client</option>
-                        <option value="FOURNISSEUR">Fournisseur</option>
-                        <option value="PARTENAIRE">Partenaire</option>
-                        <option value="PARTICULIER">Particulier</option>
-                        <option value="ETRANGER">Entreprise etrangere</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Nom du tiers</span>
-                      <input value={newThirdParty.displayName} onChange={(event) => handleNewThirdPartyFieldChange('displayName', event)} />
-                    </label>
-                    <label>
-                      <span>SIREN</span>
-                      <input inputMode="numeric" value={newThirdParty.siren} onChange={(event) => handleNewThirdPartyFieldChange('siren', event)} />
-                    </label>
-                    <label>
-                      <span>TVA / reference externe</span>
-                      <input value={newThirdParty.vatNumber} onChange={(event) => handleNewThirdPartyFieldChange('vatNumber', event)} />
-                    </label>
-                    <label>
-                      <span>Reference externe</span>
-                      <input value={newThirdParty.externalReference} onChange={(event) => handleNewThirdPartyFieldChange('externalReference', event)} />
-                    </label>
-                    <label>
-                      <span>Analytiques rattaches</span>
-                      <select multiple value={newThirdParty.analyticIds} onChange={handleNewThirdPartyAnalyticChange}>
-                        {analytics.map((analytic) => (
-                          <option key={analytic.id} value={analytic.id}>{analytic.code} - {analytic.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="toggle-label">
-                      <input checked={newThirdParty.isForeignCompany} onChange={(event) => handleNewThirdPartyBooleanChange('isForeignCompany', event)} type="checkbox" />
-                      <span>Entreprise etrangere</span>
-                    </label>
-                    <label className="toggle-label">
-                      <input checked={newThirdParty.isActive} onChange={(event) => handleNewThirdPartyBooleanChange('isActive', event)} type="checkbox" />
-                      <span>Actif</span>
-                    </label>
-                    <div className="profile-action-row">
-                      <button className="primary-button" disabled={newThirdParty.isSaving} type="submit">
-                        {newThirdParty.isSaving ? 'Enregistrement...' : 'Ajouter le tiers'}
-                      </button>
-                      {newThirdParty.error ? <small className="account-error">{newThirdParty.error}</small> : null}
-                    </div>
-                  </form>
                   <div className="profiles-overview-grid">
-                    {thirdParties.map((thirdParty) => (
+                    {thirdParties.length === 0 ? (
+                      <div className="settings-empty">Aucun tiers charg&eacute; pour le moment.</div>
+                    ) : thirdParties.map((thirdParty) => (
                       <article className="profile-summary-card accent-orange" key={thirdParty.id}>
                         <header className="profile-summary-header">
                           <div>
@@ -3706,6 +3833,11 @@ function App() {
                             <strong>{thirdParty.analytics.map((item) => item.code).join(', ') || 'Aucun'}</strong>
                           </div>
                         </div>
+                        <div className="profile-summary-actions">
+                          <button className="secondary-button" onClick={() => openEditThirdPartyModal(thirdParty)} type="button">
+                            Configurer le tiers
+                          </button>
+                        </div>
                       </article>
                     ))}
                   </div>
@@ -3715,64 +3847,21 @@ function App() {
                 {selectedSettingsSection === materialSettingsSection ? (
                 <section className="settings-list-section">
                   <div className="settings-list-header">
-                    <h3>Mat&eacute;riels</h3>
-                    <small>{materials.length} materiel(s) - parc</small>
+                    <div>
+                      <h3>Mat&eacute;riels</h3>
+                      <small>{materials.length} materiel(s) - parc</small>
+                    </div>
+                    <button className="primary-button" onClick={openCreateMaterialModal} type="button">
+                      Ajouter un mat&eacute;riel
+                    </button>
                   </div>
                   <p className="profiles-toolbar-copy">
                     R&eacute;f&eacute;rentiel mat&eacute;riels local avec num&eacute;ro de parc unique, pr&ecirc;t pour TruckOnline et YellowBox.
                   </p>
-                  <form className="settings-form settings-create-form" onSubmit={handleCreateMaterial}>
-                    <label>
-                      <span>Numero de parc</span>
-                      <input value={newMaterial.fleetNumber} onChange={(event) => handleNewMaterialFieldChange('fleetNumber', event)} />
-                    </label>
-                    <label>
-                      <span>Libelle</span>
-                      <input value={newMaterial.label} onChange={(event) => handleNewMaterialFieldChange('label', event)} />
-                    </label>
-                    <label>
-                      <span>Type</span>
-                      <select value={newMaterial.materialType} onChange={(event) => handleNewMaterialFieldChange('materialType', event)}>
-                        <option value="TRACTEUR">Tracteur</option>
-                        <option value="REMORQUE">Remorque</option>
-                        <option value="VL">Vehicule leger</option>
-                        <option value="AUTRE">Autre</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Immatriculation</span>
-                      <input value={newMaterial.registrationNumber} onChange={(event) => handleNewMaterialFieldChange('registrationNumber', event)} />
-                    </label>
-                    <label>
-                      <span>Source</span>
-                      <select value={newMaterial.sourceSystem} onChange={(event) => handleNewMaterialFieldChange('sourceSystem', event)}>
-                        <option value="TruckOnline">TruckOnline</option>
-                        <option value="YellowBox">YellowBox</option>
-                        <option value="Manuel">Manuel</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Exploitation</span>
-                      <select value={newMaterial.exploitationId} onChange={(event) => handleNewMaterialFieldChange('exploitationId', event)}>
-                        <option value="">Non rattache</option>
-                        {exploitations.map((exploitation) => (
-                          <option key={exploitation.id} value={exploitation.id}>{exploitation.code} - {exploitation.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="toggle-label">
-                      <input checked={newMaterial.isActive} onChange={handleNewMaterialStatusChange} type="checkbox" />
-                      <span>Actif</span>
-                    </label>
-                    <div className="profile-action-row">
-                      <button className="primary-button" disabled={newMaterial.isSaving} type="submit">
-                        {newMaterial.isSaving ? 'Enregistrement...' : 'Ajouter le materiel'}
-                      </button>
-                      {newMaterial.error ? <small className="account-error">{newMaterial.error}</small> : null}
-                    </div>
-                  </form>
                   <div className="profiles-overview-grid">
-                    {materials.map((material) => (
+                    {materials.length === 0 ? (
+                      <div className="settings-empty">Aucun mat&eacute;riel charg&eacute; pour le moment.</div>
+                    ) : materials.map((material) => (
                       <article className="profile-summary-card accent-navy" key={material.id}>
                         <header className="profile-summary-header">
                           <div>
@@ -3792,6 +3881,11 @@ function App() {
                             <span>Exploitation</span>
                             <strong>{material.exploitation?.label ?? 'Non rattache'}</strong>
                           </div>
+                        </div>
+                        <div className="profile-summary-actions">
+                          <button className="secondary-button" onClick={() => openEditMaterialModal(material)} type="button">
+                            Configurer le mat&eacute;riel
+                          </button>
                         </div>
                       </article>
                     ))}
@@ -3814,13 +3908,6 @@ function App() {
                 Les outils techniques sont regroupés par usage pour éviter une page unique fourre-tout.
               </p>
               <section className="admin-subnav tools-subnav" aria-label="Sous-menu outils">
-                <button
-                  className={`admin-subnav-link ${selectedToolsSection === 'Sessions' ? 'admin-subnav-link-active' : ''}`}
-                  onClick={() => setSelectedToolsSection('Sessions')}
-                  type="button"
-                >
-                  Sessions
-                </button>
                 {toolsSubmenuEntries.map((entry) => (
                   <button
                     key={entry}
@@ -3835,15 +3922,6 @@ function App() {
 
               {selectedToolsSection === 'Accueil' ? (
                 <div className="dashboard-actions tools-dashboard-actions">
-                  <button
-                    className="dashboard-action-card"
-                    onClick={() => setSelectedToolsSection('Sessions')}
-                    type="button"
-                  >
-                    <span className="eyebrow">Sessions</span>
-                    <strong>Sessions utilisateurs</strong>
-                    <p>Utilisateurs connectes, historique des connexions et deconnexion forcee.</p>
-                  </button>
                   {toolsSubmenuEntries
                     .filter((entry) => entry !== 'Accueil')
                     .map((entry) => (
@@ -3862,7 +3940,7 @@ function App() {
               ) : null}
             </article>
 
-            {selectedToolsSection === 'Sessions' ? (
+            {selectedToolsSection === toolsSessionsSection ? (
               <article className="panel-card panel-card-wide admin-tools-card sessions-card">
                 <div className="panel-heading">
                   <span className="eyebrow">Outils</span>
@@ -3964,7 +4042,7 @@ function App() {
               </article>
             ) : null}
 
-            {selectedToolsSection === 'Diagnostics' ? (
+            {selectedToolsSection === toolsDiagnosticsSection ? (
             <article className="panel-card panel-card-wide admin-tools-card">
               <div className="panel-heading">
                 <span className="eyebrow">Outils</span>
@@ -4037,7 +4115,7 @@ function App() {
                   {[
                     ['UX', adminDiagnostics.readiness.ux],
                     ['Securite et administration', adminDiagnostics.readiness.security],
-                    ['Parametres transverses', adminDiagnostics.readiness.settings],
+                    ['Param\u00e8tres', adminDiagnostics.readiness.settings],
                     ['Interfaces', adminDiagnostics.readiness.interfaces],
                   ].map(([sectionLabel, items]) => (
                     <section className="readiness-section" key={sectionLabel as string}>
@@ -4070,7 +4148,7 @@ function App() {
               )}
             </article>
             ) : null}
-            {selectedToolsSection === 'Clés API' ? (
+            {selectedToolsSection === toolsApiKeysSection ? (
             <article className="panel-card panel-card-wide integration-credentials-card">
               <div className="panel-heading">
                 <span className="eyebrow">Intégrations</span>
@@ -4158,7 +4236,7 @@ function App() {
             </article>
             ) : null}
 
-            {selectedToolsSection === 'Tâches planifiées' ? (
+            {selectedToolsSection === toolsScheduledTasksSection ? (
               <article className="panel-card panel-card-wide scheduled-tasks-card">
                 <div className="panel-heading">
                   <span className="eyebrow">Outils</span>
@@ -4194,7 +4272,7 @@ function App() {
               </article>
             ) : null}
 
-            {selectedToolsSection === toolsSubmenuEntries[3] ? (
+            {selectedToolsSection === toolsSqlSection ? (
               <article className="panel-card panel-card-wide tools-catalog-card">
                 <div className="panel-heading">
                   <span className="eyebrow">Outils</span>
@@ -4228,7 +4306,7 @@ function App() {
               </article>
             ) : null}
 
-            {selectedToolsSection === 'Requêteur SQL' ? (
+            {false ? (
               <article className="panel-card panel-card-wide tools-catalog-card">
                 <div className="panel-heading">
                   <span className="eyebrow">Outils</span>
@@ -4262,7 +4340,7 @@ function App() {
               </article>
             ) : null}
 
-            {selectedToolsSection === toolsSubmenuEntries[4] ? (
+            {selectedToolsSection === toolsTracesSection ? (
               <article className="panel-card panel-card-wide tools-catalog-card">
                 <div className="panel-heading">
                   <span className="eyebrow">Outils</span>
@@ -4302,7 +4380,7 @@ function App() {
               </article>
             ) : null}
 
-            {selectedToolsSection === 'Traces' && false ? (
+            {false ? (
               <article className="panel-card panel-card-wide tools-catalog-card">
                 <div className="panel-heading">
                   <span className="eyebrow">Outils</span>
@@ -4343,14 +4421,12 @@ function App() {
             ) : null}
 
             {selectedToolsSection !== 'Accueil' &&
-            selectedToolsSection !== 'Sessions' &&
-            selectedToolsSection !== toolsSubmenuEntries[3] &&
-            selectedToolsSection !== toolsSubmenuEntries[4] &&
-            selectedToolsSection !== 'Clés API' &&
-            selectedToolsSection !== 'Tâches planifiées' &&
-            selectedToolsSection !== 'Requêteur SQL' &&
-            selectedToolsSection !== 'Traces' &&
-            selectedToolsSection !== 'Diagnostics' ? (
+            selectedToolsSection !== toolsSessionsSection &&
+            selectedToolsSection !== toolsSqlSection &&
+            selectedToolsSection !== toolsTracesSection &&
+            selectedToolsSection !== toolsApiKeysSection &&
+            selectedToolsSection !== toolsScheduledTasksSection &&
+            selectedToolsSection !== toolsDiagnosticsSection ? (
               <article className="panel-card panel-card-wide tool-placeholder-card">
                 <div className="panel-heading">
                   <span className="eyebrow">Outils</span>
@@ -4568,6 +4644,152 @@ function App() {
                     {employeeForm.isSaving ? 'Enregistrement...' : editingEmployee ? 'Enregistrer le salarié' : 'Ajouter le salarié'}
                   </button>
                   {employeeForm.error ? <small className="account-error">{employeeForm.error}</small> : null}
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
+        {isThirdPartyModalOpen || editingThirdParty ? (
+          <div className="modal-overlay" onClick={closeThirdPartyModal} role="presentation">
+            <section
+              aria-labelledby="third-party-modal-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">{editingThirdParty ? 'Configuration' : 'Cr\u00e9ation'}</span>
+                  <h2 id="third-party-modal-title">{editingThirdParty ? 'Configurer le tiers' : 'Ajouter un tiers'}</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeThirdPartyModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="settings-form settings-create-form" onSubmit={editingThirdParty ? handleSaveThirdParty : handleCreateThirdParty}>
+                <label>
+                  <span>Type</span>
+                  <select value={newThirdParty.typeCode} onChange={(event) => handleNewThirdPartyFieldChange('typeCode', event)}>
+                    <option value="CLIENT">Client</option>
+                    <option value="FOURNISSEUR">Fournisseur</option>
+                    <option value="PARTENAIRE">Partenaire</option>
+                    <option value="PARTICULIER">Particulier</option>
+                    <option value="ETRANGER">Entreprise &eacute;trang&egrave;re</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Nom du tiers</span>
+                  <input value={newThirdParty.displayName} onChange={(event) => handleNewThirdPartyFieldChange('displayName', event)} />
+                </label>
+                <label>
+                  <span>SIREN</span>
+                  <input inputMode="numeric" value={newThirdParty.siren} onChange={(event) => handleNewThirdPartyFieldChange('siren', event)} />
+                </label>
+                <label>
+                  <span>TVA</span>
+                  <input value={newThirdParty.vatNumber} onChange={(event) => handleNewThirdPartyFieldChange('vatNumber', event)} />
+                </label>
+                <label>
+                  <span>R&eacute;f&eacute;rence externe</span>
+                  <input value={newThirdParty.externalReference} onChange={(event) => handleNewThirdPartyFieldChange('externalReference', event)} />
+                </label>
+                <label>
+                  <span>Analytiques rattach&eacute;s</span>
+                  <select multiple value={newThirdParty.analyticIds} onChange={handleNewThirdPartyAnalyticChange}>
+                    {analytics.map((analytic) => (
+                      <option key={analytic.id} value={analytic.id}>{analytic.code} - {analytic.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="toggle-label">
+                  <input checked={newThirdParty.isForeignCompany} onChange={(event) => handleNewThirdPartyBooleanChange('isForeignCompany', event)} type="checkbox" />
+                  <span>Entreprise &eacute;trang&egrave;re</span>
+                </label>
+                <label className="toggle-label">
+                  <input checked={newThirdParty.isActive} onChange={(event) => handleNewThirdPartyBooleanChange('isActive', event)} type="checkbox" />
+                  <span>Actif</span>
+                </label>
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={newThirdParty.isSaving} type="submit">
+                    {newThirdParty.isSaving ? 'Enregistrement...' : editingThirdParty ? 'Enregistrer le tiers' : 'Ajouter le tiers'}
+                  </button>
+                  {newThirdParty.error ? <small className="account-error">{newThirdParty.error}</small> : null}
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
+        {isMaterialModalOpen || editingMaterial ? (
+          <div className="modal-overlay" onClick={closeMaterialModal} role="presentation">
+            <section
+              aria-labelledby="material-modal-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">{editingMaterial ? 'Configuration' : 'Cr\u00e9ation'}</span>
+                  <h2 id="material-modal-title">{editingMaterial ? 'Configurer le mat&eacute;riel' : 'Ajouter un mat&eacute;riel'}</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeMaterialModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="settings-form settings-create-form" onSubmit={editingMaterial ? handleSaveMaterial : handleCreateMaterial}>
+                <label>
+                  <span>Num&eacute;ro de parc</span>
+                  <input value={newMaterial.fleetNumber} onChange={(event) => handleNewMaterialFieldChange('fleetNumber', event)} />
+                </label>
+                <label>
+                  <span>Libell&eacute;</span>
+                  <input value={newMaterial.label} onChange={(event) => handleNewMaterialFieldChange('label', event)} />
+                </label>
+                <label>
+                  <span>Type</span>
+                  <select value={newMaterial.materialType} onChange={(event) => handleNewMaterialFieldChange('materialType', event)}>
+                    <option value="TRACTEUR">Tracteur</option>
+                    <option value="REMORQUE">Remorque</option>
+                    <option value="VL">V&eacute;hicule l&eacute;ger</option>
+                    <option value="AUTRE">Autre</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Immatriculation</span>
+                  <input value={newMaterial.registrationNumber} onChange={(event) => handleNewMaterialFieldChange('registrationNumber', event)} />
+                </label>
+                <label>
+                  <span>Source</span>
+                  <select value={newMaterial.sourceSystem} onChange={(event) => handleNewMaterialFieldChange('sourceSystem', event)}>
+                    <option value="TruckOnline">TruckOnline</option>
+                    <option value="YellowBox">YellowBox</option>
+                    <option value="Manuel">Manuel</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Exploitation</span>
+                  <select value={newMaterial.exploitationId} onChange={(event) => handleNewMaterialFieldChange('exploitationId', event)}>
+                    <option value="">Non rattach&eacute;</option>
+                    {exploitations.map((exploitation) => (
+                      <option key={exploitation.id} value={exploitation.id}>{exploitation.code} - {exploitation.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="toggle-label">
+                  <input checked={newMaterial.isActive} onChange={handleNewMaterialStatusChange} type="checkbox" />
+                  <span>Actif</span>
+                </label>
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={newMaterial.isSaving} type="submit">
+                    {newMaterial.isSaving ? 'Enregistrement...' : editingMaterial ? 'Enregistrer le mat&eacute;riel' : 'Ajouter le mat&eacute;riel'}
+                  </button>
+                  {newMaterial.error ? <small className="account-error">{newMaterial.error}</small> : null}
                 </div>
               </form>
             </section>
@@ -5213,6 +5435,21 @@ function createEmptyThirdPartyForm(): ThirdPartyFormState {
   }
 }
 
+function buildThirdPartyFormFromItem(thirdParty: ThirdPartyItem): ThirdPartyFormState {
+  return {
+    typeCode: thirdParty.typeCode,
+    displayName: thirdParty.displayName,
+    siren: thirdParty.siren ?? '',
+    vatNumber: thirdParty.vatNumber ?? '',
+    externalReference: thirdParty.externalReference ?? '',
+    isForeignCompany: thirdParty.isForeignCompany,
+    isActive: thirdParty.isActive,
+    analyticIds: thirdParty.analytics.map((analytic) => analytic.analyticId),
+    isSaving: false,
+    error: null,
+  }
+}
+
 function createEmptyMaterialForm(): MaterialFormState {
   return {
     fleetNumber: '',
@@ -5222,6 +5459,20 @@ function createEmptyMaterialForm(): MaterialFormState {
     sourceSystem: 'TruckOnline',
     exploitationId: '',
     isActive: true,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildMaterialFormFromItem(material: MaterialItem): MaterialFormState {
+  return {
+    fleetNumber: material.fleetNumber,
+    label: material.label,
+    materialType: material.materialType,
+    registrationNumber: material.registrationNumber ?? '',
+    sourceSystem: material.sourceSystem ?? 'TruckOnline',
+    exploitationId: material.exploitation?.id ?? '',
+    isActive: material.isActive,
     isSaving: false,
     error: null,
   }
@@ -5277,8 +5528,8 @@ function getWorkspaceTitle(selectedNavigation: string) {
     return 'Administration'
   }
 
-  if (selectedNavigation === 'Transverse') {
-    return 'Transverse'
+  if (selectedNavigation === commonDataNavigationLabel) {
+    return commonDataNavigationLabel
   }
 
   if (selectedNavigation === 'Gestion administrative') {
@@ -5330,8 +5581,8 @@ function getWorkspaceDescription(selectedNavigation: string, isInformatique: boo
       : 'Cette entrée est réservée à l’administration.'
   }
 
-  if (selectedNavigation === 'Transverse') {
-    return 'Socle transverse: salariés, tiers et matériels partagés par les modules métier.'
+  if (selectedNavigation === commonDataNavigationLabel) {
+    return 'Donn\u00e9es Communes: salariés, tiers et matériels partagés par les modules métier.'
   }
 
   if (selectedNavigation === 'Gestion administrative') {
@@ -5347,10 +5598,8 @@ function getAdministrationSectionDescription(section: (typeof administrationSubm
       return 'Créer, modifier, activer ou rattacher les comptes aux profils.'
     case 'Profils':
       return 'Configurer les profils et leurs droits par module.'
-    case 'Paramètres':
-      return 'Administrer les référentiels transverses de base.'
-    case 'Transverse':
-      return 'Gérer les salariés, tiers et matériels du socle transverse.'
+    case administrationSettingsSection:
+      return 'Administrer les paramètres de structure de base.'
     case 'Outils':
       return 'Préparer les futurs outils techniques et de maintenance.'
     default:
@@ -5360,15 +5609,17 @@ function getAdministrationSectionDescription(section: (typeof administrationSubm
 
 function getToolsSectionDescription(section: string) {
   switch (section) {
-    case 'Clés API':
+    case toolsApiKeysSection:
       return 'Déclarer et maintenir les accès API par logiciel externe.'
-    case 'Tâches planifiées':
+    case toolsScheduledTasksSection:
       return 'Préparer le suivi des traitements planifiés, exécutions et historiques.'
-    case 'Requêteur SQL':
+    case toolsSqlSection:
       return 'Préparer un espace de requêtes d’analyse contrôlées.'
-    case 'Traces':
+    case toolsSessionsSection:
+      return 'Utilisateurs connectés, historique des connexions et déconnexion forcée.'
+    case toolsTracesSection:
       return 'Préparer la consultation des journaux applicatifs et techniques.'
-    case 'Diagnostics':
+    case toolsDiagnosticsSection:
       return 'Contrôler rapidement l’application, la base et les référentiels.'
     default:
       return 'Vue d’ensemble des outils techniques disponibles.'
@@ -5389,7 +5640,7 @@ function formatDurationMinutes(totalMinutes: number) {
 
 function getSettingsSectionDescription(section: string) {
   switch (section) {
-    case 'Sociétés':
+    case settingsCompaniesSection:
       return 'Créer et maintenir les sociétés Groupe Laure.'
     case 'Analytiques':
       return 'Créer et maintenir les codes analytiques rattachés aux sociétés.'
@@ -5402,7 +5653,7 @@ function getSettingsSectionDescription(section: string) {
     case 'Exploitations':
       return 'Créer et maintenir les exploitations rattachées aux sociétés.'
     default:
-      return 'Synthèse des référentiels transverses.'
+      return 'Synthèse des données communes.'
   }
 }
 

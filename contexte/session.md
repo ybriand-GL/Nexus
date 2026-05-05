@@ -955,6 +955,8 @@ Ordre cible de construction:
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+
+
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK via `powershell.exe -ExecutionPolicy Bypass -File`
 - validation publication:
@@ -1632,7 +1634,7 @@ Ordre cible de construction:
 
 - demande:
   - reprise du backlog apres la passe sessions utilisateurs
-  - prochain item traite: `Transverse | Creation auto des comptes depuis salaries`
+  - prochain item traite: `Donnees Communes | Creation auto des comptes depuis salaries`
 - choix fonctionnel:
   - provisioning local sans dependance Lucca reelle
   - seuls les salaries actifs sont traites
@@ -1652,3 +1654,36 @@ Ordre cible de construction:
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+
+## 2026-05-05 - Donnees Communes, ordre alphabetique et modales Tiers/Materiels
+
+- demande:
+  - remplacer le libelle applicatif `Transverse` par `Donnees Communes`
+  - appliquer l'ordre alphabetique comme regle absolue dans les entrees de navigation
+  - ajouter des sous-menus dans les menus qui n'en avaient pas encore
+  - aligner Tiers et Materiels sur l'ergonomie liste + bouton ajout + modale ajout/modification
+- navigation:
+  - entree principale `Donnees Communes` ajoutee a la place de `Transverse`
+  - navigation principale triee: Accueil, Administration, Donnees Communes, Exploitation, Gestion administrative
+  - sous-menu Administration trie: Accueil, Comptes utilisateurs, Outils, Parametres, Profils
+  - sous-menu Parametres trie: Accueil, Analytiques, Exploitations, Societes
+  - sous-menu Donnees Communes trie: Accueil, Materiels, Salaries, Tiers
+  - sous-menu Outils trie: Accueil, Cles API, Diagnostics, Requeteur SQL, Sessions, Taches planifiees, Traces
+  - sous-menus ajoutes dans Exploitation et Gestion administrative avec Accueil puis les modules accessibles tries alphabetiquement
+- ergonomie Donnees Communes:
+  - Tiers passe en liste de cartes, bouton `Ajouter un tiers` et modale de creation/modification
+  - Materiels passe en liste de cartes, bouton `Ajouter un materiel` et modale de creation/modification
+  - les formulaires inline Tiers/Materiels sont retires pour conserver le modele commun de l'application
+- backlog:
+  - section courante renommee `Donnees Communes`
+  - item `Navigation alphabetique absolue` ajoute en `A_TESTER`
+  - items Tiers et Materiels mis a jour avec la regle liste + modales
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-DCYKUqRU.css` et `index-BAmCwOmk.js`

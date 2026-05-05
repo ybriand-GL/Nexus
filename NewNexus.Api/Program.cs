@@ -1389,6 +1389,48 @@ app.MapGet("/api/settings/companies/sirene/{siren}", async (string siren, IHttpC
     });
 }).RequireAuthorization("RequireInformatique");
 
+app.MapGet("/api/settings/companies/sirene-search", async (
+    string? name,
+    string? city,
+    string? postalCode,
+    IHttpClientFactory httpClientFactory) =>
+{
+    var normalizedName = NormalizeOptionalText(name);
+    var normalizedCity = NormalizeOptionalText(city);
+    var normalizedPostalCode = NormalizeOptionalText(postalCode);
+
+    if (string.IsNullOrWhiteSpace(normalizedName) &&
+        string.IsNullOrWhiteSpace(normalizedCity) &&
+        string.IsNullOrWhiteSpace(normalizedPostalCode))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["sireneSearch"] = ["Saisissez au moins un nom, une ville ou un code postal."]
+        });
+    }
+
+    var lookup = await SearchSireneCompaniesAsync(httpClientFactory, normalizedName, normalizedCity, normalizedPostalCode);
+    if (!lookup.IsAvailable)
+    {
+        return Results.Problem(
+            title: "La recherche SIRENE est indisponible.",
+            detail: lookup.ErrorDetail,
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+
+    return Results.Ok(lookup.Companies.Select(company => new
+    {
+        company.Siren,
+        company.Siret,
+        company.DisplayName,
+        company.LegalName,
+        company.Naf,
+        company.PostalCode,
+        company.City,
+        Source = "API Recherche d'Entreprises"
+    }));
+}).RequireAuthorization("RequireInformatique");
+
 app.MapPost("/api/settings/companies", async (UpsertCompanyRequest request, NewNexusDbContext dbContext, IHttpClientFactory httpClientFactory) =>
 {
     var validationErrors = await ValidateCompanyRequestAsync(request, dbContext);
@@ -2482,6 +2524,55 @@ static async Task<SireneLookupResult> LookupSireneCompanyAsync(IHttpClientFactor
         return new SireneLookupResult(true, null, "Aucune societe trouvee pour ce SIREN.");
     }
 
+    return new SireneLookupResult(
+        true,
+        BuildSireneCompanyLookup(company, normalizedSiren),
+        null);
+}
+
+static async Task<SireneSearchResult> SearchSireneCompaniesAsync(
+    IHttpClientFactory httpClientFactory,
+    string? name,
+    string? city,
+    string? postalCode)
+{
+    var searchTerms = new[] { name, city, postalCode }
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => value!.Trim());
+    var query = string.Join(' ', searchTerms);
+    var normalizedPostalCode = NormalizeOptionalText(postalCode);
+    var normalizedCity = NormalizeOptionalText(city);
+
+    var client = httpClientFactory.CreateClient("Sirene");
+    using var response = await client.GetAsync($"/search?q={Uri.EscapeDataString(query)}&per_page=12");
+    if (!response.IsSuccessStatusCode)
+    {
+        var detail = await response.Content.ReadAsStringAsync();
+        return new SireneSearchResult(false, [], $"SIRENE retourne {(int)response.StatusCode} {response.ReasonPhrase}. {detail}");
+    }
+
+    await using var stream = await response.Content.ReadAsStreamAsync();
+    using var document = await JsonDocument.ParseAsync(stream);
+
+    if (!document.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+    {
+        return new SireneSearchResult(true, [], "La reponse SIRENE ne contient pas de resultats.");
+    }
+
+    var companies = results.EnumerateArray()
+        .Select(result => BuildSireneCompanyLookup(result))
+        .Where(company => string.IsNullOrWhiteSpace(normalizedPostalCode) || string.Equals(company.PostalCode, normalizedPostalCode, StringComparison.OrdinalIgnoreCase))
+        .Where(company => string.IsNullOrWhiteSpace(normalizedCity) || (company.City?.Contains(normalizedCity, StringComparison.OrdinalIgnoreCase) ?? false))
+        .GroupBy(company => company.Siren)
+        .Select(group => group.First())
+        .Take(8)
+        .ToList();
+
+    return new SireneSearchResult(true, companies, null);
+}
+
+static SireneCompanyLookup BuildSireneCompanyLookup(JsonElement company, string? fallbackSiren = null)
+{
     var legalName = FirstNonEmpty(
         GetJsonString(company, "nom_complet"),
         GetJsonString(company, "nom_raison_sociale"),
@@ -2491,15 +2582,17 @@ static async Task<SireneLookupResult> LookupSireneCompanyAsync(IHttpClientFactor
         GetJsonString(company, "nom_complet"),
         GetJsonString(company, "denomination"));
 
-    return new SireneLookupResult(
-        true,
-        new SireneCompanyLookup(
-            normalizedSiren,
-            GetJsonString(company, "siret"),
-            displayName,
-            legalName,
-            GetJsonString(company, "activite_principale")),
-        null);
+    company.TryGetProperty("siege", out var headquarters);
+    var hasHeadquarters = headquarters.ValueKind == JsonValueKind.Object;
+
+    return new SireneCompanyLookup(
+        FirstNonEmpty(GetJsonString(company, "siren"), fallbackSiren) ?? string.Empty,
+        FirstNonEmpty(GetJsonString(company, "siret"), hasHeadquarters ? GetJsonString(headquarters, "siret") : null),
+        displayName,
+        legalName,
+        FirstNonEmpty(GetJsonString(company, "activite_principale"), hasHeadquarters ? GetJsonString(headquarters, "activite_principale") : null),
+        hasHeadquarters ? GetJsonString(headquarters, "code_postal") : null,
+        hasHeadquarters ? GetJsonString(headquarters, "libelle_commune") : null);
 }
 
 static bool IsLuccaLegacyApi(Uri requestUri)
@@ -3392,8 +3485,9 @@ internal sealed record ProfileModuleRightRequest(Guid SecurityModuleId, string A
 internal sealed record CreateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
 internal sealed record UpdateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
 internal sealed record UpsertCompanyRequest(string Siren, string DisplayName, string LegalName, bool IsActive);
-internal sealed record SireneCompanyLookup(string Siren, string? Siret, string? DisplayName, string? LegalName, string? Naf);
+internal sealed record SireneCompanyLookup(string Siren, string? Siret, string? DisplayName, string? LegalName, string? Naf, string? PostalCode, string? City);
 internal sealed record SireneLookupResult(bool IsAvailable, SireneCompanyLookup? Company, string? ErrorDetail);
+internal sealed record SireneSearchResult(bool IsAvailable, IReadOnlyList<SireneCompanyLookup> Companies, string? ErrorDetail);
 internal sealed record UpsertAnalyticRequest(string Code, string Label, Guid CompanyId, bool IsActive);
 internal sealed record UpsertExploitationRequest(string Code, string Label, Guid CompanyId, bool IsActive);
 internal sealed record UpsertEmployeeRequest(

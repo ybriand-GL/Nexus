@@ -130,6 +130,8 @@ type SireneCompanyLookup = {
   displayName: string | null
   legalName: string | null
   naf: string | null
+  postalCode: string | null
+  city: string | null
   source: string
 }
 
@@ -342,6 +344,15 @@ type CompanyFormState = {
   error: string | null
 }
 
+type SireneCompanySearchFormState = {
+  name: string
+  city: string
+  postalCode: string
+  isSearching: boolean
+  results: SireneCompanyLookup[]
+  error: string | null
+}
+
 type EmployeeFormState = {
   sourceEmployeeId: string
   employeeNumber: string
@@ -507,6 +518,7 @@ function App() {
   const [editingMaterial, setEditingMaterial] = useState<MaterialItem | null>(null)
   const [employeeForm, setEmployeeForm] = useState<EmployeeFormState>(createEmptyEmployeeForm())
   const [companyForm, setCompanyForm] = useState<CompanyFormState>(createEmptyCompanyForm())
+  const [sireneCompanySearch, setSireneCompanySearch] = useState<SireneCompanySearchFormState>(createEmptySireneCompanySearchForm())
   const [isCreateCompanyModalOpen, setIsCreateCompanyModalOpen] = useState(false)
   const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false)
   const [isThirdPartyModalOpen, setIsThirdPartyModalOpen] = useState(false)
@@ -1923,6 +1935,17 @@ function App() {
     }))
   }
 
+  function handleSireneCompanySearchFieldChange(
+    field: 'name' | 'city' | 'postalCode',
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    setSireneCompanySearch((current) => ({
+      ...current,
+      [field]: field === 'postalCode' ? event.target.value.replace(/\D/g, '').slice(0, 5) : event.target.value,
+      error: null,
+    }))
+  }
+
   async function handleLookupNewCompanySirene() {
     const siren = companyForm.siren.replace(/\D/g, '')
     if (siren.length !== 9) {
@@ -1961,6 +1984,68 @@ function App() {
     } finally {
       setIsLookingUpNewCompany(false)
     }
+  }
+
+  async function handleSearchCompaniesSirene() {
+    const searchName = sireneCompanySearch.name.trim()
+    const searchCity = sireneCompanySearch.city.trim()
+    const searchPostalCode = sireneCompanySearch.postalCode.trim()
+
+    if (!searchName && !searchCity && !searchPostalCode) {
+      setSireneCompanySearch((current) => ({
+        ...current,
+        error: 'Saisissez au moins un nom, une ville ou un code postal.',
+        results: [],
+      }))
+      return
+    }
+
+    const query = new URLSearchParams()
+    if (searchName) {
+      query.set('name', searchName)
+    }
+    if (searchCity) {
+      query.set('city', searchCity)
+    }
+    if (searchPostalCode) {
+      query.set('postalCode', searchPostalCode)
+    }
+
+    setSireneCompanySearch((current) => ({ ...current, isSearching: true, error: null, results: [] }))
+
+    try {
+      const response = await fetch(apiPath(`api/settings/companies/sirene-search?${query.toString()}`))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La recherche SIRENE a échoué.'))
+      }
+
+      const results = (await response.json()) as SireneCompanyLookup[]
+      setSireneCompanySearch((current) => ({
+        ...current,
+        isSearching: false,
+        results,
+        error: results.length === 0 ? 'Aucune société trouvée pour ces critères.' : null,
+      }))
+    } catch (searchError) {
+      setSireneCompanySearch((current) => ({
+        ...current,
+        isSearching: false,
+        results: [],
+        error: searchError instanceof Error ? searchError.message : 'Erreur de recherche SIRENE.',
+      }))
+    }
+  }
+
+  function selectSireneCompanyResult(company: SireneCompanyLookup) {
+    setCompanyForm((current) => ({
+      ...current,
+      siren: company.siren,
+      displayName: company.displayName ?? current.displayName,
+      legalName: company.legalName ?? company.displayName ?? current.legalName,
+      isSireneValidated: true,
+      error: null,
+    }))
+    setSireneCompanySearch((current) => ({ ...current, error: null }))
   }
 
   async function handleCreateCompany(event: FormEvent<HTMLFormElement>) {
@@ -2027,12 +2112,14 @@ function App() {
   function openCreateCompanyModal() {
     setEditingCompany(null)
     setCompanyForm(createEmptyCompanyForm())
+    setSireneCompanySearch(createEmptySireneCompanySearchForm())
     setIsCreateCompanyModalOpen(true)
   }
 
   function openEditCompanyModal(company: CompanyItem) {
     setEditingCompany(company)
     setCompanyForm(buildCompanyFormFromItem(company))
+    setSireneCompanySearch(createEmptySireneCompanySearchForm())
   }
 
   function closeCompanyModal() {
@@ -2043,6 +2130,7 @@ function App() {
     setEditingCompany(null)
     setIsCreateCompanyModalOpen(false)
     setCompanyForm(createEmptyCompanyForm())
+    setSireneCompanySearch(createEmptySireneCompanySearchForm())
   }
 
   function handleNewAnalyticFieldChange(
@@ -4662,6 +4750,55 @@ function App() {
                     {isLookingUpNewCompany ? 'Recherche...' : 'Rechercher SIRENE'}
                   </button>
                 ) : null}
+                {!editingCompany ? (
+                  <section className="sirene-search-panel">
+                    <div className="settings-list-header">
+                      <div>
+                        <h3>Recherche par critères</h3>
+                        <small>Nom, ville et/ou code postal</small>
+                      </div>
+                      <button
+                        className="secondary-button"
+                        disabled={sireneCompanySearch.isSearching || companyForm.isSaving}
+                        onClick={() => void handleSearchCompaniesSirene()}
+                        type="button"
+                      >
+                        {sireneCompanySearch.isSearching ? 'Recherche...' : 'Rechercher'}
+                      </button>
+                    </div>
+                    <div className="sirene-search-grid">
+                      <label>
+                        <span>Nom</span>
+                        <input value={sireneCompanySearch.name} onChange={(event) => handleSireneCompanySearchFieldChange('name', event)} />
+                      </label>
+                      <label>
+                        <span>Ville</span>
+                        <input value={sireneCompanySearch.city} onChange={(event) => handleSireneCompanySearchFieldChange('city', event)} />
+                      </label>
+                      <label>
+                        <span>Code postal</span>
+                        <input inputMode="numeric" maxLength={5} value={sireneCompanySearch.postalCode} onChange={(event) => handleSireneCompanySearchFieldChange('postalCode', event)} />
+                      </label>
+                    </div>
+                    {sireneCompanySearch.error ? <small className="account-error">{sireneCompanySearch.error}</small> : null}
+                    {sireneCompanySearch.results.length > 0 ? (
+                      <div className="sirene-search-results">
+                        {sireneCompanySearch.results.map((company) => (
+                          <button
+                            className={`sirene-result-card ${companyForm.siren === company.siren ? 'sirene-result-card-selected' : ''}`}
+                            key={`${company.siren}-${company.siret ?? 'siege'}`}
+                            onClick={() => selectSireneCompanyResult(company)}
+                            type="button"
+                          >
+                            <strong>{company.displayName ?? company.legalName ?? company.siren}</strong>
+                            <span>{company.siren}{company.siret ? ` - ${company.siret}` : ''}</span>
+                            <small>{[company.postalCode, company.city].filter(Boolean).join(' ') || 'Localisation non renseignée'}</small>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
                 <label>
                   <span>Nom affiché</span>
                   <input value={companyForm.displayName} onChange={(event) => handleNewCompanyFieldChange('displayName', event)} />
@@ -5458,6 +5595,17 @@ function createEmptyCompanyForm(): CompanyFormState {
     isActive: true,
     isSireneValidated: false,
     isSaving: false,
+    error: null,
+  }
+}
+
+function createEmptySireneCompanySearchForm(): SireneCompanySearchFormState {
+  return {
+    name: '',
+    city: '',
+    postalCode: '',
+    isSearching: false,
+    results: [],
     error: null,
   }
 }

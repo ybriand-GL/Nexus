@@ -448,12 +448,34 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-BOero0j2.css` et `index-BNVeubKI.js`
+
+## 2026-05-05 - Recherche SIRENE par nom ville code postal
+
+- demande:
+  - la recherche SIRENE doit etre disponible en saisissant seulement un nom et/ou une ville et/ou un code postal
+  - la modale d'ajout societe ne proposait que le SIREN
+- backend:
+  - ajout de `GET /api/settings/companies/sirene-search`
+  - criteres acceptes: `name`, `city`, `postalCode`
+  - appel de l'API publique Recherche d'Entreprises avec resultats limites, dedoublonnes par SIREN et filtres sur ville/code postal si renseignes
+  - enrichissement du DTO SIRENE avec `postalCode` et `city`
+- frontend:
+  - ajout d'un bloc `Recherche par criteres` dans la modale `Ajouter une societe`
+  - champs `Nom`, `Ville`, `Code postal`
+  - affichage des resultats SIRENE sous forme de cartes selectionnables
+  - selection d'un resultat: renseigne SIREN, nom affiche, raison sociale et valide la societe avant creation
+  - la recherche directe par SIREN reste disponible
+- backlog:
+  - item `Societes Groupe Laure` precise avec recherche SIREN et recherche nom/ville/code postal
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
-  - bundles publies: `index-N4AU1MMi.css` et `index-DMssxsT0.js`
+  - bundles publies: `index-BE9Hlo43.css` et `index-CaWevmG6.js`
 
 ## 2026-05-05 - Disponibilite recherche SIRENE en creation Societe
 

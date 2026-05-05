@@ -184,3 +184,38 @@ Un ecran est acceptable lorsque:
 - le responsive est utilisable sur tablette et mobile
 - le contexte et le backlog sont mis a jour
 - la publication IIS a ete verifiee
+
+## Inventaire composants V1
+
+Composants applicatifs actuellement utilises:
+
+- Shell connecte: `.nexus-app-shell`, `.nexus-sidebar`, `.nexus-main`
+- Bandeau titre: `.hero-card`, `.hero-card-compact`, `.hero-copy`
+- Navigation: `.sidebar-nav`, `.admin-subnav`, `.tools-subnav`
+- Cartes: `.panel-card`, `.metric-card`, `.dashboard-action-card`, `.profile-summary-card`
+- Formulaires: `.settings-form`, `.settings-create-form`, `.settings-edit-grid`, `.account-form-grid`
+- Modales: `.modal-overlay`, `.modal-card`, `.profile-modal-card`, `.credential-modal-card`
+- Etats: `.status-banner`, `.profile-status-badge`, `.workspace-empty`
+- Outils: `.tools-catalog-grid`, `.tool-blueprint-card`, `.readiness-card`
+
+Regles de reutilisation:
+
+- un nouveau referentiel metier doit utiliser le couple `settings-list-section` + `settings-create-form`
+- une liste de synthese doit utiliser `profiles-overview-grid` + `profile-summary-card`
+- un chantier non raccorde doit utiliser `tool-blueprint-card` avec statut explicite
+- une vue de pilotage doit utiliser `readiness-section` et `readiness-card`
+
+## Captures a produire
+
+Captures ciblees a ajouter lors de la recette:
+
+- authentification premium
+- accueil connecte
+- administration accueil
+- profils
+- comptes utilisateurs
+- parametres societes/analytiques/exploitations
+- parametres salaries/tiers/materiels
+- outils diagnostics/readiness
+- responsive tablette
+- responsive smartphone

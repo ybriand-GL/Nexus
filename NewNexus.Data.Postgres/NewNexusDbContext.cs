@@ -15,6 +15,10 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Analytic> Analytics => Set<Analytic>();
     public DbSet<Exploitation> Exploitations => Set<Exploitation>();
+    public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<ThirdParty> ThirdParties => Set<ThirdParty>();
+    public DbSet<ThirdPartyAnalytic> ThirdPartyAnalytics => Set<ThirdPartyAnalytic>();
+    public DbSet<Material> Materials => Set<Material>();
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -26,6 +30,10 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
         modelBuilder.ApplyConfiguration(new CompanyConfiguration());
         modelBuilder.ApplyConfiguration(new AnalyticConfiguration());
         modelBuilder.ApplyConfiguration(new ExploitationConfiguration());
+        modelBuilder.ApplyConfiguration(new EmployeeConfiguration());
+        modelBuilder.ApplyConfiguration(new ThirdPartyConfiguration());
+        modelBuilder.ApplyConfiguration(new ThirdPartyAnalyticConfiguration());
+        modelBuilder.ApplyConfiguration(new MaterialConfiguration());
         modelBuilder.ApplyConfiguration(new IntegrationCredentialConfiguration());
     }
 }

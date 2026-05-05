@@ -215,6 +215,9 @@ app.MapGet("/api/admin/diagnostics", async (NewNexusDbContext dbContext, HttpCon
     var companyCount = canConnect ? await dbContext.Companies.CountAsync() : 0;
     var analyticCount = canConnect ? await dbContext.Analytics.CountAsync() : 0;
     var exploitationCount = canConnect ? await dbContext.Exploitations.CountAsync() : 0;
+    var employeeCount = canConnect ? await dbContext.Employees.CountAsync() : 0;
+    var thirdPartyCount = canConnect ? await dbContext.ThirdParties.CountAsync() : 0;
+    var materialCount = canConnect ? await dbContext.Materials.CountAsync() : 0;
     var credentialProviderStatus = canConnect
         ? await dbContext.IntegrationCredentials
             .AsNoTracking()
@@ -259,7 +262,10 @@ app.MapGet("/api/admin/diagnostics", async (NewNexusDbContext dbContext, HttpCon
         {
             CompanyCount = companyCount,
             AnalyticCount = analyticCount,
-            ExploitationCount = exploitationCount
+            ExploitationCount = exploitationCount,
+            EmployeeCount = employeeCount,
+            ThirdPartyCount = thirdPartyCount,
+            MaterialCount = materialCount
         },
         Integrations = new
         {
@@ -356,21 +362,21 @@ app.MapGet("/api/admin/diagnostics", async (NewNexusDbContext dbContext, HttpCon
                 {
                     Label = "Lucca",
                     Status = HasActiveCredential("LUCCA") ? "PRET_A_RACCORDER" : "CLE_A_COMPLETER",
-                    Detail = "Cles parametrees dans Outils; import salaries non active.",
+                    Detail = $"{employeeCount} salarie(s); cles parametrees dans Outils; import reel non active.",
                     NextStep = "Brancher le client Lucca lorsque le contrat API cible est valide."
                 },
                 new
                 {
                     Label = "TruckOnline",
                     Status = HasActiveCredential("TRUCKONLINE", "TRUCK_ONLINE") ? "PRET_A_RACCORDER" : "CLE_A_COMPLETER",
-                    Detail = "Cles parametrees dans Outils; synchronisation parc non activee.",
+                    Detail = $"{materialCount} materiel(s); cles parametrees dans Outils; synchronisation parc non activee.",
                     NextStep = "Valider endpoints TruckOnline et mapping materiels."
                 },
                 new
                 {
                     Label = "YellowBox",
                     Status = HasActiveCredential("YELLOWBOX", "YELLOW_BOX") ? "PRET_A_RACCORDER" : "CLE_A_COMPLETER",
-                    Detail = "Cles parametrees dans Outils; telematique non activee.",
+                    Detail = $"{materialCount} materiel(s); cles parametrees dans Outils; telematique non activee.",
                     NextStep = "Valider endpoints YellowBox et mapping telematique."
                 },
                 new
@@ -1127,11 +1133,91 @@ app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
         })
         .ToListAsync();
 
+    var employees = await dbContext.Employees
+        .AsNoTracking()
+        .OrderBy(item => item.DisplayName)
+        .ThenBy(item => item.EmployeeNumber)
+        .Select(item => new
+        {
+            item.Id,
+            item.SourceEmployeeId,
+            item.EmployeeNumber,
+            item.DisplayName,
+            item.Email,
+            item.IsDriver,
+            item.IsActive,
+            item.LastSyncedAtUtc,
+            item.CreatedAtUtc
+        })
+        .ToListAsync();
+
+    var thirdParties = await dbContext.ThirdParties
+        .AsNoTracking()
+        .Include(item => item.Analytics)
+            .ThenInclude(link => link.Analytic!)
+                .ThenInclude(analytic => analytic.Company)
+        .OrderBy(item => item.DisplayName)
+        .Select(item => new
+        {
+            item.Id,
+            item.TypeCode,
+            item.DisplayName,
+            item.Siren,
+            item.VatNumber,
+            item.ExternalReference,
+            item.IsForeignCompany,
+            item.IsActive,
+            item.CreatedAtUtc,
+            Analytics = item.Analytics
+                .OrderBy(link => link.Analytic!.Code)
+                .Select(link => new
+                {
+                    link.AnalyticId,
+                    link.Analytic!.Code,
+                    link.Analytic.Label,
+                    Company = new
+                    {
+                        link.Analytic.Company!.Id,
+                        link.Analytic.Company.DisplayName
+                    }
+                })
+        })
+        .ToListAsync();
+
+    var materials = await dbContext.Materials
+        .AsNoTracking()
+        .Include(item => item.Exploitation)
+        .OrderBy(item => item.FleetNumber)
+        .Select(item => new
+        {
+            item.Id,
+            item.FleetNumber,
+            item.Label,
+            item.MaterialType,
+            item.RegistrationNumber,
+            item.SourceSystem,
+            item.IsActive,
+            item.LastSyncedAtUtc,
+            item.CreatedAtUtc,
+            Exploitation = item.Exploitation == null
+                ? null
+                : new
+                {
+                    item.Exploitation.Id,
+                    item.Exploitation.Code,
+                    item.Exploitation.Label
+                }
+        })
+        .ToListAsync();
+
     return Results.Ok(new
     {
         Companies = companies,
         Analytics = analytics,
-        Exploitations = exploitations
+        Exploitations = exploitations,
+        Employees = employees,
+        ThirdParties = thirdParties,
+        Materials = materials
     });
 }).RequireAuthorization("RequireInformatique");
 
@@ -1331,6 +1417,189 @@ app.MapPut("/api/settings/exploitations/{exploitationId:guid}", async (
     exploitation.Label = request.Label.Trim();
     exploitation.CompanyId = request.CompanyId;
     exploitation.IsActive = request.IsActive;
+
+    await dbContext.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/settings/employees", async (UpsertEmployeeRequest request, NewNexusDbContext dbContext) =>
+{
+    var validationErrors = await ValidateEmployeeRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var employee = new Employee
+    {
+        Id = Guid.NewGuid(),
+        SourceEmployeeId = request.SourceEmployeeId.Trim(),
+        EmployeeNumber = request.EmployeeNumber.Trim(),
+        DisplayName = request.DisplayName.Trim(),
+        Email = NormalizeOptionalText(request.Email),
+        IsDriver = request.IsDriver,
+        IsActive = request.IsActive,
+        LastSyncedAtUtc = request.LastSyncedAtUtc,
+        CreatedAtUtc = DateTime.UtcNow
+    };
+
+    dbContext.Employees.Add(employee);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/settings/employees/{employee.Id}", new { employee.Id });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/settings/employees/{employeeId:guid}", async (
+    Guid employeeId,
+    UpsertEmployeeRequest request,
+    NewNexusDbContext dbContext) =>
+{
+    var employee = await dbContext.Employees.SingleOrDefaultAsync(item => item.Id == employeeId);
+    if (employee is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateEmployeeRequestAsync(request, dbContext, employeeId);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    employee.SourceEmployeeId = request.SourceEmployeeId.Trim();
+    employee.EmployeeNumber = request.EmployeeNumber.Trim();
+    employee.DisplayName = request.DisplayName.Trim();
+    employee.Email = NormalizeOptionalText(request.Email);
+    employee.IsDriver = request.IsDriver;
+    employee.IsActive = request.IsActive;
+    employee.LastSyncedAtUtc = request.LastSyncedAtUtc;
+
+    await dbContext.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/settings/third-parties", async (UpsertThirdPartyRequest request, NewNexusDbContext dbContext) =>
+{
+    var validationErrors = await ValidateThirdPartyRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var thirdParty = new ThirdParty
+    {
+        Id = Guid.NewGuid(),
+        TypeCode = request.TypeCode.Trim().ToUpperInvariant(),
+        DisplayName = request.DisplayName.Trim(),
+        Siren = NormalizeOptionalText(request.Siren),
+        VatNumber = NormalizeOptionalText(request.VatNumber),
+        ExternalReference = NormalizeOptionalText(request.ExternalReference),
+        IsForeignCompany = request.IsForeignCompany,
+        IsActive = request.IsActive,
+        CreatedAtUtc = DateTime.UtcNow,
+        Analytics = request.AnalyticIds.Distinct().Select(analyticId => new ThirdPartyAnalytic
+        {
+            AnalyticId = analyticId
+        }).ToList()
+    };
+
+    dbContext.ThirdParties.Add(thirdParty);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/settings/third-parties/{thirdParty.Id}", new { thirdParty.Id });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/settings/third-parties/{thirdPartyId:guid}", async (
+    Guid thirdPartyId,
+    UpsertThirdPartyRequest request,
+    NewNexusDbContext dbContext) =>
+{
+    var thirdParty = await dbContext.ThirdParties
+        .Include(item => item.Analytics)
+        .SingleOrDefaultAsync(item => item.Id == thirdPartyId);
+    if (thirdParty is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateThirdPartyRequestAsync(request, dbContext, thirdPartyId);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    thirdParty.TypeCode = request.TypeCode.Trim().ToUpperInvariant();
+    thirdParty.DisplayName = request.DisplayName.Trim();
+    thirdParty.Siren = NormalizeOptionalText(request.Siren);
+    thirdParty.VatNumber = NormalizeOptionalText(request.VatNumber);
+    thirdParty.ExternalReference = NormalizeOptionalText(request.ExternalReference);
+    thirdParty.IsForeignCompany = request.IsForeignCompany;
+    thirdParty.IsActive = request.IsActive;
+
+    var desiredAnalyticIds = request.AnalyticIds.Distinct().ToHashSet();
+    dbContext.ThirdPartyAnalytics.RemoveRange(thirdParty.Analytics.Where(link => !desiredAnalyticIds.Contains(link.AnalyticId)));
+    foreach (var analyticId in desiredAnalyticIds.Except(thirdParty.Analytics.Select(link => link.AnalyticId)))
+    {
+        thirdParty.Analytics.Add(new ThirdPartyAnalytic { ThirdPartyId = thirdParty.Id, AnalyticId = analyticId });
+    }
+
+    await dbContext.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/settings/materials", async (UpsertMaterialRequest request, NewNexusDbContext dbContext) =>
+{
+    var validationErrors = await ValidateMaterialRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var material = new Material
+    {
+        Id = Guid.NewGuid(),
+        FleetNumber = request.FleetNumber.Trim().ToUpperInvariant(),
+        Label = request.Label.Trim(),
+        MaterialType = request.MaterialType.Trim().ToUpperInvariant(),
+        RegistrationNumber = NormalizeOptionalText(request.RegistrationNumber),
+        SourceSystem = NormalizeOptionalText(request.SourceSystem),
+        ExploitationId = request.ExploitationId,
+        IsActive = request.IsActive,
+        LastSyncedAtUtc = request.LastSyncedAtUtc,
+        CreatedAtUtc = DateTime.UtcNow
+    };
+
+    dbContext.Materials.Add(material);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/settings/materials/{material.Id}", new { material.Id });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/settings/materials/{materialId:guid}", async (
+    Guid materialId,
+    UpsertMaterialRequest request,
+    NewNexusDbContext dbContext) =>
+{
+    var material = await dbContext.Materials.SingleOrDefaultAsync(item => item.Id == materialId);
+    if (material is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateMaterialRequestAsync(request, dbContext, materialId);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    material.FleetNumber = request.FleetNumber.Trim().ToUpperInvariant();
+    material.Label = request.Label.Trim();
+    material.MaterialType = request.MaterialType.Trim().ToUpperInvariant();
+    material.RegistrationNumber = NormalizeOptionalText(request.RegistrationNumber);
+    material.SourceSystem = NormalizeOptionalText(request.SourceSystem);
+    material.ExploitationId = request.ExploitationId;
+    material.IsActive = request.IsActive;
+    material.LastSyncedAtUtc = request.LastSyncedAtUtc;
 
     await dbContext.SaveChangesAsync();
     return Results.NoContent();
@@ -2324,6 +2593,130 @@ static async Task<Dictionary<string, string[]>> ValidateExploitationRequestAsync
     return errors;
 }
 
+static async Task<Dictionary<string, string[]>> ValidateEmployeeRequestAsync(
+    UpsertEmployeeRequest request,
+    NewNexusDbContext dbContext,
+    Guid? currentEmployeeId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var sourceEmployeeId = request.SourceEmployeeId.Trim();
+    var employeeNumber = request.EmployeeNumber.Trim();
+    var displayName = request.DisplayName.Trim();
+    var email = NormalizeOptionalText(request.Email);
+
+    if (string.IsNullOrWhiteSpace(sourceEmployeeId))
+    {
+        errors["sourceEmployeeId"] = ["L'identifiant source Lucca est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(employeeNumber))
+    {
+        errors["employeeNumber"] = ["Le matricule est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(displayName))
+    {
+        errors["displayName"] = ["Le nom du salarie est obligatoire."];
+    }
+
+    if (!string.IsNullOrWhiteSpace(email) && !email.Contains('@'))
+    {
+        errors["email"] = ["L'adresse email est invalide."];
+    }
+
+    if (await dbContext.Employees.AnyAsync(item => item.SourceEmployeeId == sourceEmployeeId && item.Id != currentEmployeeId))
+    {
+        errors["sourceEmployeeId"] = ["Cet identifiant source existe deja."];
+    }
+
+    if (await dbContext.Employees.AnyAsync(item => item.EmployeeNumber == employeeNumber && item.Id != currentEmployeeId))
+    {
+        errors["employeeNumber"] = ["Ce matricule existe deja."];
+    }
+
+    return errors;
+}
+
+static async Task<Dictionary<string, string[]>> ValidateThirdPartyRequestAsync(
+    UpsertThirdPartyRequest request,
+    NewNexusDbContext dbContext,
+    Guid? currentThirdPartyId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var typeCode = request.TypeCode.Trim().ToUpperInvariant();
+    var displayName = request.DisplayName.Trim();
+    var siren = NormalizeOptionalText(request.Siren);
+
+    if (string.IsNullOrWhiteSpace(typeCode))
+    {
+        errors["typeCode"] = ["Le type de tiers est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(displayName))
+    {
+        errors["displayName"] = ["Le nom du tiers est obligatoire."];
+    }
+
+    if (!string.IsNullOrWhiteSpace(siren) && (siren.Length != 9 || siren.Any(character => !char.IsDigit(character))))
+    {
+        errors["siren"] = ["Le SIREN doit contenir 9 chiffres."];
+    }
+
+    if (!string.IsNullOrWhiteSpace(siren) &&
+        await dbContext.ThirdParties.AnyAsync(item => item.Siren == siren && item.Id != currentThirdPartyId))
+    {
+        errors["siren"] = ["Ce SIREN est deja rattache a un tiers."];
+    }
+
+    var requestedAnalyticIds = request.AnalyticIds.Distinct().ToArray();
+    var existingAnalyticCount = await dbContext.Analytics.CountAsync(item => requestedAnalyticIds.Contains(item.Id));
+    if (existingAnalyticCount != requestedAnalyticIds.Length)
+    {
+        errors["analyticIds"] = ["Un analytique selectionne est introuvable."];
+    }
+
+    return errors;
+}
+
+static async Task<Dictionary<string, string[]>> ValidateMaterialRequestAsync(
+    UpsertMaterialRequest request,
+    NewNexusDbContext dbContext,
+    Guid? currentMaterialId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var fleetNumber = request.FleetNumber.Trim().ToUpperInvariant();
+    var label = request.Label.Trim();
+    var materialType = request.MaterialType.Trim().ToUpperInvariant();
+
+    if (string.IsNullOrWhiteSpace(fleetNumber))
+    {
+        errors["fleetNumber"] = ["Le numero de parc est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(label))
+    {
+        errors["label"] = ["Le libelle materiel est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(materialType))
+    {
+        errors["materialType"] = ["Le type de materiel est obligatoire."];
+    }
+
+    if (await dbContext.Materials.AnyAsync(item => item.FleetNumber == fleetNumber && item.Id != currentMaterialId))
+    {
+        errors["fleetNumber"] = ["Ce numero de parc existe deja."];
+    }
+
+    if (request.ExploitationId is not null &&
+        !await dbContext.Exploitations.AnyAsync(item => item.Id == request.ExploitationId.Value))
+    {
+        errors["exploitationId"] = ["L'exploitation selectionnee est introuvable."];
+    }
+
+    return errors;
+}
+
 internal sealed record LoginRequest(string Login, string Password);
 internal sealed record ForgotPasswordRequest(string LoginOrEmail);
 internal sealed record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
@@ -2354,6 +2747,32 @@ internal sealed record UpdateSecurityProfileRequest(string Label, bool IsActive,
 internal sealed record UpsertCompanyRequest(string Siren, string DisplayName, string LegalName, bool IsActive);
 internal sealed record UpsertAnalyticRequest(string Code, string Label, Guid CompanyId, bool IsActive);
 internal sealed record UpsertExploitationRequest(string Code, string Label, Guid CompanyId, bool IsActive);
+internal sealed record UpsertEmployeeRequest(
+    string SourceEmployeeId,
+    string EmployeeNumber,
+    string DisplayName,
+    string? Email,
+    bool IsDriver,
+    bool IsActive,
+    DateTime? LastSyncedAtUtc);
+internal sealed record UpsertThirdPartyRequest(
+    string TypeCode,
+    string DisplayName,
+    string? Siren,
+    string? VatNumber,
+    string? ExternalReference,
+    bool IsForeignCompany,
+    bool IsActive,
+    List<Guid> AnalyticIds);
+internal sealed record UpsertMaterialRequest(
+    string FleetNumber,
+    string Label,
+    string MaterialType,
+    string? RegistrationNumber,
+    string? SourceSystem,
+    Guid? ExploitationId,
+    bool IsActive,
+    DateTime? LastSyncedAtUtc);
 internal sealed record ProfileRightsBuildResult(bool IsValid, Dictionary<string, string[]> Errors, Dictionary<Guid, ModuleAccessLevel> RightsByModuleId);
 internal sealed record UpsertIntegrationCredentialRequest(
     string ProviderCode,

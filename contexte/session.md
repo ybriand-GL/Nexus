@@ -1418,3 +1418,43 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-DyRnIfVN.css` et `index-CNSem55a.js`
+
+## 2026-05-05 - Etapes 2 et 3 finalisation technique et referentiels transverses
+
+- demande:
+  - realiser les etapes 2 et 3 du backlog
+  - conserver le SSO et le mot de passe oublie hors perimetre
+- finalisation technique:
+  - design system V1 enrichi avec inventaire des composants et captures a produire
+  - cibles reseau validees: `http://192.168.60.158/newNexus/` et `http://192.168.50.102/newNexus/` retournent `200 text/html`
+  - `psql` reste absent du PATH local, aucun changement d'installation effectue
+  - les nouvelles chaines ajoutees evitent le mojibake, le nettoyage historique complet du fichier React reste progressif
+- referentiels transverses:
+  - ajout des entites persistantes `Employee`, `ThirdParty`, `ThirdPartyAnalytic` et `Material`
+  - ajout des configurations EF Core et des `DbSet` associes
+  - generation et application locale de la migration `TransverseBusinessReferentials`
+  - `GET /api/settings/bootstrap` expose maintenant salaries, tiers et materiels
+  - ajout des endpoints de creation et modification pour salaries, tiers et materiels
+- UI administration:
+  - ajout des formulaires et listes dans `Administration > Parametres`
+  - salaries: base Lucca, email, telephone, matricule et indicateur conducteur
+  - tiers: type, SIREN, TVA/reference, societe et rattachement multi-analytiques
+  - materiels: numero de parc unique, type, source et rattachement exploitation
+- limites assumees:
+  - import Lucca reel, TruckOnline, YellowBox et autres providers restent dependants des contrats API et credentials definitifs
+  - creation automatique des comptes depuis salaries posee cote modele/backlog, raccordement complet a securiser dans une passe dediee
+- backlog:
+  - items salaries, conducteurs, tiers, multi-analytiques tiers, materiels et design system passes a `A_TESTER`
+  - ajout du suivi de migration technique des referentiels transverses
+- validation technique:
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - `GET http://192.168.60.158/newNexus/` retourne `200 text/html`
+  - `GET http://192.168.50.102/newNexus/` retourne `200 text/html`
+  - bundles publies: `index-DyRnIfVN.css` et `index-Cp348Y8u.js`

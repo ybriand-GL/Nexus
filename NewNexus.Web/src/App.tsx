@@ -195,6 +195,56 @@ type ExploitationItem = {
   }
 }
 
+type EmployeeItem = {
+  id: string
+  sourceEmployeeId: string
+  employeeNumber: string
+  displayName: string
+  email: string | null
+  isDriver: boolean
+  isActive: boolean
+  lastSyncedAtUtc: string | null
+  createdAtUtc: string
+}
+
+type ThirdPartyItem = {
+  id: string
+  typeCode: string
+  displayName: string
+  siren: string | null
+  vatNumber: string | null
+  externalReference: string | null
+  isForeignCompany: boolean
+  isActive: boolean
+  createdAtUtc: string
+  analytics: Array<{
+    analyticId: string
+    code: string
+    label: string
+    company: {
+      id: string
+      displayName: string
+    }
+  }>
+}
+
+type MaterialItem = {
+  id: string
+  fleetNumber: string
+  label: string
+  materialType: string
+  registrationNumber: string | null
+  sourceSystem: string | null
+  isActive: boolean
+  lastSyncedAtUtc: string | null
+  createdAtUtc: string
+  exploitation: {
+    id: string
+    code: string
+    label: string
+  } | null
+}
+
 type EditableAccountState = {
   login: string
   displayName: string
@@ -237,6 +287,42 @@ type CompanyFormState = {
   siren: string
   displayName: string
   legalName: string
+  isActive: boolean
+  isSaving: boolean
+  error: string | null
+}
+
+type EmployeeFormState = {
+  sourceEmployeeId: string
+  employeeNumber: string
+  displayName: string
+  email: string
+  isDriver: boolean
+  isActive: boolean
+  isSaving: boolean
+  error: string | null
+}
+
+type ThirdPartyFormState = {
+  typeCode: string
+  displayName: string
+  siren: string
+  vatNumber: string
+  externalReference: string
+  isForeignCompany: boolean
+  isActive: boolean
+  analyticIds: string[]
+  isSaving: boolean
+  error: string | null
+}
+
+type MaterialFormState = {
+  fleetNumber: string
+  label: string
+  materialType: string
+  registrationNumber: string
+  sourceSystem: string
+  exploitationId: string
   isActive: boolean
   isSaving: boolean
   error: string | null
@@ -329,6 +415,9 @@ function App() {
   const [companies, setCompanies] = useState<CompanyItem[]>([])
   const [analytics, setAnalytics] = useState<AnalyticItem[]>([])
   const [exploitations, setExploitations] = useState<ExploitationItem[]>([])
+  const [employees, setEmployees] = useState<EmployeeItem[]>([])
+  const [thirdParties, setThirdParties] = useState<ThirdPartyItem[]>([])
+  const [materials, setMaterials] = useState<MaterialItem[]>([])
   const [adminDiagnostics, setAdminDiagnostics] = useState<AdminDiagnostics | null>(null)
   const [integrationCredentials, setIntegrationCredentials] = useState<IntegrationCredentialItem[]>([])
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
@@ -347,6 +436,9 @@ function App() {
   const [newCompany, setNewCompany] = useState<CompanyFormState>(createEmptyCompanyForm())
   const [newAnalytic, setNewAnalytic] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
+  const [newEmployee, setNewEmployee] = useState<EmployeeFormState>(createEmptyEmployeeForm())
+  const [newThirdParty, setNewThirdParty] = useState<ThirdPartyFormState>(createEmptyThirdPartyForm())
+  const [newMaterial, setNewMaterial] = useState<MaterialFormState>(createEmptyMaterialForm())
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
   const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
   const [accountPasswordReset, setAccountPasswordReset] = useState<AccountPasswordResetState>(createEmptyAccountPasswordResetState())
@@ -692,78 +784,6 @@ function App() {
     [],
   )
 
-  const employeeReadinessItems = useMemo(
-    () => [
-      {
-        code: 'LUCCA_SOURCE',
-        label: 'Source unique Lucca',
-        status: '\u00c0 raccorder',
-        description: 'Le salari\u00e9 NewNexus doit provenir de Lucca, sans saisie locale concurrente.',
-      },
-      {
-        code: 'DRIVER_QUALIFICATION',
-        label: 'Distinction conducteurs',
-        status: '\u00c0 cadrer',
-        description: 'La qualification conducteur sera port\u00e9e dans le mod\u00e8le local apr\u00e8s import RH.',
-      },
-      {
-        code: 'ACCOUNT_PROVISIONING',
-        label: 'Cr\u00e9ation auto des comptes',
-        status: '\u00c0 cadrer',
-        description: 'Les comptes cr\u00e9\u00e9s depuis les salari\u00e9s devront d\u00e9marrer sans droit applicatif.',
-      },
-    ],
-    [],
-  )
-
-  const thirdPartyReadinessItems = useMemo(
-    () => [
-      {
-        code: 'THIRD_PARTY_TYPES',
-        label: 'Types de tiers',
-        status: '\u00c0 cadrer',
-        description: 'Pr\u00e9parer les cat\u00e9gories: client, fournisseur, partenaire, particulier et entreprise \u00e9trang\u00e8re.',
-      },
-      {
-        code: 'SIRENE_LIMITS',
-        label: 'Limites SIRENE',
-        status: '\u00c0 arbitrer',
-        description: 'Identifier les cas non couverts par SIRENE: particuliers et entreprises \u00e9trang\u00e8res.',
-      },
-      {
-        code: 'MULTI_ANALYTICS',
-        label: 'Rattachement multi-analytiques',
-        status: '\u00c0 mod\u00e9liser',
-        description: 'Pr\u00e9parer la table de liaison entre tiers, soci\u00e9t\u00e9s et analytiques.',
-      },
-    ],
-    [],
-  )
-
-  const materialReadinessItems = useMemo(
-    () => [
-      {
-        code: 'FLEET_REFERENCE',
-        label: 'R\u00e9f\u00e9rentiel parc',
-        status: '\u00c0 cadrer',
-        description: 'Pr\u00e9parer le mod\u00e8le local des mat\u00e9riels et le num\u00e9ro de parc unique.',
-      },
-      {
-        code: 'TRUCKONLINE_SOURCE',
-        label: 'Source TruckOnline',
-        status: '\u00c0 raccorder',
-        description: 'Rattacher les statuts techniques et informations tracteurs au fournisseur TruckOnline.',
-      },
-      {
-        code: 'YELLOWBOX_TELEMATICS',
-        label: 'T\u00e9l\u00e9matique YellowBox',
-        status: '\u00c0 raccorder',
-        description: 'Pr\u00e9parer les donn\u00e9es t\u00e9l\u00e9matiques utiles aux indicateurs tracteurs.',
-      },
-    ],
-    [],
-  )
-
   useEffect(() => {
     if (visibleNavigationEntries.length === 0) {
       return
@@ -953,6 +973,9 @@ function App() {
     setCompanies([])
     setAnalytics([])
     setExploitations([])
+    setEmployees([])
+    setThirdParties([])
+    setMaterials([])
     setAdminDiagnostics(null)
     setIntegrationCredentials([])
     setEditableAccounts({})
@@ -985,6 +1008,9 @@ function App() {
         companies: CompanyItem[]
         analytics: AnalyticItem[]
         exploitations: ExploitationItem[]
+        employees: EmployeeItem[]
+        thirdParties: ThirdPartyItem[]
+        materials: MaterialItem[]
       }>,
     ])
 
@@ -994,6 +1020,9 @@ function App() {
     setCompanies(settingsPayload.companies)
     setAnalytics(settingsPayload.analytics)
     setExploitations(settingsPayload.exploitations)
+    setEmployees(settingsPayload.employees)
+    setThirdParties(settingsPayload.thirdParties)
+    setMaterials(settingsPayload.materials)
   }
 
   async function loadAdminToolsData() {
@@ -1189,6 +1218,9 @@ function App() {
     setCompanies([])
     setAnalytics([])
     setExploitations([])
+    setEmployees([])
+    setThirdParties([])
+    setMaterials([])
     setIntegrationCredentials([])
     setEditableAccounts({})
     setEditableProfiles({})
@@ -2006,6 +2038,139 @@ function App() {
           isSaving: false,
           error: saveError instanceof Error ? saveError.message : 'Erreur de mise à jour.',
         },
+      }))
+    }
+  }
+
+  function handleNewEmployeeFieldChange(field: 'sourceEmployeeId' | 'employeeNumber' | 'displayName' | 'email', event: ChangeEvent<HTMLInputElement>) {
+    setNewEmployee((current) => ({ ...current, [field]: event.target.value, error: null }))
+  }
+
+  function handleNewEmployeeBooleanChange(field: 'isDriver' | 'isActive', event: ChangeEvent<HTMLInputElement>) {
+    setNewEmployee((current) => ({ ...current, [field]: event.target.checked, error: null }))
+  }
+
+  async function handleCreateEmployee(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setNewEmployee((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/settings/employees'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceEmployeeId: newEmployee.sourceEmployeeId,
+          employeeNumber: newEmployee.employeeNumber,
+          displayName: newEmployee.displayName,
+          email: newEmployee.email,
+          isDriver: newEmployee.isDriver,
+          isActive: newEmployee.isActive,
+          lastSyncedAtUtc: null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La creation du salarie a echoue.'))
+      }
+
+      await loadAdminSecurityData()
+      setNewEmployee(createEmptyEmployeeForm())
+    } catch (createError) {
+      setNewEmployee((current) => ({
+        ...current,
+        isSaving: false,
+        error: createError instanceof Error ? createError.message : 'Erreur de creation.',
+      }))
+    }
+  }
+
+  function handleNewThirdPartyFieldChange(
+    field: 'typeCode' | 'displayName' | 'siren' | 'vatNumber' | 'externalReference',
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    setNewThirdParty((current) => ({
+      ...current,
+      [field]: field === 'siren' ? event.target.value.replace(/\D/g, '').slice(0, 9) : event.target.value,
+      error: null,
+    }))
+  }
+
+  function handleNewThirdPartyBooleanChange(field: 'isForeignCompany' | 'isActive', event: ChangeEvent<HTMLInputElement>) {
+    setNewThirdParty((current) => ({ ...current, [field]: event.target.checked, error: null }))
+  }
+
+  function handleNewThirdPartyAnalyticChange(event: ChangeEvent<HTMLSelectElement>) {
+    const analyticIds = Array.from(event.target.selectedOptions).map((option) => option.value)
+    setNewThirdParty((current) => ({ ...current, analyticIds, error: null }))
+  }
+
+  async function handleCreateThirdParty(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setNewThirdParty((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/settings/third-parties'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newThirdParty),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La creation du tiers a echoue.'))
+      }
+
+      await loadAdminSecurityData()
+      setNewThirdParty(createEmptyThirdPartyForm())
+    } catch (createError) {
+      setNewThirdParty((current) => ({
+        ...current,
+        isSaving: false,
+        error: createError instanceof Error ? createError.message : 'Erreur de creation.',
+      }))
+    }
+  }
+
+  function handleNewMaterialFieldChange(
+    field: 'fleetNumber' | 'label' | 'materialType' | 'registrationNumber' | 'sourceSystem' | 'exploitationId',
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    setNewMaterial((current) => ({
+      ...current,
+      [field]: field === 'fleetNumber' || field === 'materialType' ? event.target.value.toUpperCase() : event.target.value,
+      error: null,
+    }))
+  }
+
+  function handleNewMaterialStatusChange(event: ChangeEvent<HTMLInputElement>) {
+    setNewMaterial((current) => ({ ...current, isActive: event.target.checked, error: null }))
+  }
+
+  async function handleCreateMaterial(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setNewMaterial((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath('api/settings/materials'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newMaterial,
+          exploitationId: newMaterial.exploitationId || null,
+          lastSyncedAtUtc: null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La creation du materiel a echoue.'))
+      }
+
+      await loadAdminSecurityData()
+      setNewMaterial(createEmptyMaterialForm())
+    } catch (createError) {
+      setNewMaterial((current) => ({
+        ...current,
+        isSaving: false,
+        error: createError instanceof Error ? createError.message : 'Erreur de creation.',
       }))
     }
   }
@@ -3210,22 +3375,65 @@ function App() {
                 <section className="settings-list-section">
                   <div className="settings-list-header">
                     <h3>Salari&eacute;s</h3>
-                    <small>Source unique Lucca</small>
+                    <small>{employees.length} salari&eacute;(s) - source Lucca</small>
                   </div>
                   <p className="profiles-toolbar-copy">
-                    Premier cadrage du r&eacute;f&eacute;rentiel salari&eacute;s avant raccord Lucca. Aucun import r&eacute;el ni cr&eacute;ation de compte automatique n&apos;est encore activ&eacute;.
+                    R&eacute;f&eacute;rentiel local pr&ecirc;t pour l&apos;import Lucca. La qualification conducteur est port&eacute;e par le champ d&eacute;di&eacute; en attendant le mapping d&eacute;finitif.
                   </p>
-                  <div className="tools-catalog-grid">
-                    {employeeReadinessItems.map((item) => (
-                      <article className="tool-blueprint-card" key={item.code}>
-                        <header>
+                  <form className="settings-form settings-create-form" onSubmit={handleCreateEmployee}>
+                    <label>
+                      <span>ID source Lucca</span>
+                      <input value={newEmployee.sourceEmployeeId} onChange={(event) => handleNewEmployeeFieldChange('sourceEmployeeId', event)} />
+                    </label>
+                    <label>
+                      <span>Matricule</span>
+                      <input value={newEmployee.employeeNumber} onChange={(event) => handleNewEmployeeFieldChange('employeeNumber', event)} />
+                    </label>
+                    <label>
+                      <span>Nom complet</span>
+                      <input value={newEmployee.displayName} onChange={(event) => handleNewEmployeeFieldChange('displayName', event)} />
+                    </label>
+                    <label>
+                      <span>Email</span>
+                      <input value={newEmployee.email} onChange={(event) => handleNewEmployeeFieldChange('email', event)} />
+                    </label>
+                    <label className="toggle-label">
+                      <input checked={newEmployee.isDriver} onChange={(event) => handleNewEmployeeBooleanChange('isDriver', event)} type="checkbox" />
+                      <span>Conducteur</span>
+                    </label>
+                    <label className="toggle-label">
+                      <input checked={newEmployee.isActive} onChange={(event) => handleNewEmployeeBooleanChange('isActive', event)} type="checkbox" />
+                      <span>Actif</span>
+                    </label>
+                    <div className="profile-action-row">
+                      <button className="primary-button" disabled={newEmployee.isSaving} type="submit">
+                        {newEmployee.isSaving ? 'Enregistrement...' : 'Ajouter le salarie'}
+                      </button>
+                      {newEmployee.error ? <small className="account-error">{newEmployee.error}</small> : null}
+                    </div>
+                  </form>
+                  <div className="profiles-overview-grid">
+                    {employees.map((employee) => (
+                      <article className="profile-summary-card accent-green" key={employee.id}>
+                        <header className="profile-summary-header">
                           <div>
-                            <span className="eyebrow">{item.code}</span>
-                            <h3>{item.label}</h3>
+                            <h3>{employee.displayName}</h3>
+                            <p>{employee.employeeNumber}</p>
                           </div>
-                          <span className="profile-status-badge is-inactive">{item.status}</span>
+                          <span className={`profile-status-badge ${employee.isActive ? 'is-active' : 'is-inactive'}`}>
+                            {employee.isDriver ? 'Conducteur' : 'Salarie'}
+                          </span>
                         </header>
-                        <p>{item.description}</p>
+                        <div className="profile-summary-rights">
+                          <div className="profile-summary-right">
+                            <span>Source Lucca</span>
+                            <strong>{employee.sourceEmployeeId}</strong>
+                          </div>
+                          <div className="profile-summary-right">
+                            <span>Email</span>
+                            <strong>{employee.email ?? 'Non renseigne'}</strong>
+                          </div>
+                        </div>
                       </article>
                     ))}
                   </div>
@@ -3240,22 +3448,83 @@ function App() {
                 <section className="settings-list-section">
                   <div className="settings-list-header">
                     <h3>Tiers</h3>
-                    <small>Multi-types et analytiques</small>
+                    <small>{thirdParties.length} tiers - multi-analytiques</small>
                   </div>
                   <p className="profiles-toolbar-copy">
-                    Premier cadrage du r&eacute;f&eacute;rentiel tiers. Les cas particuliers et entreprises &eacute;trang&egrave;res restent &agrave; arbitrer car ils ne sont pas couverts par SIRENE.
+                    R&eacute;f&eacute;rentiel tiers multi-types avec rattachement possible &agrave; plusieurs analytiques. Les particuliers et entreprises &eacute;trang&egrave;res restent &agrave; arbitrer hors SIRENE.
                   </p>
-                  <div className="tools-catalog-grid">
-                    {thirdPartyReadinessItems.map((item) => (
-                      <article className="tool-blueprint-card" key={item.code}>
-                        <header>
+                  <form className="settings-form settings-create-form" onSubmit={handleCreateThirdParty}>
+                    <label>
+                      <span>Type</span>
+                      <select value={newThirdParty.typeCode} onChange={(event) => handleNewThirdPartyFieldChange('typeCode', event)}>
+                        <option value="CLIENT">Client</option>
+                        <option value="FOURNISSEUR">Fournisseur</option>
+                        <option value="PARTENAIRE">Partenaire</option>
+                        <option value="PARTICULIER">Particulier</option>
+                        <option value="ETRANGER">Entreprise etrangere</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Nom du tiers</span>
+                      <input value={newThirdParty.displayName} onChange={(event) => handleNewThirdPartyFieldChange('displayName', event)} />
+                    </label>
+                    <label>
+                      <span>SIREN</span>
+                      <input inputMode="numeric" value={newThirdParty.siren} onChange={(event) => handleNewThirdPartyFieldChange('siren', event)} />
+                    </label>
+                    <label>
+                      <span>TVA / reference externe</span>
+                      <input value={newThirdParty.vatNumber} onChange={(event) => handleNewThirdPartyFieldChange('vatNumber', event)} />
+                    </label>
+                    <label>
+                      <span>Reference externe</span>
+                      <input value={newThirdParty.externalReference} onChange={(event) => handleNewThirdPartyFieldChange('externalReference', event)} />
+                    </label>
+                    <label>
+                      <span>Analytiques rattaches</span>
+                      <select multiple value={newThirdParty.analyticIds} onChange={handleNewThirdPartyAnalyticChange}>
+                        {analytics.map((analytic) => (
+                          <option key={analytic.id} value={analytic.id}>{analytic.code} - {analytic.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="toggle-label">
+                      <input checked={newThirdParty.isForeignCompany} onChange={(event) => handleNewThirdPartyBooleanChange('isForeignCompany', event)} type="checkbox" />
+                      <span>Entreprise etrangere</span>
+                    </label>
+                    <label className="toggle-label">
+                      <input checked={newThirdParty.isActive} onChange={(event) => handleNewThirdPartyBooleanChange('isActive', event)} type="checkbox" />
+                      <span>Actif</span>
+                    </label>
+                    <div className="profile-action-row">
+                      <button className="primary-button" disabled={newThirdParty.isSaving} type="submit">
+                        {newThirdParty.isSaving ? 'Enregistrement...' : 'Ajouter le tiers'}
+                      </button>
+                      {newThirdParty.error ? <small className="account-error">{newThirdParty.error}</small> : null}
+                    </div>
+                  </form>
+                  <div className="profiles-overview-grid">
+                    {thirdParties.map((thirdParty) => (
+                      <article className="profile-summary-card accent-orange" key={thirdParty.id}>
+                        <header className="profile-summary-header">
                           <div>
-                            <span className="eyebrow">{item.code}</span>
-                            <h3>{item.label}</h3>
+                            <h3>{thirdParty.displayName}</h3>
+                            <p>{thirdParty.typeCode}</p>
                           </div>
-                          <span className="profile-status-badge is-inactive">{item.status}</span>
+                          <span className={`profile-status-badge ${thirdParty.isActive ? 'is-active' : 'is-inactive'}`}>
+                            {thirdParty.isForeignCompany ? 'Etranger' : 'Actif'}
+                          </span>
                         </header>
-                        <p>{item.description}</p>
+                        <div className="profile-summary-rights">
+                          <div className="profile-summary-right">
+                            <span>SIREN</span>
+                            <strong>{thirdParty.siren ?? 'Non renseigne'}</strong>
+                          </div>
+                          <div className="profile-summary-right">
+                            <span>Analytiques</span>
+                            <strong>{thirdParty.analytics.map((item) => item.code).join(', ') || 'Aucun'}</strong>
+                          </div>
+                        </div>
                       </article>
                     ))}
                   </div>
@@ -3266,22 +3535,83 @@ function App() {
                 <section className="settings-list-section">
                   <div className="settings-list-header">
                     <h3>Mat&eacute;riels</h3>
-                    <small>Parc et imports exploitation</small>
+                    <small>{materials.length} materiel(s) - parc</small>
                   </div>
                   <p className="profiles-toolbar-copy">
-                    Premier cadrage du r&eacute;f&eacute;rentiel mat&eacute;riels. Le num&eacute;ro de parc unique est la r&egrave;gle structurante avant import.
+                    R&eacute;f&eacute;rentiel mat&eacute;riels local avec num&eacute;ro de parc unique, pr&ecirc;t pour TruckOnline et YellowBox.
                   </p>
-                  <div className="tools-catalog-grid">
-                    {materialReadinessItems.map((item) => (
-                      <article className="tool-blueprint-card" key={item.code}>
-                        <header>
+                  <form className="settings-form settings-create-form" onSubmit={handleCreateMaterial}>
+                    <label>
+                      <span>Numero de parc</span>
+                      <input value={newMaterial.fleetNumber} onChange={(event) => handleNewMaterialFieldChange('fleetNumber', event)} />
+                    </label>
+                    <label>
+                      <span>Libelle</span>
+                      <input value={newMaterial.label} onChange={(event) => handleNewMaterialFieldChange('label', event)} />
+                    </label>
+                    <label>
+                      <span>Type</span>
+                      <select value={newMaterial.materialType} onChange={(event) => handleNewMaterialFieldChange('materialType', event)}>
+                        <option value="TRACTEUR">Tracteur</option>
+                        <option value="REMORQUE">Remorque</option>
+                        <option value="VL">Vehicule leger</option>
+                        <option value="AUTRE">Autre</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Immatriculation</span>
+                      <input value={newMaterial.registrationNumber} onChange={(event) => handleNewMaterialFieldChange('registrationNumber', event)} />
+                    </label>
+                    <label>
+                      <span>Source</span>
+                      <select value={newMaterial.sourceSystem} onChange={(event) => handleNewMaterialFieldChange('sourceSystem', event)}>
+                        <option value="TruckOnline">TruckOnline</option>
+                        <option value="YellowBox">YellowBox</option>
+                        <option value="Manuel">Manuel</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Exploitation</span>
+                      <select value={newMaterial.exploitationId} onChange={(event) => handleNewMaterialFieldChange('exploitationId', event)}>
+                        <option value="">Non rattache</option>
+                        {exploitations.map((exploitation) => (
+                          <option key={exploitation.id} value={exploitation.id}>{exploitation.code} - {exploitation.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="toggle-label">
+                      <input checked={newMaterial.isActive} onChange={handleNewMaterialStatusChange} type="checkbox" />
+                      <span>Actif</span>
+                    </label>
+                    <div className="profile-action-row">
+                      <button className="primary-button" disabled={newMaterial.isSaving} type="submit">
+                        {newMaterial.isSaving ? 'Enregistrement...' : 'Ajouter le materiel'}
+                      </button>
+                      {newMaterial.error ? <small className="account-error">{newMaterial.error}</small> : null}
+                    </div>
+                  </form>
+                  <div className="profiles-overview-grid">
+                    {materials.map((material) => (
+                      <article className="profile-summary-card accent-navy" key={material.id}>
+                        <header className="profile-summary-header">
                           <div>
-                            <span className="eyebrow">{item.code}</span>
-                            <h3>{item.label}</h3>
+                            <h3>{material.fleetNumber}</h3>
+                            <p>{material.label}</p>
                           </div>
-                          <span className="profile-status-badge is-inactive">{item.status}</span>
+                          <span className={`profile-status-badge ${material.isActive ? 'is-active' : 'is-inactive'}`}>
+                            {material.materialType}
+                          </span>
                         </header>
-                        <p>{item.description}</p>
+                        <div className="profile-summary-rights">
+                          <div className="profile-summary-right">
+                            <span>Immatriculation</span>
+                            <strong>{material.registrationNumber ?? 'Non renseignee'}</strong>
+                          </div>
+                          <div className="profile-summary-right">
+                            <span>Exploitation</span>
+                            <strong>{material.exploitation?.label ?? 'Non rattache'}</strong>
+                          </div>
+                        </div>
                       </article>
                     ))}
                   </div>
@@ -4358,6 +4688,48 @@ function createEmptyCompanyForm(): CompanyFormState {
     siren: '',
     displayName: '',
     legalName: '',
+    isActive: true,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function createEmptyEmployeeForm(): EmployeeFormState {
+  return {
+    sourceEmployeeId: '',
+    employeeNumber: '',
+    displayName: '',
+    email: '',
+    isDriver: false,
+    isActive: true,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function createEmptyThirdPartyForm(): ThirdPartyFormState {
+  return {
+    typeCode: 'CLIENT',
+    displayName: '',
+    siren: '',
+    vatNumber: '',
+    externalReference: '',
+    isForeignCompany: false,
+    isActive: true,
+    analyticIds: [],
+    isSaving: false,
+    error: null,
+  }
+}
+
+function createEmptyMaterialForm(): MaterialFormState {
+  return {
+    fleetNumber: '',
+    label: '',
+    materialType: 'TRACTEUR',
+    registrationNumber: '',
+    sourceSystem: 'TruckOnline',
+    exploitationId: '',
     isActive: true,
     isSaving: false,
     error: null,

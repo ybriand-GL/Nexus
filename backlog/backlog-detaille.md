@@ -34,7 +34,7 @@ Derniere mise a jour: 2026-05-04
 | UX | Dashboard par profil | A_TESTER | Accueil, vues de travail et readiness diagnostics disponibles; personnalisation fine par profil a poursuivre apres recette |
 | UX | Coque frontend premium initiale | TERMINE | Shell Nexus 4C integre et branche au socle |
 | UX | Integration identite visuelle Nexus | TERMINE | Assets officiels SVG, palette graphite/champagne et tokens centralises appliques depuis le prompt Nexus |
-| UX | Qualite accents et libelles UTF-8 | A_TESTER | Normalisation visible des libelles mojibake ajoutee cote interface; nettoyage source complet a poursuivre apres recette |
+| UX | Qualite accents et libelles UTF-8 | A_TESTER | Normalisation visible active; nouveaux ecrans ajoutes en libelles propres, nettoyage source historique complet a poursuivre |
 | UX | Tokens officiels du handoff | TERMINE | `nexus-theme.css`, `design-tokens.css` et `design-tokens.json` alignes sur l'identite Nexus sombre |
 | UX | Animation post-authentification | TERMINE | Transition `Groupe Laure × Nexus` integree, affichage unique après login |
 | UX | Favicon et identite navigateur | TERMINE | Icônes 16/32/180/192/512 et manifest publies |
@@ -50,7 +50,7 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Outils cles API par logiciel | TERMINE | Import manuel retire de l'UI; liste regroupee a une carte par fournisseur logiciel |
 | Transverse | Outils cles API en modal | TERMINE | Fonctionnement aligne sur Profils: liste des logiciels, bouton ajouter une cle et configuration en modale |
 | UX | Maquettes UI haute fidelite | CADRE | Design system V1 et readiness diagnostics posent le cadre; captures haute fidelite a produire ensuite |
-| UX | Design system NewNexus | SCAFFOLDE | Document V1 cree dans `docs/newnexus-design-system-v1.md`; a enrichir avec composants et captures |
+| UX | Design system NewNexus | A_TESTER | Document V1 enrichi avec inventaire composants et liste des captures de recette a produire |
 
 ## 3. Securite et droits
 
@@ -93,12 +93,12 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, UI create/update, recherche SIRENE par SIREN et readiness diagnostics en place; enrichissement complet SIRENE a poursuivre |
 | Transverse | Analytiques | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
 | Transverse | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
-| Transverse | Salaries | A_DEVELOPPER | Entree `Parametres > Salaries` et readiness Lucca preparees; import reel suspendu au contrat API Lucca |
-| Transverse | Distinction conducteurs | SCAFFOLDE | Regle de qualification conducteur cadree dans l'ecran Salaries; modele local a developper |
+| Transverse | Salaries | A_TESTER | Table, endpoints create/update et UI de creation/liste disponibles; import reel Lucca suspendu au contrat API |
+| Transverse | Distinction conducteurs | A_TESTER | Champ local `IsDriver` ajoute au referentiel salaries; mapping definitif Lucca a arbitrer |
 | Transverse | Creation auto des comptes depuis salaries | A_DEVELOPPER | Regle cadree: compte cree depuis Lucca sans droit tant qu'un profil NewNexus n'est pas affecte; depend de l'import salaries |
-| Transverse | Tiers | SCAFFOLDE | Entree `Parametres > Tiers` preparee: multi-types, limites SIRENE et cas particuliers a arbitrer |
-| Transverse | Rattachement multi-analytiques des tiers | SCAFFOLDE | Cadrage affiche dans `Tiers`; table de liaison tiers/societes/analytiques a developper |
-| Transverse | Materiels | SCAFFOLDE | Entree `Parametres > Materiels` preparee: numero de parc unique, TruckOnline et YellowBox a raccorder |
+| Transverse | Tiers | A_TESTER | Table, endpoints create/update, UI de creation/liste et types de tiers disponibles; cas hors SIRENE a arbitrer |
+| Transverse | Rattachement multi-analytiques des tiers | A_TESTER | Table de liaison tiers/analytiques et selection multiple UI disponibles |
+| Transverse | Materiels | A_TESTER | Table, endpoints create/update, UI de creation/liste, numero de parc unique et rattachement exploitation disponibles |
 | Transverse | Parametrage des interfaces | A_TESTER | Table `IntegrationCredential`, UI Outils, import des cles Nexus legacy et readiness par fournisseur disponibles |
 | Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
 | Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
@@ -150,6 +150,7 @@ Derniere mise a jour: 2026-05-04
 | Technique | Migration authentification | TERMINE | `AuthenticationBootstrap` generee et appliquee |
 | Technique | Migration transverse Parametres | TERMINE | `TransverseSettingsSocle` generee et appliquee |
 | Technique | Migration cles integrations | TERMINE | `IntegrationCredentials` generee et appliquee |
+| Technique | Migration referentiels metier transverses | TERMINE | `TransverseBusinessReferentials` generee et appliquee localement |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 | Technique | Endpoint diagnostics administration | TERMINE | `GET /api/admin/diagnostics` publie pour le profil Informatique |
 | Technique | Import cles Nexus legacy | TERMINE | 22 valeurs importees depuis `LOCATIF_DEV` et rechiffrees avec le trousseau IIS NewNexus |
@@ -158,8 +159,8 @@ Derniere mise a jour: 2026-05-04
 
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
-| Hebergement | URL cible `http://192.168.60.158/newNexus` | CADRE | URL a supporter lors de la publication IIS |
-| Hebergement | URL cible `http://192.168.50.102/newNexus` | CADRE | URL a supporter lors de la publication IIS |
+| Hebergement | URL cible `http://192.168.60.158/newNexus` | A_TESTER | URL testee en HTTP, retour `200 text/html`; recette navigateur a faire |
+| Hebergement | URL cible `http://192.168.50.102/newNexus` | A_TESTER | URL testee en HTTP, retour `200 text/html`; recette navigateur a faire |
 | Hebergement | Publication sous repertoire virtuel `/newNexus` | SCAFFOLDE | Application configuree pour fonctionner sous ce chemin |
 | Hebergement | Compatibilite acces HTTP cible | TERMINE | Redirection HTTPS forcee retiree du socle API |
 | Hebergement | Compatibilite URL `/newNexus` sans slash final | TERMINE | Appels API frontend construits avec le base path Vite absolu pour eviter les retours HTML du site parent |

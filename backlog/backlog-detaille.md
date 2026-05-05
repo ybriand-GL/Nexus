@@ -80,7 +80,7 @@ Derniere mise a jour: 2026-05-05
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
 | Securite | Ecran administration des profils | A_TESTER | Vue synthese par profil, creation via modale, edition directe et etat vide en place |
-| Securite | Ecran administration des parametres | A_TESTER | Mini-accueil Parametres, entrees separees, recherche SIRENE par SIREN et readiness diagnostics disponibles |
+| Securite | Ecran administration des parametres | A_TESTER | Mini-accueil Parametres limite aux Societes, Analytiques et Exploitations; Societes en liste + modale avec creation verrouillee par SIRENE |
 | Securite | Ecran administration des outils | A_TESTER | Diagnostics application, PostgreSQL, securite, parametres, readiness backlog, SIRENE, cles API, Taches planifiees, Requeteur SQL et Traces en place |
 | UX | Sortie du mode tout-dashboard | A_TESTER | Navigation laterale reliee a des vues de travail distinctes; Administration, Parametres et Outils disposent d'accueils de choix |
 | UX | Accueil par profil | A_TESTER | Entree `Accueil` retablie comme page d'arrivee; personnalisation fine par profil a approfondir apres recette |
@@ -91,15 +91,15 @@ Derniere mise a jour: 2026-05-05
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Transverse | Schema transverse V1 | TERMINE | Document redige |
-| Transverse | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, UI create/update, recherche SIRENE par SIREN et readiness diagnostics en place; enrichissement complet SIRENE a poursuivre |
+| Transverse | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, liste + modale ajout/modification, recherche SIRENE obligatoire avant creation et validation backend SIRENE en place |
 | Transverse | Analytiques | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
 | Transverse | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
 | Transverse | Salaries | A_TESTER | Table enrichie telephone, endpoints create/update, liste avec modales ajout/modification et import Lucca disponibles |
 | Transverse | Distinction conducteurs | A_TESTER | Champ local `IsDriver` ajoute au referentiel salaries; mapping definitif Lucca a arbitrer |
-| Transverse | Creation auto des comptes depuis salaries | A_TESTER | Endpoint et action UI disponibles dans `Parametres > Salaries`: creation des comptes actifs sans profil depuis les salaries actifs, avec mot de passe temporaire et rattachement matricule |
-| Transverse | Tiers | A_TESTER | Table, endpoints create/update, UI de creation/liste et types de tiers disponibles; cas hors SIRENE a arbitrer |
+| Transverse | Creation auto des comptes depuis salaries | A_TESTER | Endpoint et action UI disponibles dans `Transverse > Salaries`: creation des comptes actifs sans profil depuis les salaries actifs, avec mot de passe temporaire et rattachement matricule |
+| Transverse | Tiers | A_TESTER | Table, endpoints create/update, UI de creation/liste deplacee dans `Transverse > Tiers`; cas hors SIRENE a arbitrer |
 | Transverse | Rattachement multi-analytiques des tiers | A_TESTER | Table de liaison tiers/analytiques et selection multiple UI disponibles |
-| Transverse | Materiels | A_TESTER | Table, endpoints create/update, UI de creation/liste, numero de parc unique et rattachement exploitation disponibles |
+| Transverse | Materiels | A_TESTER | Table, endpoints create/update, UI de creation/liste deplacee dans `Transverse > Materiels`, numero de parc unique et rattachement exploitation disponibles |
 | Transverse | Parametrage des interfaces | A_TESTER | Table `IntegrationCredential`, UI Outils, import des cles Nexus legacy et readiness par fournisseur disponibles |
 | Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Sessions, Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
 | Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
@@ -111,7 +111,7 @@ Derniere mise a jour: 2026-05-05
 
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
-| Interfaces | SIRENE | A_TESTER | Creation societes et recherche SIRENE actives; readiness diagnostics ajoutee, enrichissement complet a poursuivre |
+| Interfaces | SIRENE | A_TESTER | Recherche SIRENE mutualisee backend et creation Societes bloquee si le SIREN n'est pas valide par SIRENE; readiness diagnostics ajoutee, enrichissement complet a poursuivre |
 | Interfaces | LUCCA | A_TESTER | Import compatible Lucca legacy `/api/v3/users` et API v5 `/lucca-api/employees`; authentification application-key ou Bearer, mapping champs v3/v5 et message d'erreur detaille disponibles; recette avec cle reelle a faire |
 | Interfaces | Truckonline | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client metier a raccorder apres validation contrat API |
 | Interfaces | YellowBox | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client telematique a raccorder apres validation contrat API |

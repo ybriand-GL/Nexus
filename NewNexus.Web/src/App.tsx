@@ -337,6 +337,7 @@ type CompanyFormState = {
   displayName: string
   legalName: string
   isActive: boolean
+  isSireneValidated: boolean
   isSaving: boolean
   error: string | null
 }
@@ -408,19 +409,15 @@ type IntegrationCredentialFormState = {
   error: string | null
 }
 
-const navigationEntries = ['Accueil', 'Administration', 'Exploitation', 'Gestion administrative']
-const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Outils'] as const
+const navigationEntries = ['Accueil', 'Administration', 'Transverse', 'Exploitation', 'Gestion administrative']
+const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Profils', 'Paramètres', 'Transverse', 'Outils'] as const
 const settingsSubmenuEntries = ['Accueil', 'Sociétés', 'Analytiques', 'Exploitations'] as const
 const hiddenIntegrationProviderCodes = new Set(['LEGACY_NEXUS', 'TRACTOR_TRACKING'])
 const employeeSettingsSection = 'Salari\u00e9s'
 const thirdPartySettingsSection = 'Tiers'
 const materialSettingsSection = 'Mat\u00e9riels'
-const settingsNavigationEntries = [
-  ...settingsSubmenuEntries,
-  employeeSettingsSection,
-  thirdPartySettingsSection,
-  materialSettingsSection,
-] as const
+const settingsNavigationEntries = [...settingsSubmenuEntries] as const
+const transverseNavigationEntries = ['Accueil', employeeSettingsSection, thirdPartySettingsSection, materialSettingsSection] as const
 const toolsSubmenuEntries = ['Accueil', 'Clés API', 'Tâches planifiées', 'Requêteur SQL', 'Traces', 'Diagnostics'] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
 const accessLevels = ['None', 'Read', 'Write'] as const
@@ -473,7 +470,6 @@ function App() {
   const [userSessions, setUserSessions] = useState<UserSessionsPayload>({ active: [], history: [] })
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
   const [editableProfiles, setEditableProfiles] = useState<Record<string, EditableProfileState>>({})
-  const [editableCompanies, setEditableCompanies] = useState<Record<string, CompanyFormState>>({})
   const [editableAnalytics, setEditableAnalytics] = useState<Record<string, SettingsReferenceFormState>>({})
   const [editableExploitations, setEditableExploitations] = useState<Record<string, SettingsReferenceFormState>>({})
   const [newAccount, setNewAccount] = useState<EditableAccountState>(createEmptyAccountForm())
@@ -484,13 +480,15 @@ function App() {
     isSaving: false,
     error: null,
   })
-  const [newCompany, setNewCompany] = useState<CompanyFormState>(createEmptyCompanyForm())
   const [newAnalytic, setNewAnalytic] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [newThirdParty, setNewThirdParty] = useState<ThirdPartyFormState>(createEmptyThirdPartyForm())
   const [newMaterial, setNewMaterial] = useState<MaterialFormState>(createEmptyMaterialForm())
   const [editingEmployee, setEditingEmployee] = useState<EmployeeItem | null>(null)
+  const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null)
   const [employeeForm, setEmployeeForm] = useState<EmployeeFormState>(createEmptyEmployeeForm())
+  const [companyForm, setCompanyForm] = useState<CompanyFormState>(createEmptyCompanyForm())
+  const [isCreateCompanyModalOpen, setIsCreateCompanyModalOpen] = useState(false)
   const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false)
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
   const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
@@ -609,9 +607,9 @@ function App() {
   const visibleNavigationEntries = useMemo(
     () =>
       navigationEntries.filter(
-        (entry) => entry === 'Accueil' || (modulesByGroup[entry] ?? []).length > 0,
+        (entry) => entry === 'Accueil' || (isInformatique && entry === 'Transverse') || (modulesByGroup[entry] ?? []).length > 0,
       ),
-    [modulesByGroup],
+    [isInformatique, modulesByGroup],
   )
 
   const visibleIntegrationCredentials = useMemo(
@@ -657,6 +655,11 @@ function App() {
 
     return Array.from(grouped.values()).sort((left, right) => left.providerLabel.localeCompare(right.providerLabel))
   }, [visibleIntegrationCredentials])
+
+  const activeReferenceNavigationEntries =
+    selectedAdministrationSection === 'Transverse' || selectedNavigation === 'Transverse'
+      ? transverseNavigationEntries
+      : settingsNavigationEntries
 
   const scheduledTasks = useMemo(
     () => [
@@ -923,21 +926,6 @@ function App() {
   }, [accounts])
 
   useEffect(() => {
-    setEditableCompanies(
-      Object.fromEntries(
-        companies.map((company) => [
-          company.id,
-          {
-            siren: company.siren,
-            displayName: company.displayName,
-            legalName: company.legalName,
-            isActive: company.isActive,
-            isSaving: false,
-            error: null,
-          },
-        ]),
-      ),
-    )
     setNewAnalytic((current) => ({
       ...current,
       companyId: current.companyId || companies[0]?.id || '',
@@ -1054,7 +1042,6 @@ function App() {
     setUserSessions({ active: [], history: [] })
     setEditableAccounts({})
     setEditableProfiles({})
-    setEditableCompanies({})
     setEditableAnalytics({})
     setEditableExploitations({})
   }
@@ -1333,13 +1320,15 @@ function App() {
     setUserSessions({ active: [], history: [] })
     setEditableAccounts({})
     setEditableProfiles({})
-    setEditableCompanies({})
     setEditableAnalytics({})
     setEditableExploitations({})
     setChangePassword(createEmptyChangePasswordForm())
     setForgotPassword(createEmptyForgotPasswordForm())
     setAccountPasswordReset(createEmptyAccountPasswordResetState())
     setCredentialForm(createEmptyIntegrationCredentialForm())
+    setEditingCompany(null)
+    setCompanyForm(createEmptyCompanyForm())
+    setIsCreateCompanyModalOpen(false)
     setEditingEmployee(null)
     setEmployeeForm(createEmptyEmployeeForm())
     setIsCreateEmployeeModalOpen(false)
@@ -1526,6 +1515,7 @@ function App() {
       }
 
       await loadAdminSecurityData()
+      closeCompanyModal()
       setNewAccount(createEmptyAccountForm())
       setIsCreateAccountModalOpen(false)
     } catch (createError) {
@@ -1806,15 +1796,16 @@ function App() {
     field: 'siren' | 'displayName' | 'legalName',
     event: ChangeEvent<HTMLInputElement>,
   ) {
-    setNewCompany((current) => ({
+    setCompanyForm((current) => ({
       ...current,
       [field]: field === 'siren' ? event.target.value.replace(/\D/g, '').slice(0, 9) : event.target.value,
+      isSireneValidated: field === 'siren' ? false : current.isSireneValidated,
       error: null,
     }))
   }
 
   function handleNewCompanyStatusChange(event: ChangeEvent<HTMLInputElement>) {
-    setNewCompany((current) => ({
+    setCompanyForm((current) => ({
       ...current,
       isActive: event.target.checked,
       error: null,
@@ -1822,14 +1813,14 @@ function App() {
   }
 
   async function handleLookupNewCompanySirene() {
-    const siren = newCompany.siren.trim()
+    const siren = companyForm.siren.trim()
     if (siren.length !== 9) {
-      setNewCompany((current) => ({ ...current, error: 'Saisissez un SIREN de 9 chiffres avant la recherche SIRENE.' }))
+      setCompanyForm((current) => ({ ...current, error: 'Saisissez un SIREN de 9 chiffres avant la recherche SIRENE.' }))
       return
     }
 
     setIsLookingUpNewCompany(true)
-    setNewCompany((current) => ({ ...current, error: null }))
+    setCompanyForm((current) => ({ ...current, error: null, isSireneValidated: false }))
 
     try {
       const response = await fetch(apiPath(`api/settings/companies/sirene/${siren}`))
@@ -1842,15 +1833,18 @@ function App() {
       }
 
       const lookup = (await response.json()) as SireneCompanyLookup
-      setNewCompany((current) => ({
+      setCompanyForm((current) => ({
         ...current,
+        siren: lookup.siren,
         displayName: lookup.displayName ?? current.displayName,
         legalName: lookup.legalName ?? current.legalName,
+        isSireneValidated: true,
         error: null,
       }))
     } catch (lookupError) {
-      setNewCompany((current) => ({
+      setCompanyForm((current) => ({
         ...current,
+        isSireneValidated: false,
         error: lookupError instanceof Error ? lookupError.message : 'Erreur de recherche SIRENE.',
       }))
     } finally {
@@ -1858,41 +1852,20 @@ function App() {
     }
   }
 
-  function handleEditableCompanyFieldChange(
-    companyId: string,
-    field: 'siren' | 'displayName' | 'legalName',
-    event: ChangeEvent<HTMLInputElement>,
-  ) {
-    setEditableCompanies((current) => ({
-      ...current,
-      [companyId]: {
-        ...(current[companyId] ?? createEmptyCompanyForm()),
-        [field]: field === 'siren' ? event.target.value.replace(/\D/g, '').slice(0, 9) : event.target.value,
-        error: null,
-      },
-    }))
-  }
-
-  function handleEditableCompanyStatusChange(companyId: string, event: ChangeEvent<HTMLInputElement>) {
-    setEditableCompanies((current) => ({
-      ...current,
-      [companyId]: {
-        ...(current[companyId] ?? createEmptyCompanyForm()),
-        isActive: event.target.checked,
-        error: null,
-      },
-    }))
-  }
-
   async function handleCreateCompany(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setNewCompany((current) => ({ ...current, isSaving: true, error: null }))
+    if (!companyForm.isSireneValidated) {
+      setCompanyForm((current) => ({ ...current, error: 'La recherche SIRENE doit etre validee avant la creation.' }))
+      return
+    }
+
+    setCompanyForm((current) => ({ ...current, isSaving: true, error: null }))
 
     try {
       const response = await fetch(apiPath('api/settings/companies'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildCompanyPayload(newCompany)),
+        body: JSON.stringify(buildCompanyPayload(companyForm)),
       })
 
       if (!response.ok) {
@@ -1900,9 +1873,9 @@ function App() {
       }
 
       await loadAdminSecurityData()
-      setNewCompany(createEmptyCompanyForm())
+      closeCompanyModal()
     } catch (createError) {
-      setNewCompany((current) => ({
+      setCompanyForm((current) => ({
         ...current,
         isSaving: false,
         error: createError instanceof Error ? createError.message : 'Erreur de création.',
@@ -1910,39 +1883,55 @@ function App() {
     }
   }
 
-  async function handleSaveCompany(companyId: string) {
-    const editableCompany = editableCompanies[companyId]
-    if (!editableCompany) {
+  async function handleSaveCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingCompany) {
       return
     }
 
-    setEditableCompanies((current) => ({
-      ...current,
-      [companyId]: { ...editableCompany, isSaving: true, error: null },
-    }))
+    setCompanyForm((current) => ({ ...current, isSaving: true, error: null }))
 
     try {
-      const response = await fetch(apiPath(`api/settings/companies/${companyId}`), {
+      const response = await fetch(apiPath(`api/settings/companies/${editingCompany.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildCompanyPayload(editableCompany)),
+        body: JSON.stringify(buildCompanyPayload(companyForm)),
       })
 
       if (!response.ok) {
-        throw new Error(await getRequestError(response, 'La mise à jour de la société a échoué.'))
+        throw new Error(await getRequestError(response, 'La mise a jour de la societe a echoue.'))
       }
 
       await loadAdminSecurityData()
+      closeCompanyModal()
     } catch (saveError) {
-      setEditableCompanies((current) => ({
+      setCompanyForm((current) => ({
         ...current,
-        [companyId]: {
-          ...(current[companyId] ?? editableCompany),
-          isSaving: false,
-          error: saveError instanceof Error ? saveError.message : 'Erreur de mise à jour.',
-        },
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur de mise a jour.',
       }))
     }
+  }
+
+  function openCreateCompanyModal() {
+    setEditingCompany(null)
+    setCompanyForm(createEmptyCompanyForm())
+    setIsCreateCompanyModalOpen(true)
+  }
+
+  function openEditCompanyModal(company: CompanyItem) {
+    setEditingCompany(company)
+    setCompanyForm(buildCompanyFormFromItem(company))
+  }
+
+  function closeCompanyModal() {
+    if (companyForm.isSaving) {
+      return
+    }
+
+    setEditingCompany(null)
+    setIsCreateCompanyModalOpen(false)
+    setCompanyForm(createEmptyCompanyForm())
   }
 
   function handleNewAnalyticFieldChange(
@@ -2685,6 +2674,9 @@ function App() {
                   setSelectedSettingsSection('Accueil')
                   setSelectedToolsSection('Accueil')
                 }
+                if (entry === 'Transverse') {
+                  setSelectedSettingsSection('Accueil')
+                }
               }}
               type="button"
             >
@@ -2731,6 +2723,9 @@ function App() {
                   setSelectedAdministrationSection(entry)
                   if (entry === 'Outils') {
                     setSelectedToolsSection('Accueil')
+                  }
+                  if (entry === 'Paramètres' || entry === 'Transverse') {
+                    setSelectedSettingsSection('Accueil')
                   }
                 }}
                 type="button"
@@ -3163,42 +3158,49 @@ function App() {
           </section>
         ) : null}
 
-        {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Paramètres' ? (
+        {((selectedNavigation === 'Administration' && isInformatique && (selectedAdministrationSection === 'Paramètres' || selectedAdministrationSection === 'Transverse')) ||
+          (selectedNavigation === 'Transverse' && isInformatique)) ? (
           <section className="workspace-grid">
             <article className="panel-card panel-card-wide settings-card">
               <div className="panel-heading">
-                <span className="eyebrow">Paramètres</span>
-                <h2>Socle de paramétrage transverse</h2>
+                <span className="eyebrow">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Transverse' : 'Paramètres'}</span>
+                <h2>{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Socle transverse' : 'Socle de paramétrage'}</h2>
               </div>
               <div className="settings-intro-grid">
                 <div className="settings-intro-copy">
-                  <p>Cette vue centralise les premiers référentiels transverses de NewNexus.</p>
                   <p>
-                    {companies.length} société(s), {analytics.length} analytique(s) et {exploitations.length} exploitation(s)
-                    actuellement chargée(s).
+                    {activeReferenceNavigationEntries === transverseNavigationEntries
+                      ? 'Cette vue centralise les référentiels transverses opérationnels de NewNexus.'
+                      : 'Cette vue centralise les paramètres de structure de NewNexus.'}
+                  </p>
+                  <p>
+                    {activeReferenceNavigationEntries === transverseNavigationEntries
+                      ? `${employees.length} salarié(s), ${thirdParties.length} tiers et ${materials.length} matériel(s) actuellement chargé(s).`
+                      : `${companies.length} société(s), ${analytics.length} analytique(s) et ${exploitations.length} exploitation(s) actuellement chargée(s).`}
                   </p>
                   <p className="settings-note">
-                    Les sociétés Groupe Laure sont alimentées via SIRENE. Les analytiques et exploitations seront gérés ici
-                    directement dès qu’une société de rattachement est disponible.
+                    {activeReferenceNavigationEntries === transverseNavigationEntries
+                      ? 'Les salariés, tiers et matériels ne sont pas des paramètres: ils restent dans le socle transverse.'
+                      : 'Les sociétés Groupe Laure sont alimentées via SIRENE. Les analytiques et exploitations sont rattachés aux sociétés validées.'}
                   </p>
                 </div>
                 <div className="settings-kpis">
                   <div className="metric-card metric-card-navy">
-                    <span className="metric-label">Sociétés</span>
-                    <strong>{companies.length}</strong>
+                    <span className="metric-label">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Salariés' : 'Sociétés'}</span>
+                    <strong>{activeReferenceNavigationEntries === transverseNavigationEntries ? employees.length : companies.length}</strong>
                   </div>
                   <div className="metric-card metric-card-champagne">
-                    <span className="metric-label">Analytiques</span>
-                    <strong>{analytics.length}</strong>
+                    <span className="metric-label">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Tiers' : 'Analytiques'}</span>
+                    <strong>{activeReferenceNavigationEntries === transverseNavigationEntries ? thirdParties.length : analytics.length}</strong>
                   </div>
                   <div className="metric-card metric-card-cyan">
-                    <span className="metric-label">Exploitations</span>
-                    <strong>{exploitations.length}</strong>
+                    <span className="metric-label">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Matériels' : 'Exploitations'}</span>
+                    <strong>{activeReferenceNavigationEntries === transverseNavigationEntries ? materials.length : exploitations.length}</strong>
                   </div>
                 </div>
               </div>
 
-              {companies.length === 0 ? (
+              {activeReferenceNavigationEntries === settingsNavigationEntries && companies.length === 0 ? (
                 <div className="status-banner status-banner-warning">
                   <strong>Paramétrage bloqué</strong>
                   <span>Ajoutez d’abord une société Groupe Laure pour créer les analytiques et exploitations.</span>
@@ -3206,7 +3208,7 @@ function App() {
               ) : null}
 
               <section className="admin-subnav" aria-label="Sous-menu paramètres">
-                {settingsNavigationEntries.map((entry) => (
+                {activeReferenceNavigationEntries.map((entry) => (
                   <button
                     key={entry}
                     className={`admin-subnav-link ${selectedSettingsSection === entry ? 'admin-subnav-link-active' : ''}`}
@@ -3220,7 +3222,7 @@ function App() {
 
               {selectedSettingsSection === 'Accueil' ? (
                 <div className="dashboard-actions">
-                  {settingsNavigationEntries
+                  {activeReferenceNavigationEntries
                     .filter((entry) => entry !== 'Accueil')
                     .map((entry) => (
                       <button
@@ -3229,7 +3231,7 @@ function App() {
                         onClick={() => setSelectedSettingsSection(entry)}
                         type="button"
                       >
-                        <span className="eyebrow">Paramètres</span>
+                        <span className="eyebrow">{activeReferenceNavigationEntries === transverseNavigationEntries ? 'Transverse' : 'Paramètres'}</span>
                         <strong>{entry}</strong>
                         <p>{getSettingsSectionDescription(entry)}</p>
                       </button>
@@ -3242,107 +3244,43 @@ function App() {
                 {selectedSettingsSection === 'Sociétés' ? (
                 <section className="settings-list-section">
                   <div className="settings-list-header">
-                    <h3>Sociétés Groupe Laure</h3>
-                    <small>Recherche SIRENE puis saisie contrôlée</small>
-                  </div>
-                  <form className="settings-form settings-create-form" onSubmit={handleCreateCompany}>
-                    <label>
-                      <span>SIREN</span>
-                      <input
-                        inputMode="numeric"
-                        maxLength={9}
-                        placeholder="123456789"
-                        value={newCompany.siren}
-                        onChange={(event) => handleNewCompanyFieldChange('siren', event)}
-                      />
-                    </label>
-                    <button
-                      className="secondary-button settings-lookup-button"
-                      disabled={isLookingUpNewCompany || newCompany.siren.length !== 9}
-                      onClick={() => void handleLookupNewCompanySirene()}
-                      type="button"
-                    >
-                      {isLookingUpNewCompany ? 'Recherche...' : 'Rechercher SIRENE'}
-                    </button>
-                    <label>
-                      <span>Nom affiché</span>
-                      <input
-                        placeholder="Nom court"
-                        value={newCompany.displayName}
-                        onChange={(event) => handleNewCompanyFieldChange('displayName', event)}
-                      />
-                    </label>
-                    <label>
-                      <span>Raison sociale</span>
-                      <input
-                        placeholder="Raison sociale complète"
-                        value={newCompany.legalName}
-                        onChange={(event) => handleNewCompanyFieldChange('legalName', event)}
-                      />
-                    </label>
-                    <label className="toggle-label settings-toggle">
-                      <input checked={newCompany.isActive} onChange={handleNewCompanyStatusChange} type="checkbox" />
-                      <span>{newCompany.isActive ? 'Active' : 'Inactive'}</span>
-                    </label>
-                    <div className="profile-action-row">
-                      <button className="primary-button" disabled={newCompany.isSaving} type="submit">
-                        {newCompany.isSaving ? 'Création…' : 'Ajouter la société'}
-                      </button>
-                      {newCompany.error ? <small className="account-error">{newCompany.error}</small> : null}
+                    <div>
+                      <h3>Sociétés Groupe Laure</h3>
+                      <small>Liste des sociétés validées par SIRENE</small>
                     </div>
-                  </form>
+                    <button className="primary-button" onClick={openCreateCompanyModal} type="button">
+                      Ajouter une société
+                    </button>
+                  </div>
                   <div className="settings-list">
                     {companies.length === 0 ? (
                       <div className="settings-empty">Aucune société chargée pour le moment.</div>
                     ) : (
                       companies.map((company) => (
-                        <article className="settings-edit-card" key={company.id}>
-                          <div className="settings-edit-grid">
-                            <label>
+                        <article className="profile-summary-card accent-navy" key={company.id}>
+                          <header className="profile-summary-header">
+                            <div>
+                              <h3>{company.displayName}</h3>
+                              <p>{company.legalName}</p>
+                            </div>
+                            <span className={`profile-status-badge ${company.isActive ? 'is-active' : 'is-inactive'}`}>
+                              {company.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </header>
+                          <div className="profile-summary-rights">
+                            <div className="profile-summary-right">
                               <span>SIREN</span>
-                              <input
-                                inputMode="numeric"
-                                maxLength={9}
-                                value={editableCompanies[company.id]?.siren ?? company.siren}
-                                onChange={(event) => handleEditableCompanyFieldChange(company.id, 'siren', event)}
-                              />
-                            </label>
-                            <label>
-                              <span>Nom affiché</span>
-                              <input
-                                value={editableCompanies[company.id]?.displayName ?? company.displayName}
-                                onChange={(event) => handleEditableCompanyFieldChange(company.id, 'displayName', event)}
-                              />
-                            </label>
-                            <label>
-                              <span>Raison sociale</span>
-                              <input
-                                value={editableCompanies[company.id]?.legalName ?? company.legalName}
-                                onChange={(event) => handleEditableCompanyFieldChange(company.id, 'legalName', event)}
-                              />
-                            </label>
-                            <label className="toggle-label settings-toggle">
-                              <input
-                                checked={editableCompanies[company.id]?.isActive ?? company.isActive}
-                                onChange={(event) => handleEditableCompanyStatusChange(company.id, event)}
-                                type="checkbox"
-                              />
-                              <span>{editableCompanies[company.id]?.isActive ?? company.isActive ? 'Active' : 'Inactive'}</span>
-                            </label>
+                              <strong>{company.siren}</strong>
+                            </div>
+                            <div className="profile-summary-right">
+                              <span>Créée le</span>
+                              <strong>{new Date(company.createdAtUtc).toLocaleDateString()}</strong>
+                            </div>
                           </div>
                           <div className="settings-inline-actions">
-                            <small>SIREN {company.siren}</small>
-                            <button
-                              className="secondary-button"
-                              disabled={editableCompanies[company.id]?.isSaving}
-                              onClick={() => void handleSaveCompany(company.id)}
-                              type="button"
-                            >
-                              {editableCompanies[company.id]?.isSaving ? 'Enregistrement…' : 'Enregistrer'}
+                            <button className="secondary-button" onClick={() => openEditCompanyModal(company)} type="button">
+                              Configurer la société
                             </button>
-                            {editableCompanies[company.id]?.error ? (
-                              <small className="account-error">{editableCompanies[company.id]?.error}</small>
-                            ) : null}
                           </div>
                         </article>
                       ))
@@ -4508,6 +4446,75 @@ function App() {
           </div>
         ) : null}
 
+        {isCreateCompanyModalOpen || editingCompany ? (
+          <div className="modal-overlay" onClick={closeCompanyModal} role="presentation">
+            <section
+              aria-labelledby="company-modal-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">{editingCompany ? 'Configuration' : 'Création SIRENE'}</span>
+                  <h2 id="company-modal-title">{editingCompany ? 'Configurer la société' : 'Ajouter une société'}</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeCompanyModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="settings-form settings-create-form" onSubmit={editingCompany ? handleSaveCompany : handleCreateCompany}>
+                <div className="status-banner status-banner-warning account-form-warning">
+                  <strong>Recherche SIRENE obligatoire</strong>
+                  <span>La création d'une société est bloquée tant que le SIREN n'a pas été validé par SIRENE.</span>
+                </div>
+                <label>
+                  <span>SIREN</span>
+                  <input
+                    disabled={Boolean(editingCompany)}
+                    inputMode="numeric"
+                    maxLength={9}
+                    placeholder="123456789"
+                    value={companyForm.siren}
+                    onChange={(event) => handleNewCompanyFieldChange('siren', event)}
+                  />
+                </label>
+                {!editingCompany ? (
+                  <button
+                    className="secondary-button settings-lookup-button"
+                    disabled={isLookingUpNewCompany || companyForm.siren.length !== 9}
+                    onClick={() => void handleLookupNewCompanySirene()}
+                    type="button"
+                  >
+                    {isLookingUpNewCompany ? 'Recherche...' : 'Rechercher SIRENE'}
+                  </button>
+                ) : null}
+                <label>
+                  <span>Nom affiché</span>
+                  <input value={companyForm.displayName} onChange={(event) => handleNewCompanyFieldChange('displayName', event)} />
+                </label>
+                <label>
+                  <span>Raison sociale</span>
+                  <input value={companyForm.legalName} onChange={(event) => handleNewCompanyFieldChange('legalName', event)} />
+                </label>
+                <label className="toggle-label settings-toggle">
+                  <input checked={companyForm.isActive} onChange={handleNewCompanyStatusChange} type="checkbox" />
+                  <span>{companyForm.isActive ? 'Active' : 'Inactive'}</span>
+                </label>
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={companyForm.isSaving || (!editingCompany && !companyForm.isSireneValidated)} type="submit">
+                    {companyForm.isSaving ? 'Enregistrement...' : editingCompany ? 'Enregistrer la société' : 'Ajouter la société'}
+                  </button>
+                  {companyForm.isSireneValidated ? <small className="form-success">SIRENE validé pour ce SIREN.</small> : null}
+                  {companyForm.error ? <small className="account-error">{companyForm.error}</small> : null}
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
         {isCreateEmployeeModalOpen || editingEmployee ? (
           <div className="modal-overlay" onClick={closeEmployeeModal} role="presentation">
             <section
@@ -5132,6 +5139,19 @@ function createEmptyCompanyForm(): CompanyFormState {
     displayName: '',
     legalName: '',
     isActive: true,
+    isSireneValidated: false,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildCompanyFormFromItem(company: CompanyItem): CompanyFormState {
+  return {
+    siren: company.siren,
+    displayName: company.displayName,
+    legalName: company.legalName,
+    isActive: company.isActive,
+    isSireneValidated: true,
     isSaving: false,
     error: null,
   }
@@ -5257,6 +5277,10 @@ function getWorkspaceTitle(selectedNavigation: string) {
     return 'Administration'
   }
 
+  if (selectedNavigation === 'Transverse') {
+    return 'Transverse'
+  }
+
   if (selectedNavigation === 'Gestion administrative') {
     return 'Gestion administrative'
   }
@@ -5306,6 +5330,10 @@ function getWorkspaceDescription(selectedNavigation: string, isInformatique: boo
       : 'Cette entrée est réservée à l’administration.'
   }
 
+  if (selectedNavigation === 'Transverse') {
+    return 'Socle transverse: salariés, tiers et matériels partagés par les modules métier.'
+  }
+
   if (selectedNavigation === 'Gestion administrative') {
     return 'Cette vue présente uniquement les modules réellement accessibles dans le périmètre administratif.'
   }
@@ -5321,6 +5349,8 @@ function getAdministrationSectionDescription(section: (typeof administrationSubm
       return 'Configurer les profils et leurs droits par module.'
     case 'Paramètres':
       return 'Administrer les référentiels transverses de base.'
+    case 'Transverse':
+      return 'Gérer les salariés, tiers et matériels du socle transverse.'
     case 'Outils':
       return 'Préparer les futurs outils techniques et de maintenance.'
     default:

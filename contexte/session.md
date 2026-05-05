@@ -960,6 +960,38 @@ Ordre cible de construction:
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
+  - `GET /newNexus/api/settings/companies/sirene/552100554` retourne `401 Unauthorized` sans authentification, attendu
+  - bundle publie: `index-C2iMSue1.js`
+
+## 2026-05-05 - Ergonomie Societes et separation Transverse
+
+- demande:
+  - rendre `Rechercher SIRENE` operationnel dans Societes
+  - interdire la creation d'une societe sans validation SIRENE
+  - aligner Societes sur l'ergonomie liste + bouton + modale ajouter/modifier
+  - sortir Tiers et Salaries de Parametres car ils appartiennent au socle transverse
+- corrections API:
+  - mutualisation de la recherche SIRENE dans `LookupSireneCompanyAsync`
+  - `GET /api/settings/companies/sirene/{siren}` retourne maintenant le detail d'indisponibilite SIRENE
+  - `POST /api/settings/companies` verifie obligatoirement le SIREN via SIRENE avant creation
+  - creation refusee si le SIREN n'est pas retrouve dans SIRENE, meme en contournant l'UI
+- corrections UI:
+  - ajout de l'entree principale `Transverse`
+  - `Administration > Parametres` limite a `Societes`, `Analytiques`, `Exploitations`
+  - `Transverse` regroupe `Salaries`, `Tiers`, `Materiels`
+  - `Administration > Parametres > Societes` passe en liste de cartes + bouton `Ajouter une societe`
+  - creation/modification Societes via modale
+  - bouton `Rechercher SIRENE` pre-remplit la modale et deverrouille le bouton de creation uniquement apres validation
+- backlog:
+  - Societes, SIRENE, Salaries, Tiers et Materiels mis a jour avec le nouvel emplacement fonctionnel
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK via `powershell.exe -ExecutionPolicy Bypass -File`
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
   - `POST /newNexus/api/settings/employees/import-lucca` retourne `401 Unauthorized` sans authentification, attendu
   - bundles publies: `index-DCYKUqRU.css` et `index-CcTKVuIe.js`
 

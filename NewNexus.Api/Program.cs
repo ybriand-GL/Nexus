@@ -1364,49 +1364,32 @@ app.MapGet("/api/settings/companies/sirene/{siren}", async (string siren, IHttpC
         });
     }
 
-    var client = httpClientFactory.CreateClient("Sirene");
-    using var response = await client.GetAsync($"/search?q={Uri.EscapeDataString(normalizedSiren)}&per_page=1");
-    if (!response.IsSuccessStatusCode)
+    var lookup = await LookupSireneCompanyAsync(httpClientFactory, normalizedSiren);
+    if (!lookup.IsAvailable)
     {
-        return Results.Problem("La recherche SIRENE est indisponible.", statusCode: StatusCodes.Status502BadGateway);
+        return Results.Problem(
+            title: "La recherche SIRENE est indisponible.",
+            detail: lookup.ErrorDetail,
+            statusCode: StatusCodes.Status502BadGateway);
     }
 
-    await using var stream = await response.Content.ReadAsStreamAsync();
-    using var document = await JsonDocument.ParseAsync(stream);
-
-    if (!document.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
-    {
-        return Results.NotFound();
-    }
-
-    var company = results.EnumerateArray()
-        .FirstOrDefault(result => string.Equals(GetJsonString(result, "siren"), normalizedSiren, StringComparison.OrdinalIgnoreCase));
-    if (company.ValueKind == JsonValueKind.Undefined)
+    if (lookup.Company is null)
     {
         return Results.NotFound();
     }
-
-    var legalName = FirstNonEmpty(
-        GetJsonString(company, "nom_complet"),
-        GetJsonString(company, "nom_raison_sociale"),
-        GetJsonString(company, "denomination"));
-    var displayName = FirstNonEmpty(
-        GetJsonString(company, "nom_raison_sociale"),
-        GetJsonString(company, "nom_complet"),
-        GetJsonString(company, "denomination"));
 
     return Results.Ok(new
     {
         Siren = normalizedSiren,
-        Siret = GetJsonString(company, "siret"),
-        DisplayName = displayName,
-        LegalName = legalName,
-        Naf = GetJsonString(company, "activite_principale"),
+        lookup.Company.Siret,
+        lookup.Company.DisplayName,
+        lookup.Company.LegalName,
+        lookup.Company.Naf,
         Source = "API Recherche d'Entreprises"
     });
 }).RequireAuthorization("RequireInformatique");
 
-app.MapPost("/api/settings/companies", async (UpsertCompanyRequest request, NewNexusDbContext dbContext) =>
+app.MapPost("/api/settings/companies", async (UpsertCompanyRequest request, NewNexusDbContext dbContext, IHttpClientFactory httpClientFactory) =>
 {
     var validationErrors = await ValidateCompanyRequestAsync(request, dbContext);
     if (validationErrors.Count > 0)
@@ -1414,12 +1397,29 @@ app.MapPost("/api/settings/companies", async (UpsertCompanyRequest request, NewN
         return Results.ValidationProblem(validationErrors);
     }
 
+    var sireneLookup = await LookupSireneCompanyAsync(httpClientFactory, request.Siren.Trim());
+    if (!sireneLookup.IsAvailable)
+    {
+        return Results.Problem(
+            title: "Creation societe impossible",
+            detail: $"La verification SIRENE est obligatoire avant creation. {sireneLookup.ErrorDetail}",
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+
+    if (sireneLookup.Company is null)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["siren"] = ["La societe doit etre retrouvee dans SIRENE avant creation."]
+        });
+    }
+
     var company = new Company
     {
         Id = Guid.NewGuid(),
         Siren = request.Siren.Trim(),
-        DisplayName = request.DisplayName.Trim(),
-        LegalName = request.LegalName.Trim(),
+        DisplayName = FirstNonEmpty(request.DisplayName.Trim(), sireneLookup.Company.DisplayName, sireneLookup.Company.LegalName)!,
+        LegalName = FirstNonEmpty(request.LegalName.Trim(), sireneLookup.Company.LegalName, sireneLookup.Company.DisplayName)!,
         IsActive = request.IsActive,
         CreatedAtUtc = DateTime.UtcNow
     };
@@ -2451,6 +2451,57 @@ static Uri BuildLuccaEmployeesUri(Uri baseUri, string path)
     return builder.Uri;
 }
 
+static async Task<SireneLookupResult> LookupSireneCompanyAsync(IHttpClientFactory httpClientFactory, string siren)
+{
+    var normalizedSiren = new string((siren ?? string.Empty).Where(char.IsDigit).ToArray());
+    if (normalizedSiren.Length != 9)
+    {
+        return new SireneLookupResult(true, null, "Le SIREN doit contenir 9 chiffres.");
+    }
+
+    var client = httpClientFactory.CreateClient("Sirene");
+    using var response = await client.GetAsync($"/search?q={Uri.EscapeDataString(normalizedSiren)}&per_page=10");
+    if (!response.IsSuccessStatusCode)
+    {
+        var detail = await response.Content.ReadAsStringAsync();
+        return new SireneLookupResult(false, null, $"SIRENE retourne {(int)response.StatusCode} {response.ReasonPhrase}. {detail}");
+    }
+
+    await using var stream = await response.Content.ReadAsStreamAsync();
+    using var document = await JsonDocument.ParseAsync(stream);
+
+    if (!document.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
+    {
+        return new SireneLookupResult(true, null, "La reponse SIRENE ne contient pas de resultats.");
+    }
+
+    var company = results.EnumerateArray()
+        .FirstOrDefault(result => string.Equals(GetJsonString(result, "siren"), normalizedSiren, StringComparison.OrdinalIgnoreCase));
+    if (company.ValueKind == JsonValueKind.Undefined)
+    {
+        return new SireneLookupResult(true, null, "Aucune societe trouvee pour ce SIREN.");
+    }
+
+    var legalName = FirstNonEmpty(
+        GetJsonString(company, "nom_complet"),
+        GetJsonString(company, "nom_raison_sociale"),
+        GetJsonString(company, "denomination"));
+    var displayName = FirstNonEmpty(
+        GetJsonString(company, "nom_raison_sociale"),
+        GetJsonString(company, "nom_complet"),
+        GetJsonString(company, "denomination"));
+
+    return new SireneLookupResult(
+        true,
+        new SireneCompanyLookup(
+            normalizedSiren,
+            GetJsonString(company, "siret"),
+            displayName,
+            legalName,
+            GetJsonString(company, "activite_principale")),
+        null);
+}
+
 static bool IsLuccaLegacyApi(Uri requestUri)
 {
     return requestUri.AbsolutePath.Contains("/api/v3/", StringComparison.OrdinalIgnoreCase) ||
@@ -3341,6 +3392,8 @@ internal sealed record ProfileModuleRightRequest(Guid SecurityModuleId, string A
 internal sealed record CreateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
 internal sealed record UpdateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
 internal sealed record UpsertCompanyRequest(string Siren, string DisplayName, string LegalName, bool IsActive);
+internal sealed record SireneCompanyLookup(string Siren, string? Siret, string? DisplayName, string? LegalName, string? Naf);
+internal sealed record SireneLookupResult(bool IsAvailable, SireneCompanyLookup? Company, string? ErrorDetail);
 internal sealed record UpsertAnalyticRequest(string Code, string Label, Guid CompanyId, bool IsActive);
 internal sealed record UpsertExploitationRequest(string Code, string Label, Guid CompanyId, bool IsActive);
 internal sealed record UpsertEmployeeRequest(

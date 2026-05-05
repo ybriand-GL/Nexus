@@ -24,6 +24,7 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
     public DbSet<Material> Materials => Set<Material>();
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<ApplicationTrace> ApplicationTraces => Set<ApplicationTrace>();
+    public DbSet<Contravention> Contraventions => Set<Contravention>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,5 +42,6 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
         modelBuilder.ApplyConfiguration(new MaterialConfiguration());
         modelBuilder.ApplyConfiguration(new IntegrationCredentialConfiguration());
         modelBuilder.ApplyConfiguration(new ApplicationTraceConfiguration());
+        modelBuilder.ApplyConfiguration(new ContraventionConfiguration());
     }
 }

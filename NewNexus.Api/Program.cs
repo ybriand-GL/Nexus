@@ -1501,6 +1501,191 @@ app.MapPost("/api/admin/scheduled-tasks/{taskCode}/run", async (
     });
 }).RequireAuthorization("RequireInformatique");
 
+app.MapGet("/api/modules/contraventions", async (
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CONTRAVENTIONS", ModuleAccessLevel.Read))
+    {
+        return Results.Forbid();
+    }
+
+    var contraventions = await dbContext.Contraventions
+        .AsNoTracking()
+        .Include(item => item.DriverEmployee)
+        .Include(item => item.Material)
+        .OrderByDescending(item => item.OffenseDate)
+        .ThenBy(item => item.NoticeNumber)
+        .ToListAsync();
+
+    return Results.Ok(contraventions.Select(BuildContraventionResponse));
+}).RequireAuthorization();
+
+app.MapGet("/api/modules/contraventions/referentials", async (
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CONTRAVENTIONS", ModuleAccessLevel.Read))
+    {
+        return Results.Forbid();
+    }
+
+    var drivers = await dbContext.Employees
+        .AsNoTracking()
+        .Where(item => item.IsActive && item.IsDriver)
+        .OrderBy(item => item.DisplayName)
+        .ThenBy(item => item.EmployeeNumber)
+        .Select(item => new
+        {
+            item.Id,
+            item.SourceEmployeeId,
+            item.EmployeeNumber,
+            item.DisplayName,
+            item.Email,
+            item.PhoneNumber,
+            item.IsDriver,
+            item.IsActive,
+            item.LastSyncedAtUtc,
+            item.CreatedAtUtc
+        })
+        .ToListAsync();
+
+    var materials = await dbContext.Materials
+        .AsNoTracking()
+        .Include(item => item.Exploitation)
+        .Where(item => item.IsActive)
+        .OrderBy(item => item.FleetNumber)
+        .Select(item => new
+        {
+            item.Id,
+            item.FleetNumber,
+            item.Label,
+            item.MaterialType,
+            item.RegistrationNumber,
+            item.SourceSystem,
+            item.IsActive,
+            item.LastSyncedAtUtc,
+            item.CreatedAtUtc,
+            Exploitation = item.Exploitation == null
+                ? null
+                : new
+                {
+                    item.Exploitation.Id,
+                    item.Exploitation.Code,
+                    item.Exploitation.Label
+                }
+        })
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        Drivers = drivers,
+        Materials = materials
+    });
+}).RequireAuthorization();
+
+app.MapPost("/api/modules/contraventions", async (
+    UpsertContraventionRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CONTRAVENTIONS", ModuleAccessLevel.Write))
+    {
+        return Results.Forbid();
+    }
+
+    var validationErrors = await ValidateContraventionRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var now = DateTime.UtcNow;
+    var contravention = new Contravention
+    {
+        Id = Guid.NewGuid(),
+        NoticeNumber = request.NoticeNumber.Trim().ToUpperInvariant(),
+        OffenseDate = request.OffenseDate,
+        DueDate = request.DueDate,
+        Amount = request.Amount,
+        StatusCode = NormalizeContraventionStatus(request.StatusCode),
+        OffenseLabel = request.OffenseLabel.Trim(),
+        Location = NormalizeOptionalText(request.Location),
+        Notes = NormalizeOptionalText(request.Notes),
+        DriverEmployeeId = request.DriverEmployeeId,
+        MaterialId = request.MaterialId,
+        CreatedAtUtc = now,
+        UpdatedAtUtc = now
+    };
+
+    dbContext.Contraventions.Add(contravention);
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "MODULE_EVENTS",
+        "CONTRAVENTION_CREATED",
+        "Info",
+        "Contravention creee.",
+        $"Avis={contravention.NoticeNumber}; statut={contravention.StatusCode}; montant={contravention.Amount}.",
+        contravention.NoticeNumber);
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    return Results.Created($"/api/modules/contraventions/{contravention.Id}", new { contravention.Id });
+}).RequireAuthorization();
+
+app.MapPut("/api/modules/contraventions/{contraventionId:guid}", async (
+    Guid contraventionId,
+    UpsertContraventionRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CONTRAVENTIONS", ModuleAccessLevel.Write))
+    {
+        return Results.Forbid();
+    }
+
+    var contravention = await dbContext.Contraventions.SingleOrDefaultAsync(item => item.Id == contraventionId);
+    if (contravention is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateContraventionRequestAsync(request, dbContext, contraventionId);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    contravention.NoticeNumber = request.NoticeNumber.Trim().ToUpperInvariant();
+    contravention.OffenseDate = request.OffenseDate;
+    contravention.DueDate = request.DueDate;
+    contravention.Amount = request.Amount;
+    contravention.StatusCode = NormalizeContraventionStatus(request.StatusCode);
+    contravention.OffenseLabel = request.OffenseLabel.Trim();
+    contravention.Location = NormalizeOptionalText(request.Location);
+    contravention.Notes = NormalizeOptionalText(request.Notes);
+    contravention.DriverEmployeeId = request.DriverEmployeeId;
+    contravention.MaterialId = request.MaterialId;
+    contravention.UpdatedAtUtc = DateTime.UtcNow;
+
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "MODULE_EVENTS",
+        "CONTRAVENTION_UPDATED",
+        "Info",
+        "Contravention mise a jour.",
+        $"Avis={contravention.NoticeNumber}; statut={contravention.StatusCode}; montant={contravention.Amount}.",
+        contravention.NoticeNumber);
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    return Results.NoContent();
+}).RequireAuthorization();
+
 app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
 {
     var companies = await dbContext.Companies
@@ -3330,6 +3515,7 @@ static IReadOnlyList<TraceStreamDefinition> GetTraceStreams()
     [
         new("AUTH_EVENTS", "Authentification", "Connexions, deconnexions, echecs et resets de mot de passe.", "90 jours cible"),
         new("ADMIN_ACTIONS", "Actions administrateur", "Actions sensibles realisees depuis les outils d'administration.", "180 jours cible"),
+        new("MODULE_EVENTS", "Modules metier", "Creations et modifications realisees dans les modules fonctionnels.", "180 jours cible"),
         new("INTEGRATION_RUNS", "Traitements d'integration", "Imports et traitements raccordes aux logiciels externes.", "180 jours cible"),
         new("SYSTEM_ERRORS", "Erreurs applicatives", "Indisponibilites et erreurs critiques journalisees cote serveur.", "365 jours cible")
     ];
@@ -3520,6 +3706,42 @@ static object BuildProfileResponse(SecurityProfile profile)
     };
 }
 
+static object BuildContraventionResponse(Contravention contravention)
+{
+    return new
+    {
+        contravention.Id,
+        contravention.NoticeNumber,
+        contravention.OffenseDate,
+        contravention.DueDate,
+        contravention.Amount,
+        contravention.StatusCode,
+        StatusLabel = FormatContraventionStatus(contravention.StatusCode),
+        contravention.OffenseLabel,
+        contravention.Location,
+        contravention.Notes,
+        contravention.CreatedAtUtc,
+        contravention.UpdatedAtUtc,
+        DriverEmployee = contravention.DriverEmployee is null
+            ? null
+            : new
+            {
+                contravention.DriverEmployee.Id,
+                contravention.DriverEmployee.EmployeeNumber,
+                contravention.DriverEmployee.DisplayName
+            },
+        Material = contravention.Material is null
+            ? null
+            : new
+            {
+                contravention.Material.Id,
+                contravention.Material.FleetNumber,
+                contravention.Material.Label,
+                contravention.Material.RegistrationNumber
+            }
+    };
+}
+
 static ProfileRightsBuildResult TryBuildDesiredRights(
     IReadOnlyCollection<ProfileModuleRightRequest> requestedRights,
     IReadOnlyCollection<SecurityModule> modules)
@@ -3553,6 +3775,34 @@ static ProfileRightsBuildResult TryBuildDesiredRights(
 static string? NormalizeOptionalText(string? value)
 {
     return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
+
+static async Task<bool> HasModuleAccessAsync(
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    string moduleCode,
+    ModuleAccessLevel requiredAccess)
+{
+    var userId = GetUserId(principal);
+    if (userId is null)
+    {
+        return false;
+    }
+
+    var accessLevel = await dbContext.UserAccounts
+        .AsNoTracking()
+        .Where(account => account.Id == userId.Value && account.IsActive && account.SecurityProfileId != null)
+        .SelectMany(account => account.SecurityProfile!.ModuleRights)
+        .Where(right => right.SecurityModule!.Code == moduleCode && right.SecurityModule.IsActive)
+        .Select(right => (ModuleAccessLevel?)right.AccessLevel)
+        .SingleOrDefaultAsync();
+
+    return requiredAccess switch
+    {
+        ModuleAccessLevel.Read => accessLevel is ModuleAccessLevel.Read or ModuleAccessLevel.Write,
+        ModuleAccessLevel.Write => accessLevel is ModuleAccessLevel.Write,
+        _ => accessLevel is not null
+    };
 }
 
 static async Task<Dictionary<string, string[]>> ValidateCreateUserAccountRequestAsync(
@@ -4067,6 +4317,96 @@ static async Task<Dictionary<string, string[]>> ValidateMaterialRequestAsync(
     return errors;
 }
 
+static async Task<Dictionary<string, string[]>> ValidateContraventionRequestAsync(
+    UpsertContraventionRequest request,
+    NewNexusDbContext dbContext,
+    Guid? currentContraventionId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var noticeNumber = request.NoticeNumber.Trim().ToUpperInvariant();
+    var offenseLabel = request.OffenseLabel.Trim();
+    var statusCode = NormalizeContraventionStatus(request.StatusCode);
+
+    if (string.IsNullOrWhiteSpace(noticeNumber))
+    {
+        errors["noticeNumber"] = ["Le numero d'avis est obligatoire."];
+    }
+
+    if (noticeNumber.Length > 80)
+    {
+        errors["noticeNumber"] = ["Le numero d'avis ne doit pas depasser 80 caracteres."];
+    }
+
+    if (request.OffenseDate == default)
+    {
+        errors["offenseDate"] = ["La date d'infraction est obligatoire."];
+    }
+
+    if (request.DueDate is not null && request.DueDate.Value.Date < request.OffenseDate.Date)
+    {
+        errors["dueDate"] = ["L'echeance ne peut pas preceder la date d'infraction."];
+    }
+
+    if (request.Amount < 0)
+    {
+        errors["amount"] = ["Le montant ne peut pas etre negatif."];
+    }
+
+    if (string.IsNullOrWhiteSpace(offenseLabel))
+    {
+        errors["offenseLabel"] = ["Le libelle d'infraction est obligatoire."];
+    }
+
+    if (!GetContraventionStatuses().Contains(statusCode))
+    {
+        errors["statusCode"] = ["Le statut de contravention est inconnu."];
+    }
+
+    if (await dbContext.Contraventions.AnyAsync(item =>
+            item.NoticeNumber == noticeNumber &&
+            item.Id != currentContraventionId))
+    {
+        errors["noticeNumber"] = ["Ce numero d'avis existe deja."];
+    }
+
+    if (request.DriverEmployeeId is not null &&
+        !await dbContext.Employees.AnyAsync(item => item.Id == request.DriverEmployeeId.Value && item.IsActive))
+    {
+        errors["driverEmployeeId"] = ["Le conducteur selectionne est introuvable ou inactif."];
+    }
+
+    if (request.MaterialId is not null &&
+        !await dbContext.Materials.AnyAsync(item => item.Id == request.MaterialId.Value && item.IsActive))
+    {
+        errors["materialId"] = ["Le materiel selectionne est introuvable ou inactif."];
+    }
+
+    return errors;
+}
+
+static string[] GetContraventionStatuses()
+{
+    return ["A_TRAITER", "EN_CONTESTATION", "A_PAYER", "PAYEE", "CLASSEE"];
+}
+
+static string NormalizeContraventionStatus(string? statusCode)
+{
+    var normalized = NormalizeTechnicalCode(statusCode);
+    return string.IsNullOrWhiteSpace(normalized) ? "A_TRAITER" : normalized;
+}
+
+static string FormatContraventionStatus(string statusCode)
+{
+    return NormalizeContraventionStatus(statusCode) switch
+    {
+        "EN_CONTESTATION" => "En contestation",
+        "A_PAYER" => "A payer",
+        "PAYEE" => "Payee",
+        "CLASSEE" => "Classee",
+        _ => "A traiter"
+    };
+}
+
 internal sealed record LoginRequest(string Login, string Password);
 internal sealed record ForgotPasswordRequest(string LoginOrEmail);
 internal sealed record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
@@ -4148,6 +4488,17 @@ internal sealed record UpsertMaterialRequest(
     Guid? ExploitationId,
     bool IsActive,
     DateTime? LastSyncedAtUtc);
+internal sealed record UpsertContraventionRequest(
+    string NoticeNumber,
+    DateTime OffenseDate,
+    DateTime? DueDate,
+    decimal Amount,
+    string StatusCode,
+    string OffenseLabel,
+    string? Location,
+    string? Notes,
+    Guid? DriverEmployeeId,
+    Guid? MaterialId);
 internal sealed record ProfileRightsBuildResult(bool IsValid, Dictionary<string, string[]> Errors, Dictionary<Guid, ModuleAccessLevel> RightsByModuleId);
 internal sealed record UpsertIntegrationCredentialRequest(
     string ProviderCode,

@@ -123,7 +123,7 @@ Derniere mise a jour: 2026-05-05
 
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
-| Module | Gestion des contraventions | SCAFFOLDE | Carte de cadrage visible dans `Gestion administrative`: objectif, donnees attendues, droit courant et prochaine etape |
+| Module | Gestion des contraventions | A_TESTER | Module V1 branche: table `administration.Contravention`, endpoints droits `CONTRAVENTIONS`, liste, creation, edition, statuts, rattachements conducteur/materiel et traces metier |
 | Module | Carte des points chargements/dechargements | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: points, geocodage, rattachements societes/exploitations et prochaine etape |
 | Module | Les indicateurs conducteurs | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: donnees Lucca, qualification conducteur et indicateurs a definir |
 | Module | Les indicateurs des tracteurs | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: donnees materiels, TruckOnline, YellowBox et modele parc a definir |

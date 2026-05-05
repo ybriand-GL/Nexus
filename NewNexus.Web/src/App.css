@@ -864,6 +864,77 @@
   font-weight: 700;
 }
 
+.contraventions-module-card {
+  grid-column: 1 / -1;
+}
+
+.contraventions-toolbar,
+.contravention-row,
+.contravention-row-actions,
+.contraventions-kpis {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.contraventions-toolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.contraventions-kpis {
+  flex-wrap: wrap;
+}
+
+.contraventions-kpis span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(0, 0, 0, .16);
+  color: var(--nexus-muted);
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+.contraventions-kpis strong {
+  color: var(--nexus-text);
+}
+
+.contraventions-table {
+  display: grid;
+  gap: 10px;
+}
+
+.contravention-row {
+  justify-content: space-between;
+  align-items: stretch;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(0, 0, 0, .14);
+}
+
+.contravention-row > div {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.contravention-row span {
+  color: var(--nexus-muted);
+  font-size: .86rem;
+}
+
+.contravention-row-actions {
+  justify-content: end;
+  flex-wrap: wrap;
+}
+
 .profile-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1936,6 +2007,7 @@
 
 .settings-form input,
 .settings-form select,
+.settings-form textarea,
 .settings-edit-grid input,
 .settings-edit-grid select {
   min-height: 42px;
@@ -1947,8 +2019,19 @@
   font: inherit;
 }
 
+.settings-form textarea {
+  min-height: 96px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.settings-form-wide {
+  grid-column: 1 / -1;
+}
+
 .settings-form input:focus,
 .settings-form select:focus,
+.settings-form textarea:focus,
 .settings-edit-grid input:focus,
 .settings-edit-grid select:focus {
   outline: 2px solid rgba(215, 164, 73, 0.18);

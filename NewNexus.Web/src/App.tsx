@@ -355,6 +355,47 @@ type MaterialItem = {
   } | null
 }
 
+type ContraventionItem = {
+  id: string
+  noticeNumber: string
+  offenseDate: string
+  dueDate: string | null
+  amount: number
+  statusCode: string
+  statusLabel: string
+  offenseLabel: string
+  location: string | null
+  notes: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  driverEmployee: {
+    id: string
+    employeeNumber: string
+    displayName: string
+  } | null
+  material: {
+    id: string
+    fleetNumber: string
+    label: string
+    registrationNumber: string | null
+  } | null
+}
+
+type ContraventionFormState = {
+  noticeNumber: string
+  offenseDate: string
+  dueDate: string
+  amount: string
+  statusCode: string
+  offenseLabel: string
+  location: string
+  notes: string
+  driverEmployeeId: string
+  materialId: string
+  isSaving: boolean
+  error: string | null
+}
+
 type EditableAccountState = {
   login: string
   displayName: string
@@ -497,6 +538,14 @@ const employeeSettingsSection = 'Salari\u00e9s'
 const thirdPartySettingsSection = 'Tiers'
 const materialSettingsSection = 'Mat\u00e9riels'
 const settingsNavigationEntries = [...settingsSubmenuEntries] as const
+const contraventionsModuleCode = 'CONTRAVENTIONS'
+const contraventionStatuses = [
+  { code: 'A_TRAITER', label: 'A traiter' },
+  { code: 'EN_CONTESTATION', label: 'En contestation' },
+  { code: 'A_PAYER', label: 'A payer' },
+  { code: 'PAYEE', label: 'Payee' },
+  { code: 'CLASSEE', label: 'Classee' },
+]
 const commonDataNavigationEntries = ['Accueil', materialSettingsSection, employeeSettingsSection, thirdPartySettingsSection] as const
 const toolsSubmenuEntries = [
   'Accueil',
@@ -553,6 +602,7 @@ function App() {
   const [employees, setEmployees] = useState<EmployeeItem[]>([])
   const [thirdParties, setThirdParties] = useState<ThirdPartyItem[]>([])
   const [materials, setMaterials] = useState<MaterialItem[]>([])
+  const [contraventions, setContraventions] = useState<ContraventionItem[]>([])
   const [adminDiagnostics, setAdminDiagnostics] = useState<AdminDiagnostics | null>(null)
   const [integrationCredentials, setIntegrationCredentials] = useState<IntegrationCredentialItem[]>([])
   const [userSessions, setUserSessions] = useState<UserSessionsPayload>({ active: [], history: [] })
@@ -577,10 +627,12 @@ function App() {
   const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [newThirdParty, setNewThirdParty] = useState<ThirdPartyFormState>(createEmptyThirdPartyForm())
   const [newMaterial, setNewMaterial] = useState<MaterialFormState>(createEmptyMaterialForm())
+  const [contraventionForm, setContraventionForm] = useState<ContraventionFormState>(createEmptyContraventionForm())
   const [editingEmployee, setEditingEmployee] = useState<EmployeeItem | null>(null)
   const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null)
   const [editingThirdParty, setEditingThirdParty] = useState<ThirdPartyItem | null>(null)
   const [editingMaterial, setEditingMaterial] = useState<MaterialItem | null>(null)
+  const [editingContravention, setEditingContravention] = useState<ContraventionItem | null>(null)
   const [employeeForm, setEmployeeForm] = useState<EmployeeFormState>(createEmptyEmployeeForm())
   const [companyForm, setCompanyForm] = useState<CompanyFormState>(createEmptyCompanyForm())
   const [sireneCompanySearch, setSireneCompanySearch] = useState<SireneCompanySearchFormState>(createEmptySireneCompanySearchForm())
@@ -588,6 +640,7 @@ function App() {
   const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false)
   const [isThirdPartyModalOpen, setIsThirdPartyModalOpen] = useState(false)
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false)
+  const [isContraventionModalOpen, setIsContraventionModalOpen] = useState(false)
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
   const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
   const [accountPasswordReset, setAccountPasswordReset] = useState<AccountPasswordResetState>(createEmptyAccountPasswordResetState())
@@ -637,6 +690,7 @@ function App() {
   const [tracesError, setTracesError] = useState<string | null>(null)
   const [scheduledTasksError, setScheduledTasksError] = useState<string | null>(null)
   const [runningScheduledTaskCode, setRunningScheduledTaskCode] = useState<string | null>(null)
+  const [contraventionsError, setContraventionsError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -700,6 +754,9 @@ function App() {
       }))
       .sort(compareModules)
   }, [currentUser, isInformatique, modules, rightsByModuleCode])
+
+  const contraventionsAccessLevel = rightsByModuleCode.get(contraventionsModuleCode) ?? 'None'
+  const canWriteContraventions = contraventionsAccessLevel === 'Write'
 
   const modulesByGroup = useMemo(() => {
     return visibleModules.reduce<Record<string, SecurityModuleItem[]>>((groups, module) => {
@@ -1089,9 +1146,15 @@ function App() {
 
   async function hydrateAuthenticatedState(user: AuthenticatedUser) {
     setCurrentUser(user)
+    const hasContraventionsAccess = user.rights.some(
+      (right) => right.moduleCode === contraventionsModuleCode && canAccessModule(right.accessLevel),
+    )
 
     if (user.profile?.code === 'INFORMATIQUE') {
-      await loadAdminSecurityData()
+      await Promise.all([
+        loadAdminSecurityData(),
+        hasContraventionsAccess ? loadContraventionsData() : Promise.resolve(),
+      ])
       return
     }
 
@@ -1104,6 +1167,12 @@ function App() {
     setEmployees([])
     setThirdParties([])
     setMaterials([])
+    if (hasContraventionsAccess) {
+      await loadContraventionsData()
+    } else {
+      setContraventions([])
+      setContraventionsError(null)
+    }
     setAdminDiagnostics(null)
     setIntegrationCredentials([])
     setUserSessions({ active: [], history: [] })
@@ -1156,6 +1225,38 @@ function App() {
     setEmployees(settingsPayload.employees)
     setThirdParties(settingsPayload.thirdParties)
     setMaterials(settingsPayload.materials)
+  }
+
+  async function loadContraventionsData() {
+    setContraventionsError(null)
+
+    try {
+      const [contraventionsResponse, referentialsResponse] = await Promise.all([
+        fetch(apiPath('api/modules/contraventions')),
+        fetch(apiPath('api/modules/contraventions/referentials')),
+      ])
+
+      const failedResponse = [contraventionsResponse, referentialsResponse].find((response) => !response.ok)
+      if (failedResponse) {
+        throw new Error(await getRequestError(failedResponse, 'Impossible de charger les contraventions.'))
+      }
+
+      const [contraventionsPayload, referentialsPayload] = await Promise.all([
+        contraventionsResponse.json() as Promise<ContraventionItem[]>,
+        referentialsResponse.json() as Promise<{
+          drivers: EmployeeItem[]
+          materials: MaterialItem[]
+        }>,
+      ])
+
+      setContraventions(contraventionsPayload)
+      setEmployees((current) => (current.length > 0 ? current : referentialsPayload.drivers))
+      setMaterials((current) => (current.length > 0 ? current : referentialsPayload.materials))
+    } catch (contraventionsLoadError) {
+      setContraventionsError(
+        contraventionsLoadError instanceof Error ? contraventionsLoadError.message : 'Erreur de chargement des contraventions.',
+      )
+    }
   }
 
   async function loadAdminToolsData() {
@@ -2800,6 +2901,61 @@ function App() {
     setNewMaterial(createEmptyMaterialForm())
   }
 
+  function openCreateContraventionModal() {
+    setEditingContravention(null)
+    setContraventionForm(createEmptyContraventionForm())
+    setIsContraventionModalOpen(true)
+  }
+
+  function openEditContraventionModal(contravention: ContraventionItem) {
+    setEditingContravention(contravention)
+    setContraventionForm(buildContraventionFormFromItem(contravention))
+    setIsContraventionModalOpen(true)
+  }
+
+  function closeContraventionModal() {
+    if (contraventionForm.isSaving) {
+      return
+    }
+
+    setEditingContravention(null)
+    setIsContraventionModalOpen(false)
+    setContraventionForm(createEmptyContraventionForm())
+  }
+
+  function handleContraventionFormChange(
+    field: keyof Omit<ContraventionFormState, 'isSaving' | 'error'>,
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+  ) {
+    setContraventionForm((current) => ({ ...current, [field]: event.target.value, error: null }))
+  }
+
+  async function handleSaveContravention(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setContraventionForm((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath(editingContravention ? `api/modules/contraventions/${editingContravention.id}` : 'api/modules/contraventions'), {
+        method: editingContravention ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildContraventionPayload(contraventionForm)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, editingContravention ? 'La mise a jour de la contravention a echoue.' : 'La creation de la contravention a echoue.'))
+      }
+
+      await loadContraventionsData()
+      closeContraventionModal()
+    } catch (saveError) {
+      setContraventionForm((current) => ({
+        ...current,
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur de sauvegarde.',
+      }))
+    }
+  }
+
   function handlePostAuthLoaderComplete() {
     sessionStorage.removeItem(postAuthLoaderStorageKey)
     setShowPostAuthLoader(false)
@@ -3347,6 +3503,84 @@ function App() {
                   const blueprint = getFunctionalModuleBlueprint(module.code)
                   const accessLevel = rightsByModuleCode.get(module.code) ?? 'None'
 
+                  if (module.code === contraventionsModuleCode) {
+                    const openCount = contraventions.filter((item) => !['PAYEE', 'CLASSEE'].includes(item.statusCode)).length
+                    const dueSoonCount = contraventions.filter((item) => {
+                      if (!item.dueDate || ['PAYEE', 'CLASSEE'].includes(item.statusCode)) {
+                        return false
+                      }
+
+                      const dueDate = new Date(item.dueDate)
+                      const today = new Date()
+                      const limit = new Date()
+                      limit.setDate(today.getDate() + 15)
+                      return dueDate >= today && dueDate <= limit
+                    }).length
+
+                    return (
+                      <article className="functional-module-card contraventions-module-card" key={`workspace-${module.code}`}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{module.code}</span>
+                            <h3>{module.label}</h3>
+                          </div>
+                          <span className="profile-status-badge is-active">A tester</span>
+                        </header>
+                        <p>{blueprint.intent}</p>
+                        <div className="contraventions-toolbar">
+                          <div className="contraventions-kpis" aria-label="Synthese contraventions">
+                            <span><strong>{contraventions.length}</strong> avis</span>
+                            <span><strong>{openCount}</strong> ouverts</span>
+                            <span><strong>{dueSoonCount}</strong> echeance 15 j</span>
+                          </div>
+                          {canWriteContraventions ? (
+                            <button className="primary-button" onClick={openCreateContraventionModal} type="button">
+                              Ajouter
+                            </button>
+                          ) : null}
+                        </div>
+                        {contraventionsError ? <p className="form-error">{contraventionsError}</p> : null}
+                        {contraventions.length === 0 ? (
+                          <div className="workspace-empty">
+                            <strong>Aucune contravention suivie</strong>
+                            <span>Le module est pret a enregistrer les avis, statuts, conducteurs et materiels.</span>
+                          </div>
+                        ) : (
+                          <div className="contraventions-table">
+                            {contraventions.map((contravention) => (
+                              <article className="contravention-row" key={contravention.id}>
+                                <div>
+                                  <strong>{contravention.noticeNumber}</strong>
+                                  <span>{contravention.offenseLabel}</span>
+                                </div>
+                                <div>
+                                  <span>{new Date(contravention.offenseDate).toLocaleDateString()}</span>
+                                  <span>{contravention.location ?? '-'}</span>
+                                </div>
+                                <div>
+                                  <span>{contravention.driverEmployee?.displayName ?? 'Conducteur non rattache'}</span>
+                                  <span>{contravention.material ? `${contravention.material.fleetNumber} - ${contravention.material.label}` : 'Materiel non rattache'}</span>
+                                </div>
+                                <div>
+                                  <strong>{contravention.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</strong>
+                                  <span>{contravention.dueDate ? `Echeance ${new Date(contravention.dueDate).toLocaleDateString()}` : 'Sans echeance'}</span>
+                                </div>
+                                <div className="contravention-row-actions">
+                                  <span className="profile-status-badge is-active">{contravention.statusLabel}</span>
+                                  {canWriteContraventions ? (
+                                    <button className="secondary-button" onClick={() => openEditContraventionModal(contravention)} type="button">
+                                      Modifier
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    )
+                  }
+
                   return (
                     <article className="functional-module-card" key={`workspace-${module.code}`}>
                       <header>
@@ -3418,6 +3652,84 @@ function App() {
                 {visibleWorkspaceModules.map((module) => {
                   const blueprint = getFunctionalModuleBlueprint(module.code)
                   const accessLevel = rightsByModuleCode.get(module.code) ?? 'None'
+
+                  if (module.code === contraventionsModuleCode) {
+                    const openCount = contraventions.filter((item) => !['PAYEE', 'CLASSEE'].includes(item.statusCode)).length
+                    const dueSoonCount = contraventions.filter((item) => {
+                      if (!item.dueDate || ['PAYEE', 'CLASSEE'].includes(item.statusCode)) {
+                        return false
+                      }
+
+                      const dueDate = new Date(item.dueDate)
+                      const today = new Date()
+                      const limit = new Date()
+                      limit.setDate(today.getDate() + 15)
+                      return dueDate >= today && dueDate <= limit
+                    }).length
+
+                    return (
+                      <article className="functional-module-card contraventions-module-card" key={`workspace-${module.code}`}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{module.code}</span>
+                            <h3>{module.label}</h3>
+                          </div>
+                          <span className="profile-status-badge is-active">A tester</span>
+                        </header>
+                        <p>{blueprint.intent}</p>
+                        <div className="contraventions-toolbar">
+                          <div className="contraventions-kpis" aria-label="Synthese contraventions">
+                            <span><strong>{contraventions.length}</strong> avis</span>
+                            <span><strong>{openCount}</strong> ouverts</span>
+                            <span><strong>{dueSoonCount}</strong> echeance 15 j</span>
+                          </div>
+                          {canWriteContraventions ? (
+                            <button className="primary-button" onClick={openCreateContraventionModal} type="button">
+                              Ajouter
+                            </button>
+                          ) : null}
+                        </div>
+                        {contraventionsError ? <p className="form-error">{contraventionsError}</p> : null}
+                        {contraventions.length === 0 ? (
+                          <div className="workspace-empty">
+                            <strong>Aucune contravention suivie</strong>
+                            <span>Le module est pret a enregistrer les avis, statuts, conducteurs et materiels.</span>
+                          </div>
+                        ) : (
+                          <div className="contraventions-table">
+                            {contraventions.map((contravention) => (
+                              <article className="contravention-row" key={contravention.id}>
+                                <div>
+                                  <strong>{contravention.noticeNumber}</strong>
+                                  <span>{contravention.offenseLabel}</span>
+                                </div>
+                                <div>
+                                  <span>{new Date(contravention.offenseDate).toLocaleDateString()}</span>
+                                  <span>{contravention.location ?? '-'}</span>
+                                </div>
+                                <div>
+                                  <span>{contravention.driverEmployee?.displayName ?? 'Conducteur non rattache'}</span>
+                                  <span>{contravention.material ? `${contravention.material.fleetNumber} - ${contravention.material.label}` : 'Materiel non rattache'}</span>
+                                </div>
+                                <div>
+                                  <strong>{contravention.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</strong>
+                                  <span>{contravention.dueDate ? `Echeance ${new Date(contravention.dueDate).toLocaleDateString()}` : 'Sans echeance'}</span>
+                                </div>
+                                <div className="contravention-row-actions">
+                                  <span className="profile-status-badge is-active">{contravention.statusLabel}</span>
+                                  {canWriteContraventions ? (
+                                    <button className="secondary-button" onClick={() => openEditContraventionModal(contravention)} type="button">
+                                      Modifier
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    )
+                  }
 
                   return (
                     <article className="functional-module-card" key={`workspace-${module.code}`}>
@@ -5277,6 +5589,91 @@ function App() {
           </div>
         ) : null}
 
+        {isContraventionModalOpen || editingContravention ? (
+          <div className="modal-overlay" onClick={closeContraventionModal} role="presentation">
+            <section
+              aria-labelledby="contravention-modal-title"
+              className="modal-card profile-modal-card contravention-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">{editingContravention ? 'Traitement' : 'Creation'}</span>
+                  <h2 id="contravention-modal-title">{editingContravention ? 'Modifier la contravention' : 'Ajouter une contravention'}</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeContraventionModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="settings-form settings-create-form" onSubmit={handleSaveContravention}>
+                <label>
+                  <span>Numero d'avis</span>
+                  <input value={contraventionForm.noticeNumber} onChange={(event) => handleContraventionFormChange('noticeNumber', event)} />
+                </label>
+                <label>
+                  <span>Statut</span>
+                  <select value={contraventionForm.statusCode} onChange={(event) => handleContraventionFormChange('statusCode', event)}>
+                    {contraventionStatuses.map((status) => (
+                      <option key={status.code} value={status.code}>{status.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Date d'infraction</span>
+                  <input type="date" value={contraventionForm.offenseDate} onChange={(event) => handleContraventionFormChange('offenseDate', event)} />
+                </label>
+                <label>
+                  <span>Echeance</span>
+                  <input type="date" value={contraventionForm.dueDate} onChange={(event) => handleContraventionFormChange('dueDate', event)} />
+                </label>
+                <label>
+                  <span>Montant</span>
+                  <input inputMode="decimal" value={contraventionForm.amount} onChange={(event) => handleContraventionFormChange('amount', event)} />
+                </label>
+                <label>
+                  <span>Infraction</span>
+                  <input value={contraventionForm.offenseLabel} onChange={(event) => handleContraventionFormChange('offenseLabel', event)} />
+                </label>
+                <label>
+                  <span>Conducteur</span>
+                  <select value={contraventionForm.driverEmployeeId} onChange={(event) => handleContraventionFormChange('driverEmployeeId', event)}>
+                    <option value="">Non rattache</option>
+                    {employees.filter((employee) => employee.isDriver).map((employee) => (
+                      <option key={employee.id} value={employee.id}>{employee.displayName} - {employee.employeeNumber}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Materiel</span>
+                  <select value={contraventionForm.materialId} onChange={(event) => handleContraventionFormChange('materialId', event)}>
+                    <option value="">Non rattache</option>
+                    {materials.map((material) => (
+                      <option key={material.id} value={material.id}>{material.fleetNumber} - {material.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Lieu</span>
+                  <input value={contraventionForm.location} onChange={(event) => handleContraventionFormChange('location', event)} />
+                </label>
+                <label className="settings-form-wide">
+                  <span>Notes</span>
+                  <textarea value={contraventionForm.notes} onChange={(event) => handleContraventionFormChange('notes', event)} />
+                </label>
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={contraventionForm.isSaving} type="submit">
+                    {contraventionForm.isSaving ? 'Enregistrement...' : editingContravention ? 'Enregistrer' : 'Ajouter'}
+                  </button>
+                  {contraventionForm.error ? <small className="account-error">{contraventionForm.error}</small> : null}
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
         {isCreateAccountModalOpen ? (
           <div className="modal-overlay" onClick={closeCreateAccountModal} role="presentation">
             <section
@@ -5970,6 +6367,59 @@ function buildMaterialFormFromItem(material: MaterialItem): MaterialFormState {
   }
 }
 
+function createEmptyContraventionForm(): ContraventionFormState {
+  return {
+    noticeNumber: '',
+    offenseDate: new Date().toISOString().slice(0, 10),
+    dueDate: '',
+    amount: '',
+    statusCode: 'A_TRAITER',
+    offenseLabel: '',
+    location: '',
+    notes: '',
+    driverEmployeeId: '',
+    materialId: '',
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildContraventionFormFromItem(contravention: ContraventionItem): ContraventionFormState {
+  return {
+    noticeNumber: contravention.noticeNumber,
+    offenseDate: toDateInputValue(contravention.offenseDate),
+    dueDate: contravention.dueDate ? toDateInputValue(contravention.dueDate) : '',
+    amount: String(contravention.amount),
+    statusCode: contravention.statusCode,
+    offenseLabel: contravention.offenseLabel,
+    location: contravention.location ?? '',
+    notes: contravention.notes ?? '',
+    driverEmployeeId: contravention.driverEmployee?.id ?? '',
+    materialId: contravention.material?.id ?? '',
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildContraventionPayload(form: ContraventionFormState) {
+  return {
+    noticeNumber: form.noticeNumber.trim(),
+    offenseDate: form.offenseDate,
+    dueDate: form.dueDate || null,
+    amount: Number.parseFloat(form.amount.replace(',', '.')) || 0,
+    statusCode: form.statusCode,
+    offenseLabel: form.offenseLabel.trim(),
+    location: form.location.trim() || null,
+    notes: form.notes.trim() || null,
+    driverEmployeeId: form.driverEmployeeId || null,
+    materialId: form.materialId || null,
+  }
+}
+
+function toDateInputValue(value: string) {
+  return value.slice(0, 10)
+}
+
 function buildCompanyPayload(form: CompanyFormState) {
   return {
     siren: form.siren.trim(),
@@ -6202,11 +6652,11 @@ function getSettingsSectionDescription(section: string) {
 
 function getFunctionalModuleBlueprint(moduleCode: string): FunctionalModuleBlueprint {
   switch (moduleCode) {
-    case 'GESTION_CONTRAVENTIONS':
+    case 'CONTRAVENTIONS':
       return {
         intent: 'Suivre les contraventions, leur statut de traitement et les rattachements conducteurs ou vehicules.',
-        primaryData: 'Infractions, conducteurs, vehicules, echeances et justificatifs.',
-        nextStep: 'Definir le schema metier et le workflow de traitement.',
+        primaryData: 'Avis, infractions, conducteurs, vehicules, echeances et statuts.',
+        nextStep: 'Recetter la creation, les rattachements et les changements de statut.',
       }
     case 'CARTE_POINTS_CHARGEMENT_DECHARGEMENT':
       return {

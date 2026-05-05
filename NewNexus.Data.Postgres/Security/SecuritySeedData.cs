@@ -62,7 +62,7 @@ internal static class SecuritySeedData
         yield return new SecurityModule
         {
             Id = ModuleContraventionsId,
-            Code = "GESTION_CONTRAVENTIONS",
+            Code = "CONTRAVENTIONS",
             Label = "Gestion des contraventions",
             NavigationGroup = "Gestion administrative",
             DisplayOrder = 1,

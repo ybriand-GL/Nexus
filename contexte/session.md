@@ -1881,3 +1881,40 @@ Ordre cible de construction:
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+
+## 2026-05-05 - Module gestion des contraventions
+
+- demande:
+  - continuer le backlog apres la passe taches planifiees
+  - publication IIS systematique maintenue
+- corrections domaine / donnees:
+  - ajout de l'entite `Contravention`
+  - ajout de la table `administration.Contravention`
+  - rattachements optionnels vers `Employee` conducteur et `Material`
+  - dates metier `OffenseDate` / `DueDate` stockees en type PostgreSQL `date`
+  - code module aligne avec la documentation V1: `CONTRAVENTIONS`
+- corrections API:
+  - ajout de `GET /api/modules/contraventions`
+  - ajout de `GET /api/modules/contraventions/referentials`
+  - ajout de `POST /api/modules/contraventions`
+  - ajout de `PUT /api/modules/contraventions/{contraventionId}`
+  - controle backend par droit module: `Lecture` pour consultation, `Ecriture` pour creation / modification
+  - traces metier ajoutees dans le flux `MODULE_EVENTS`
+- corrections UI:
+  - remplacement de la carte scaffold par un ecran operationnel dans `Gestion administrative > Gestion des contraventions`
+  - synthese avis / ouverts / echeances 15 jours
+  - liste des avis avec statut, montant, conducteur, materiel, lieu et echeance
+  - modale de creation / edition avec rattachements conducteur et materiel
+- backlog:
+  - `Gestion des contraventions` passe de `SCAFFOLDE` a `A_TESTER`
+- validation technique:
+  - `dotnet ef migrations add ContraventionsModule --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+- validation publication:
+  - `scripts\publish_newnexus_iis.ps1` OK
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api/system/info` retourne `200 application/json`
+  - `GET /newNexus/api/modules/contraventions` retourne `401` sans session
+  - `GET /newNexus/api/modules/contraventions/referentials` retourne `401` sans session

@@ -123,6 +123,11 @@ builder.Services.AddHttpClient("Sirene", client =>
     client.Timeout = TimeSpan.FromSeconds(8);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("NewNexus/0.1");
 });
+builder.Services.AddHttpClient("Lucca", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("NewNexus/0.1");
+});
 
 var app = builder.Build();
 
@@ -1269,6 +1274,7 @@ app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
             item.EmployeeNumber,
             item.DisplayName,
             item.Email,
+            item.PhoneNumber,
             item.IsDriver,
             item.IsActive,
             item.LastSyncedAtUtc,
@@ -1562,6 +1568,7 @@ app.MapPost("/api/settings/employees", async (UpsertEmployeeRequest request, New
         EmployeeNumber = request.EmployeeNumber.Trim(),
         DisplayName = request.DisplayName.Trim(),
         Email = NormalizeOptionalText(request.Email),
+        PhoneNumber = NormalizeOptionalText(request.PhoneNumber),
         IsDriver = request.IsDriver,
         IsActive = request.IsActive,
         LastSyncedAtUtc = request.LastSyncedAtUtc,
@@ -1657,6 +1664,123 @@ app.MapPost("/api/settings/employees/provision-accounts", async (NewNexusDbConte
     });
 }).RequireAuthorization("RequireInformatique");
 
+app.MapPost("/api/settings/employees/import-lucca", async (
+    NewNexusDbContext dbContext,
+    IHttpClientFactory httpClientFactory,
+    IDataProtectionProvider dataProtectionProvider,
+    HttpContext httpContext) =>
+{
+    var baseUrl = await GetActiveCredentialValueAsync(dbContext, dataProtectionProvider, "LUCCA", "LUCCA_BASE_URL", httpContext.RequestAborted);
+    var apiKey = await GetActiveCredentialValueAsync(dbContext, dataProtectionProvider, "LUCCA", "LUCCA_API_KEY", httpContext.RequestAborted);
+    var configuredPath = await GetActiveCredentialValueAsync(dbContext, dataProtectionProvider, "LUCCA", "LUCCA_USERS_PATH", httpContext.RequestAborted);
+
+    if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["lucca"] = ["Les cles LUCCA_BASE_URL et LUCCA_API_KEY doivent etre renseignees dans Outils > Cles API."]
+        });
+    }
+
+    if (!Uri.TryCreate(baseUrl.TrimEnd('/'), UriKind.Absolute, out var baseUri))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["luccaBaseUrl"] = ["L'URL de base Lucca est invalide."]
+        });
+    }
+
+    var path = string.IsNullOrWhiteSpace(configuredPath) ? "/lucca-api/employees" : configuredPath.Trim();
+    var requestUri = BuildLuccaEmployeesUri(baseUri, path);
+    var client = httpClientFactory.CreateClient("Lucca");
+    var imported = 0;
+    var created = 0;
+    var updated = 0;
+    var skipped = 0;
+    var messages = new List<string>();
+    var now = DateTime.UtcNow;
+
+    while (requestUri is not null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+        request.Headers.TryAddWithoutValidation("Api-Version", "2025-01-01");
+
+        using var response = await client.SendAsync(request, httpContext.RequestAborted);
+        if (!response.IsSuccessStatusCode)
+        {
+            var detail = await response.Content.ReadAsStringAsync(httpContext.RequestAborted);
+            return Results.Problem(
+                title: "Import Lucca impossible",
+                detail: $"Lucca retourne {(int)response.StatusCode} {response.ReasonPhrase}. {detail}",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(httpContext.RequestAborted));
+        if (!document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+        {
+            return Results.Problem(
+                title: "Import Lucca impossible",
+                detail: "La reponse Lucca ne contient pas de collection items.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+
+        foreach (var item in items.EnumerateArray())
+        {
+            var mapped = MapLuccaEmployee(item);
+            if (mapped is null)
+            {
+                skipped++;
+                continue;
+            }
+
+            var employee = await dbContext.Employees
+                .SingleOrDefaultAsync(candidate =>
+                        candidate.SourceEmployeeId == mapped.SourceEmployeeId ||
+                        candidate.EmployeeNumber == mapped.EmployeeNumber,
+                    httpContext.RequestAborted);
+
+            if (employee is null)
+            {
+                employee = new Employee
+                {
+                    Id = Guid.NewGuid(),
+                    CreatedAtUtc = now,
+                    IsDriver = false
+                };
+                dbContext.Employees.Add(employee);
+                created++;
+            }
+            else
+            {
+                updated++;
+            }
+
+            employee.SourceEmployeeId = mapped.SourceEmployeeId;
+            employee.EmployeeNumber = mapped.EmployeeNumber;
+            employee.DisplayName = mapped.DisplayName;
+            employee.Email = mapped.Email;
+            employee.PhoneNumber = mapped.PhoneNumber;
+            employee.IsActive = mapped.IsActive;
+            employee.LastSyncedAtUtc = now;
+            imported++;
+        }
+
+        requestUri = GetLuccaNextPageUri(baseUri, document.RootElement);
+    }
+
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    return Results.Ok(new
+    {
+        ImportedCount = imported,
+        CreatedCount = created,
+        UpdatedCount = updated,
+        SkippedCount = skipped,
+        Messages = messages
+    });
+}).RequireAuthorization("RequireInformatique");
+
 app.MapPut("/api/settings/employees/{employeeId:guid}", async (
     Guid employeeId,
     UpsertEmployeeRequest request,
@@ -1678,6 +1802,7 @@ app.MapPut("/api/settings/employees/{employeeId:guid}", async (
     employee.EmployeeNumber = request.EmployeeNumber.Trim();
     employee.DisplayName = request.DisplayName.Trim();
     employee.Email = NormalizeOptionalText(request.Email);
+    employee.PhoneNumber = NormalizeOptionalText(request.PhoneNumber);
     employee.IsDriver = request.IsDriver;
     employee.IsActive = request.IsActive;
     employee.LastSyncedAtUtc = request.LastSyncedAtUtc;
@@ -2273,6 +2398,90 @@ static string? UnprotectCredentialValue(string protectedValue, IDataProtectionPr
     {
         return null;
     }
+}
+
+static async Task<string?> GetActiveCredentialValueAsync(
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider,
+    string providerCode,
+    string keyName,
+    CancellationToken cancellationToken)
+{
+    var normalizedProviderCode = NormalizeTechnicalCode(providerCode);
+    var normalizedKeyName = NormalizeTechnicalCode(keyName);
+    var credential = await dbContext.IntegrationCredentials
+        .AsNoTracking()
+        .SingleOrDefaultAsync(item =>
+                item.ProviderCode == normalizedProviderCode &&
+                item.KeyName == normalizedKeyName &&
+                item.IsActive,
+            cancellationToken);
+
+    return credential is null ? null : UnprotectCredentialValue(credential.ProtectedValue, dataProtectionProvider);
+}
+
+static Uri BuildLuccaEmployeesUri(Uri baseUri, string path)
+{
+    if (Uri.TryCreate(path, UriKind.Absolute, out var absoluteUri))
+    {
+        return absoluteUri;
+    }
+
+    var relativePath = path.StartsWith('/') ? path[1..] : path;
+    var builder = new UriBuilder(new Uri(baseUri, relativePath));
+    if (string.IsNullOrWhiteSpace(builder.Query))
+    {
+        builder.Query = "limit=100&include=totalCount";
+    }
+
+    return builder.Uri;
+}
+
+static Uri? GetLuccaNextPageUri(Uri baseUri, JsonElement root)
+{
+    if (root.TryGetProperty("links", out var links) &&
+        links.ValueKind == JsonValueKind.Object &&
+        links.TryGetProperty("next", out var next) &&
+        next.ValueKind == JsonValueKind.Object &&
+        next.TryGetProperty("href", out var href) &&
+        href.ValueKind == JsonValueKind.String &&
+        !string.IsNullOrWhiteSpace(href.GetString()))
+    {
+        var rawHref = href.GetString()!;
+        return Uri.TryCreate(rawHref, UriKind.Absolute, out var absoluteUri)
+            ? absoluteUri
+            : new Uri(baseUri, rawHref);
+    }
+
+    return null;
+}
+
+static LuccaMappedEmployee? MapLuccaEmployee(JsonElement item)
+{
+    var luccaId = GetJsonString(item, "id");
+    var remoteId = GetJsonString(item, "remoteId");
+    var employeeNumber = FirstNonEmpty(GetJsonString(item, "employeeNumber"), remoteId, luccaId);
+    var sourceEmployeeId = FirstNonEmpty(remoteId, luccaId, employeeNumber);
+    var givenName = GetJsonString(item, "givenName");
+    var familyName = GetJsonString(item, "familyName");
+    var fullName = string.Join(' ', new[] { givenName, familyName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    var displayName = FirstNonEmpty(fullName, GetJsonString(item, "name"), GetJsonString(item, "email"), employeeNumber);
+
+    if (string.IsNullOrWhiteSpace(sourceEmployeeId) ||
+        string.IsNullOrWhiteSpace(employeeNumber) ||
+        string.IsNullOrWhiteSpace(displayName))
+    {
+        return null;
+    }
+
+    var status = GetJsonString(item, "status");
+    return new LuccaMappedEmployee(
+        sourceEmployeeId,
+        employeeNumber,
+        displayName,
+        NormalizeOptionalText(GetJsonString(item, "email")),
+        NormalizeOptionalText(GetJsonString(item, "phoneNumber")),
+        !string.Equals(status, "deactivated", StringComparison.OrdinalIgnoreCase));
 }
 
 static string MaskSecret(string? value)
@@ -2889,6 +3098,7 @@ static async Task<Dictionary<string, string[]>> ValidateEmployeeRequestAsync(
     var employeeNumber = request.EmployeeNumber.Trim();
     var displayName = request.DisplayName.Trim();
     var email = NormalizeOptionalText(request.Email);
+    var phoneNumber = NormalizeOptionalText(request.PhoneNumber);
 
     if (string.IsNullOrWhiteSpace(sourceEmployeeId))
     {
@@ -2908,6 +3118,11 @@ static async Task<Dictionary<string, string[]>> ValidateEmployeeRequestAsync(
     if (!string.IsNullOrWhiteSpace(email) && !email.Contains('@'))
     {
         errors["email"] = ["L'adresse email est invalide."];
+    }
+
+    if (!string.IsNullOrWhiteSpace(phoneNumber) && phoneNumber.Length > 80)
+    {
+        errors["phoneNumber"] = ["Le telephone ne doit pas depasser 80 caracteres."];
     }
 
     if (await dbContext.Employees.AnyAsync(item => item.SourceEmployeeId == sourceEmployeeId && item.Id != currentEmployeeId))
@@ -3040,6 +3255,7 @@ internal sealed record UpsertEmployeeRequest(
     string EmployeeNumber,
     string DisplayName,
     string? Email,
+    string? PhoneNumber,
     bool IsDriver,
     bool IsActive,
     DateTime? LastSyncedAtUtc);
@@ -3050,6 +3266,13 @@ internal sealed record EmployeeAccountProvisioningItem(
     string? Login,
     string? TemporaryPassword,
     string Status);
+internal sealed record LuccaMappedEmployee(
+    string SourceEmployeeId,
+    string EmployeeNumber,
+    string DisplayName,
+    string? Email,
+    string? PhoneNumber,
+    bool IsActive);
 internal sealed record UpsertThirdPartyRequest(
     string TypeCode,
     string DisplayName,

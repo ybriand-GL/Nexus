@@ -224,6 +224,7 @@ type EmployeeItem = {
   employeeNumber: string
   displayName: string
   email: string | null
+  phoneNumber: string | null
   isDriver: boolean
   isActive: boolean
   lastSyncedAtUtc: string | null
@@ -244,6 +245,14 @@ type EmployeeAccountProvisioningResult = {
   skippedCount: number
   createdAccounts: EmployeeAccountProvisioningItem[]
   skippedEmployees: EmployeeAccountProvisioningItem[]
+}
+
+type LuccaEmployeeImportResult = {
+  importedCount: number
+  createdCount: number
+  updatedCount: number
+  skippedCount: number
+  messages: string[]
 }
 
 type ThirdPartyItem = {
@@ -337,6 +346,7 @@ type EmployeeFormState = {
   employeeNumber: string
   displayName: string
   email: string
+  phoneNumber: string
   isDriver: boolean
   isActive: boolean
   isSaving: boolean
@@ -477,9 +487,11 @@ function App() {
   const [newCompany, setNewCompany] = useState<CompanyFormState>(createEmptyCompanyForm())
   const [newAnalytic, setNewAnalytic] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
   const [newExploitation, setNewExploitation] = useState<SettingsReferenceFormState>(createEmptySettingsReferenceForm())
-  const [newEmployee, setNewEmployee] = useState<EmployeeFormState>(createEmptyEmployeeForm())
   const [newThirdParty, setNewThirdParty] = useState<ThirdPartyFormState>(createEmptyThirdPartyForm())
   const [newMaterial, setNewMaterial] = useState<MaterialFormState>(createEmptyMaterialForm())
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeItem | null>(null)
+  const [employeeForm, setEmployeeForm] = useState<EmployeeFormState>(createEmptyEmployeeForm())
+  const [isCreateEmployeeModalOpen, setIsCreateEmployeeModalOpen] = useState(false)
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
   const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
   const [accountPasswordReset, setAccountPasswordReset] = useState<AccountPasswordResetState>(createEmptyAccountPasswordResetState())
@@ -490,6 +502,15 @@ function App() {
     error: string | null
   }>({
     isProvisioning: false,
+    result: null,
+    error: null,
+  })
+  const [luccaEmployeeImport, setLuccaEmployeeImport] = useState<{
+    isImporting: boolean
+    result: LuccaEmployeeImportResult | null
+    error: string | null
+  }>({
+    isImporting: false,
     result: null,
     error: null,
   })
@@ -1319,7 +1340,11 @@ function App() {
     setForgotPassword(createEmptyForgotPasswordForm())
     setAccountPasswordReset(createEmptyAccountPasswordResetState())
     setCredentialForm(createEmptyIntegrationCredentialForm())
+    setEditingEmployee(null)
+    setEmployeeForm(createEmptyEmployeeForm())
+    setIsCreateEmployeeModalOpen(false)
     setEmployeeProvisioning({ isProvisioning: false, result: null, error: null })
+    setLuccaEmployeeImport({ isImporting: false, result: null, error: null })
     setDiagnosticsError(null)
     setCredentialsError(null)
     setSessionsError(null)
@@ -2132,31 +2157,44 @@ function App() {
     }
   }
 
-  function handleNewEmployeeFieldChange(field: 'sourceEmployeeId' | 'employeeNumber' | 'displayName' | 'email', event: ChangeEvent<HTMLInputElement>) {
-    setNewEmployee((current) => ({ ...current, [field]: event.target.value, error: null }))
+  function openCreateEmployeeModal() {
+    setEditingEmployee(null)
+    setEmployeeForm(createEmptyEmployeeForm())
+    setIsCreateEmployeeModalOpen(true)
   }
 
-  function handleNewEmployeeBooleanChange(field: 'isDriver' | 'isActive', event: ChangeEvent<HTMLInputElement>) {
-    setNewEmployee((current) => ({ ...current, [field]: event.target.checked, error: null }))
+  function openEditEmployeeModal(employee: EmployeeItem) {
+    setEditingEmployee(employee)
+    setEmployeeForm(buildEmployeeFormFromItem(employee))
+  }
+
+  function closeEmployeeModal() {
+    if (employeeForm.isSaving) {
+      return
+    }
+
+    setEditingEmployee(null)
+    setIsCreateEmployeeModalOpen(false)
+    setEmployeeForm(createEmptyEmployeeForm())
+  }
+
+  function handleEmployeeFormFieldChange(field: 'sourceEmployeeId' | 'employeeNumber' | 'displayName' | 'email' | 'phoneNumber', event: ChangeEvent<HTMLInputElement>) {
+    setEmployeeForm((current) => ({ ...current, [field]: event.target.value, error: null }))
+  }
+
+  function handleEmployeeFormBooleanChange(field: 'isDriver' | 'isActive', event: ChangeEvent<HTMLInputElement>) {
+    setEmployeeForm((current) => ({ ...current, [field]: event.target.checked, error: null }))
   }
 
   async function handleCreateEmployee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setNewEmployee((current) => ({ ...current, isSaving: true, error: null }))
+    setEmployeeForm((current) => ({ ...current, isSaving: true, error: null }))
 
     try {
       const response = await fetch(apiPath('api/settings/employees'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceEmployeeId: newEmployee.sourceEmployeeId,
-          employeeNumber: newEmployee.employeeNumber,
-          displayName: newEmployee.displayName,
-          email: newEmployee.email,
-          isDriver: newEmployee.isDriver,
-          isActive: newEmployee.isActive,
-          lastSyncedAtUtc: null,
-        }),
+        body: JSON.stringify(buildEmployeePayload(employeeForm)),
       })
 
       if (!response.ok) {
@@ -2164,12 +2202,42 @@ function App() {
       }
 
       await loadAdminSecurityData()
-      setNewEmployee(createEmptyEmployeeForm())
+      closeEmployeeModal()
     } catch (createError) {
-      setNewEmployee((current) => ({
+      setEmployeeForm((current) => ({
         ...current,
         isSaving: false,
         error: createError instanceof Error ? createError.message : 'Erreur de creation.',
+      }))
+    }
+  }
+
+  async function handleSaveEmployee(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingEmployee) {
+      return
+    }
+
+    setEmployeeForm((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath(`api/settings/employees/${editingEmployee.id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildEmployeePayload(employeeForm, editingEmployee.lastSyncedAtUtc)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La mise a jour du salarie a echoue.'))
+      }
+
+      await loadAdminSecurityData()
+      closeEmployeeModal()
+    } catch (saveError) {
+      setEmployeeForm((current) => ({
+        ...current,
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur de mise a jour.',
       }))
     }
   }
@@ -2194,6 +2262,30 @@ function App() {
         isProvisioning: false,
         result: null,
         error: provisionError instanceof Error ? provisionError.message : 'Provisioning impossible.',
+      })
+    }
+  }
+
+  async function handleImportLuccaEmployees() {
+    setLuccaEmployeeImport({ isImporting: true, result: null, error: null })
+
+    try {
+      const response = await fetch(apiPath('api/settings/employees/import-lucca'), {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'L import Lucca des salaries a echoue.'))
+      }
+
+      const result = (await response.json()) as LuccaEmployeeImportResult
+      await loadAdminSecurityData()
+      setLuccaEmployeeImport({ isImporting: false, result, error: null })
+    } catch (importError) {
+      setLuccaEmployeeImport({
+        isImporting: false,
+        result: null,
+        error: importError instanceof Error ? importError.message : 'Import Lucca impossible.',
       })
     }
   }
@@ -3494,6 +3586,23 @@ function App() {
                   <p className="profiles-toolbar-copy">
                     R&eacute;f&eacute;rentiel local pr&ecirc;t pour l&apos;import Lucca. La qualification conducteur est port&eacute;e par le champ d&eacute;di&eacute; en attendant le mapping d&eacute;finitif.
                   </p>
+                  <div className="administration-synthesis-actions">
+                    <button className="secondary-button" disabled={luccaEmployeeImport.isImporting} onClick={() => void handleImportLuccaEmployees()} type="button">
+                      {luccaEmployeeImport.isImporting ? 'Import Lucca...' : 'Importer depuis Lucca'}
+                    </button>
+                    <button className="primary-button" onClick={openCreateEmployeeModal} type="button">
+                      Ajouter un salari&eacute;
+                    </button>
+                  </div>
+                  {luccaEmployeeImport.error ? <small className="account-error">{luccaEmployeeImport.error}</small> : null}
+                  {luccaEmployeeImport.result ? (
+                    <div className="status-banner status-banner-success">
+                      <strong>Import Lucca termine</strong>
+                      <span>
+                        {luccaEmployeeImport.result.importedCount} import&eacute;(s), {luccaEmployeeImport.result.createdCount} cr&eacute;&eacute;(s), {luccaEmployeeImport.result.updatedCount} mis &agrave; jour, {luccaEmployeeImport.result.skippedCount} ignor&eacute;(s).
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="tools-safety-banner employee-provisioning-banner">
                     <strong>Creation automatique des comptes</strong>
                     <span>Les salaries actifs sans compte lie par matricule peuvent etre provisionnes sans profil NewNexus. Aucun droit n&apos;est affecte automatiquement.</span>
@@ -3535,40 +3644,10 @@ function App() {
                       ) : null}
                     </div>
                   ) : null}
-                  <form className="settings-form settings-create-form" onSubmit={handleCreateEmployee}>
-                    <label>
-                      <span>ID source Lucca</span>
-                      <input value={newEmployee.sourceEmployeeId} onChange={(event) => handleNewEmployeeFieldChange('sourceEmployeeId', event)} />
-                    </label>
-                    <label>
-                      <span>Matricule</span>
-                      <input value={newEmployee.employeeNumber} onChange={(event) => handleNewEmployeeFieldChange('employeeNumber', event)} />
-                    </label>
-                    <label>
-                      <span>Nom complet</span>
-                      <input value={newEmployee.displayName} onChange={(event) => handleNewEmployeeFieldChange('displayName', event)} />
-                    </label>
-                    <label>
-                      <span>Email</span>
-                      <input value={newEmployee.email} onChange={(event) => handleNewEmployeeFieldChange('email', event)} />
-                    </label>
-                    <label className="toggle-label">
-                      <input checked={newEmployee.isDriver} onChange={(event) => handleNewEmployeeBooleanChange('isDriver', event)} type="checkbox" />
-                      <span>Conducteur</span>
-                    </label>
-                    <label className="toggle-label">
-                      <input checked={newEmployee.isActive} onChange={(event) => handleNewEmployeeBooleanChange('isActive', event)} type="checkbox" />
-                      <span>Actif</span>
-                    </label>
-                    <div className="profile-action-row">
-                      <button className="primary-button" disabled={newEmployee.isSaving} type="submit">
-                        {newEmployee.isSaving ? 'Enregistrement...' : 'Ajouter le salarie'}
-                      </button>
-                      {newEmployee.error ? <small className="account-error">{newEmployee.error}</small> : null}
-                    </div>
-                  </form>
                   <div className="profiles-overview-grid">
-                    {employees.map((employee) => (
+                    {employees.length === 0 ? (
+                      <div className="settings-empty">Aucun salari&eacute; charg&eacute; pour le moment.</div>
+                    ) : employees.map((employee) => (
                       <article className="profile-summary-card accent-green" key={employee.id}>
                         <header className="profile-summary-header">
                           <div>
@@ -3588,6 +3667,15 @@ function App() {
                             <span>Email</span>
                             <strong>{employee.email ?? 'Non renseigne'}</strong>
                           </div>
+                          <div className="profile-summary-right">
+                            <span>T&eacute;l&eacute;phone</span>
+                            <strong>{employee.phoneNumber ?? 'Non renseign&eacute;'}</strong>
+                          </div>
+                        </div>
+                        <div className="profile-summary-actions">
+                          <button className="secondary-button" onClick={() => openEditEmployeeModal(employee)} type="button">
+                            Configurer le salari&eacute;
+                          </button>
                         </div>
                       </article>
                     ))}
@@ -4202,18 +4290,18 @@ function App() {
               </article>
             ) : null}
 
-            {selectedToolsSection === 'RequÃƒÂªteur SQL' ? (
+            {selectedToolsSection === 'Requêteur SQL' ? (
               <article className="panel-card panel-card-wide tools-catalog-card">
                 <div className="panel-heading">
                   <span className="eyebrow">Outils</span>
-                  <h2>RequÃƒÂªteur SQL</h2>
+                  <h2>Requêteur SQL</h2>
                 </div>
                 <p className="profiles-toolbar-copy">
-                  Espace de cadrage pour des requÃƒÂªtes contrÃƒÂ´lÃƒÂ©es. Aucun SQL libre nâ€™est exÃƒÂ©cutÃƒÂ© depuis lâ€™interface ÃƒÂ  ce stade.
+                  Espace de cadrage pour des requêtes contrôlées. Aucun SQL libre n&apos;est exécuté depuis l&apos;interface à ce stade.
                 </p>
                 <div className="tools-safety-banner">
-                  <strong>RÃƒÂ¨gles ÃƒÂ  verrouiller avant activation</strong>
-                  <span>Lecture seule, requÃƒÂªtes nommÃƒÂ©es, paramÃƒÂ¨tres typÃƒÂ©s, journalisation et exclusion des secrets.</span>
+                  <strong>Règles à verrouiller avant activation</strong>
+                  <span>Lecture seule, requêtes nommées, paramètres typés, journalisation et exclusion des secrets.</span>
                 </div>
                 <div className="tools-catalog-grid">
                   {controlledSqlQueries.map((query) => (
@@ -4283,7 +4371,7 @@ function App() {
                   <h2>Traces</h2>
                 </div>
                 <p className="profiles-toolbar-copy">
-                  PrÃƒÂ©paration de la future consultation des journaux applicatifs et techniques, avec conservation maÃƒÂ®trisÃƒÂ©e.
+                  Préparation de la future consultation des journaux applicatifs et techniques, avec conservation maîtrisée.
                 </p>
                 <div className="tools-catalog-grid">
                   {traceStreams.map((stream) => (
@@ -4293,12 +4381,12 @@ function App() {
                           <span className="eyebrow">{stream.scope}</span>
                           <h3>{stream.label}</h3>
                         </div>
-                        <span className="profile-status-badge is-inactive">Ãƒâ‚¬ raccorder</span>
+                        <span className="profile-status-badge is-inactive">À raccorder</span>
                       </header>
                       <p>{stream.description}</p>
                       <div className="profile-summary-rights">
                         <div className="profile-summary-right">
-                          <span>RÃƒÂ©tention</span>
+                          <span>Rétention</span>
                           <strong>{stream.retention}</strong>
                         </div>
                         <div className="profile-summary-right">
@@ -4311,7 +4399,7 @@ function App() {
                 </div>
                 <div className="trace-retention-strip">
                   <strong>Point de vigilance</strong>
-                  <span>Les traces devront masquer les secrets, filtrer les donnÃƒÂ©es personnelles et conserver une piste dâ€™audit des consultations.</span>
+                  <span>Les traces devront masquer les secrets, filtrer les données personnelles et conserver une piste d&apos;audit des consultations.</span>
                 </div>
               </article>
             ) : null}
@@ -4322,7 +4410,7 @@ function App() {
             selectedToolsSection !== toolsSubmenuEntries[4] &&
             selectedToolsSection !== 'Clés API' &&
             selectedToolsSection !== 'Tâches planifiées' &&
-            selectedToolsSection !== 'RequÃƒÂªteur SQL' &&
+            selectedToolsSection !== 'Requêteur SQL' &&
             selectedToolsSection !== 'Traces' &&
             selectedToolsSection !== 'Diagnostics' ? (
               <article className="panel-card panel-card-wide tool-placeholder-card">
@@ -4414,6 +4502,65 @@ function App() {
                     {credentialForm.isSaving ? 'Enregistrement...' : 'Enregistrer la clé'}
                   </button>
                   {credentialForm.error ? <small className="account-error">{credentialForm.error}</small> : null}
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
+        {isCreateEmployeeModalOpen || editingEmployee ? (
+          <div className="modal-overlay" onClick={closeEmployeeModal} role="presentation">
+            <section
+              aria-labelledby="employee-modal-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">{editingEmployee ? 'Configuration' : 'Création'}</span>
+                  <h2 id="employee-modal-title">{editingEmployee ? 'Configurer le salarié' : 'Ajouter un salarié'}</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeEmployeeModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="settings-form settings-create-form" onSubmit={editingEmployee ? handleSaveEmployee : handleCreateEmployee}>
+                <label>
+                  <span>ID source Lucca</span>
+                  <input value={employeeForm.sourceEmployeeId} onChange={(event) => handleEmployeeFormFieldChange('sourceEmployeeId', event)} />
+                </label>
+                <label>
+                  <span>Matricule</span>
+                  <input value={employeeForm.employeeNumber} onChange={(event) => handleEmployeeFormFieldChange('employeeNumber', event)} />
+                </label>
+                <label>
+                  <span>Nom complet</span>
+                  <input value={employeeForm.displayName} onChange={(event) => handleEmployeeFormFieldChange('displayName', event)} />
+                </label>
+                <label>
+                  <span>Email</span>
+                  <input value={employeeForm.email} onChange={(event) => handleEmployeeFormFieldChange('email', event)} />
+                </label>
+                <label>
+                  <span>Téléphone</span>
+                  <input value={employeeForm.phoneNumber} onChange={(event) => handleEmployeeFormFieldChange('phoneNumber', event)} />
+                </label>
+                <label className="toggle-label">
+                  <input checked={employeeForm.isDriver} onChange={(event) => handleEmployeeFormBooleanChange('isDriver', event)} type="checkbox" />
+                  <span>Conducteur</span>
+                </label>
+                <label className="toggle-label">
+                  <input checked={employeeForm.isActive} onChange={(event) => handleEmployeeFormBooleanChange('isActive', event)} type="checkbox" />
+                  <span>Actif</span>
+                </label>
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={employeeForm.isSaving} type="submit">
+                    {employeeForm.isSaving ? 'Enregistrement...' : editingEmployee ? 'Enregistrer le salarié' : 'Ajouter le salarié'}
+                  </button>
+                  {employeeForm.error ? <small className="account-error">{employeeForm.error}</small> : null}
                 </div>
               </form>
             </section>
@@ -4996,10 +5143,38 @@ function createEmptyEmployeeForm(): EmployeeFormState {
     employeeNumber: '',
     displayName: '',
     email: '',
+    phoneNumber: '',
     isDriver: false,
     isActive: true,
     isSaving: false,
     error: null,
+  }
+}
+
+function buildEmployeeFormFromItem(employee: EmployeeItem): EmployeeFormState {
+  return {
+    sourceEmployeeId: employee.sourceEmployeeId,
+    employeeNumber: employee.employeeNumber,
+    displayName: employee.displayName,
+    email: employee.email ?? '',
+    phoneNumber: employee.phoneNumber ?? '',
+    isDriver: employee.isDriver,
+    isActive: employee.isActive,
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildEmployeePayload(employee: EmployeeFormState, lastSyncedAtUtc: string | null = null) {
+  return {
+    sourceEmployeeId: employee.sourceEmployeeId.trim(),
+    employeeNumber: employee.employeeNumber.trim(),
+    displayName: employee.displayName.trim(),
+    email: employee.email.trim() || null,
+    phoneNumber: employee.phoneNumber.trim() || null,
+    isDriver: employee.isDriver,
+    isActive: employee.isActive,
+    lastSyncedAtUtc,
   }
 }
 

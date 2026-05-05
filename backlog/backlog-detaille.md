@@ -34,7 +34,7 @@ Derniere mise a jour: 2026-05-05
 | UX | Dashboard par profil | A_TESTER | Accueil, vues de travail et readiness diagnostics disponibles; personnalisation fine par profil a poursuivre apres recette |
 | UX | Coque frontend premium initiale | TERMINE | Shell Nexus 4C integre et branche au socle |
 | UX | Integration identite visuelle Nexus | TERMINE | Assets officiels SVG, palette graphite/champagne et tokens centralises appliques depuis le prompt Nexus |
-| UX | Qualite accents et libelles UTF-8 | A_TESTER | Normalisation visible active; nouveaux ecrans ajoutes en libelles propres, nettoyage source historique complet a poursuivre |
+| UX | Qualite accents et libelles UTF-8 | A_TESTER | Check visible refait sur les ecrans modifies; constantes Outils corrigees proprement, normalisation visible conservee pour les chaines historiques |
 | UX | Tokens officiels du handoff | TERMINE | `nexus-theme.css`, `design-tokens.css` et `design-tokens.json` alignes sur l'identite Nexus sombre |
 | UX | Animation post-authentification | TERMINE | Transition `Groupe Laure × Nexus` integree, affichage unique après login |
 | UX | Favicon et identite navigateur | TERMINE | Icônes 16/32/180/192/512 et manifest publies |
@@ -94,7 +94,7 @@ Derniere mise a jour: 2026-05-05
 | Transverse | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, UI create/update, recherche SIRENE par SIREN et readiness diagnostics en place; enrichissement complet SIRENE a poursuivre |
 | Transverse | Analytiques | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
 | Transverse | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
-| Transverse | Salaries | A_TESTER | Table, endpoints create/update et UI de creation/liste disponibles; import reel Lucca suspendu au contrat API |
+| Transverse | Salaries | A_TESTER | Table enrichie telephone, endpoints create/update, liste avec modales ajout/modification et import Lucca disponibles |
 | Transverse | Distinction conducteurs | A_TESTER | Champ local `IsDriver` ajoute au referentiel salaries; mapping definitif Lucca a arbitrer |
 | Transverse | Creation auto des comptes depuis salaries | A_TESTER | Endpoint et action UI disponibles dans `Parametres > Salaries`: creation des comptes actifs sans profil depuis les salaries actifs, avec mot de passe temporaire et rattachement matricule |
 | Transverse | Tiers | A_TESTER | Table, endpoints create/update, UI de creation/liste et types de tiers disponibles; cas hors SIRENE a arbitrer |
@@ -112,7 +112,7 @@ Derniere mise a jour: 2026-05-05
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Interfaces | SIRENE | A_TESTER | Creation societes et recherche SIRENE actives; readiness diagnostics ajoutee, enrichissement complet a poursuivre |
-| Interfaces | LUCCA | A_DEVELOPPER | Parametres legacy importes, ecran Salaries, tache provisioning et readiness disponibles; client metier a raccorder apres validation contrat API |
+| Interfaces | LUCCA | A_TESTER | Import `GET /lucca-api/employees` branche sur les cles Lucca; mapping id/remoteId, matricule, nom, email, telephone et statut actif disponible |
 | Interfaces | Truckonline | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client metier a raccorder apres validation contrat API |
 | Interfaces | YellowBox | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client telematique a raccorder apres validation contrat API |
 | Interfaces | Geocodage | A_DEVELOPPER | Emplacements Geoapify/Google et readiness disponibles; choix fournisseur et cle active a confirmer |
@@ -153,6 +153,7 @@ Derniere mise a jour: 2026-05-05
 | Technique | Migration cles integrations | TERMINE | `IntegrationCredentials` generee et appliquee |
 | Technique | Migration referentiels metier transverses | TERMINE | `TransverseBusinessReferentials` generee et appliquee localement |
 | Technique | Migration sessions utilisateurs | TERMINE | `UserSessionsAndTimeouts` generee et appliquee localement |
+| Technique | Migration telephone salaries | TERMINE | `EmployeePhoneAndLuccaImport` generee et appliquee localement |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 | Technique | Endpoint diagnostics administration | TERMINE | `GET /api/admin/diagnostics` publie pour le profil Informatique |
 | Technique | Import cles Nexus legacy | TERMINE | 22 valeurs importees depuis `LOCATIF_DEV` et rechiffrees avec le trousseau IIS NewNexus |

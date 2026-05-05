@@ -965,6 +965,61 @@ Ordre cible de construction:
   - `GET http://192.168.50.102/newNexus/` retourne `200 text/html`
   - bundles publies: `index-6cWOpYS8.css` et `index-CavBLcNU.js`
 
+## 2026-05-05 - Salariés en modales et import Lucca
+
+- demande:
+  - remplacer la creation inline des salaries par une modale, comme les profils et utilisateurs
+  - afficher une vraie liste des salaries avec ouverture de la modification au clic/bouton
+  - faire un check des accents et corriger proprement les libelles visibles
+  - developper l'import Lucca avec les champs prevus initialement
+- source API verifiee:
+  - documentation officielle Lucca `GET /lucca-api/employees`
+  - champs disponibles retenus: `id`, `remoteId`, `employeeNumber`, `givenName`, `familyName`, `status`, `email`, `phoneNumber`
+  - authentification appelee avec `Authorization: Bearer <token>` et header `Api-Version`
+- corrections modele:
+  - ajout du champ `PhoneNumber` sur `Employee`
+  - migration `EmployeePhoneAndLuccaImport` generee et appliquee localement
+- corrections API:
+  - ajout de `POST /api/settings/employees/import-lucca`
+  - lecture des cles `LUCCA_BASE_URL`, `LUCCA_API_KEY` et `LUCCA_USERS_PATH` depuis `Administration > Outils > Cles API`
+  - import pagine via `links.next.href`
+  - upsert salarie par `SourceEmployeeId` ou `EmployeeNumber`
+  - mapping Lucca:
+    - `SourceEmployeeId`: `remoteId`, sinon `id`
+    - `EmployeeNumber`: `employeeNumber`, sinon `remoteId`, sinon `id`
+    - `DisplayName`: `givenName familyName`, sinon email/matricule
+    - `Email`: `email`
+    - `PhoneNumber`: `phoneNumber`
+    - `IsActive`: false seulement si statut `deactivated`
+  - la qualification conducteur reste locale, car le mapping Lucca conducteur n'est pas encore arbitre
+- corrections UI:
+  - liste salaries en cartes
+  - bouton `Ajouter un salarie` ouvrant une modale de creation
+  - bouton `Configurer le salarie` ouvrant une modale de modification
+  - bouton `Importer depuis Lucca` dans `Administration > Parametres > Salaries`
+  - affichage du resultat import: importes, crees, mis a jour, ignores
+  - affichage du telephone dans les cartes salaries
+- accents:
+  - correction des constantes et blocs visibles Outils: `Cles API`, `Taches planifiees`, `Requeteur SQL`, textes SQL et Traces
+  - conservation de la normalisation visible pour les chaines historiques restantes
+- backlog:
+  - `Salaries` enrichi et conserve en `A_TESTER`
+  - `LUCCA` passe de `A_DEVELOPPER` a `A_TESTER`
+  - ajout du suivi de migration telephone salaries
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - `POST /newNexus/api/settings/employees/import-lucca` retourne `401 Unauthorized` sans authentification
+  - `GET http://192.168.60.158/newNexus/` retourne `200 text/html`
+  - `GET http://192.168.50.102/newNexus/` retourne `200 text/html`
+  - bundles publies: `index-DCYKUqRU.css` et `index-CV17TORT.js`
+
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
 - validation publication:

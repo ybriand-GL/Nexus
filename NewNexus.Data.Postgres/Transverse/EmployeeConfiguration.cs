@@ -26,6 +26,9 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(entity => entity.Email)
             .HasMaxLength(200);
 
+        builder.Property(entity => entity.PhoneNumber)
+            .HasMaxLength(80);
+
         builder.HasIndex(entity => entity.SourceEmployeeId)
             .IsUnique();
 

@@ -230,6 +230,22 @@ type EmployeeItem = {
   createdAtUtc: string
 }
 
+type EmployeeAccountProvisioningItem = {
+  employeeId: string
+  employeeNumber: string
+  displayName: string
+  login: string | null
+  temporaryPassword: string | null
+  status: string
+}
+
+type EmployeeAccountProvisioningResult = {
+  createdCount: number
+  skippedCount: number
+  createdAccounts: EmployeeAccountProvisioningItem[]
+  skippedEmployees: EmployeeAccountProvisioningItem[]
+}
+
 type ThirdPartyItem = {
   id: string
   typeCode: string
@@ -468,6 +484,15 @@ function App() {
   const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
   const [accountPasswordReset, setAccountPasswordReset] = useState<AccountPasswordResetState>(createEmptyAccountPasswordResetState())
   const [credentialForm, setCredentialForm] = useState<IntegrationCredentialFormState>(createEmptyIntegrationCredentialForm())
+  const [employeeProvisioning, setEmployeeProvisioning] = useState<{
+    isProvisioning: boolean
+    result: EmployeeAccountProvisioningResult | null
+    error: string | null
+  }>({
+    isProvisioning: false,
+    result: null,
+    error: null,
+  })
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null)
   const [showPostAuthLoader, setShowPostAuthLoader] = useState(false)
   const [isLookingUpNewCompany, setIsLookingUpNewCompany] = useState(false)
@@ -1294,6 +1319,7 @@ function App() {
     setForgotPassword(createEmptyForgotPasswordForm())
     setAccountPasswordReset(createEmptyAccountPasswordResetState())
     setCredentialForm(createEmptyIntegrationCredentialForm())
+    setEmployeeProvisioning({ isProvisioning: false, result: null, error: null })
     setDiagnosticsError(null)
     setCredentialsError(null)
     setSessionsError(null)
@@ -2145,6 +2171,30 @@ function App() {
         isSaving: false,
         error: createError instanceof Error ? createError.message : 'Erreur de creation.',
       }))
+    }
+  }
+
+  async function handleProvisionEmployeeAccounts() {
+    setEmployeeProvisioning({ isProvisioning: true, result: null, error: null })
+
+    try {
+      const response = await fetch(apiPath('api/settings/employees/provision-accounts'), {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La creation automatique des comptes a echoue.'))
+      }
+
+      const result = (await response.json()) as EmployeeAccountProvisioningResult
+      await loadAdminSecurityData()
+      setEmployeeProvisioning({ isProvisioning: false, result, error: null })
+    } catch (provisionError) {
+      setEmployeeProvisioning({
+        isProvisioning: false,
+        result: null,
+        error: provisionError instanceof Error ? provisionError.message : 'Provisioning impossible.',
+      })
     }
   }
 
@@ -3444,6 +3494,47 @@ function App() {
                   <p className="profiles-toolbar-copy">
                     R&eacute;f&eacute;rentiel local pr&ecirc;t pour l&apos;import Lucca. La qualification conducteur est port&eacute;e par le champ d&eacute;di&eacute; en attendant le mapping d&eacute;finitif.
                   </p>
+                  <div className="tools-safety-banner employee-provisioning-banner">
+                    <strong>Creation automatique des comptes</strong>
+                    <span>Les salaries actifs sans compte lie par matricule peuvent etre provisionnes sans profil NewNexus. Aucun droit n&apos;est affecte automatiquement.</span>
+                    <button
+                      className="secondary-button"
+                      disabled={employeeProvisioning.isProvisioning || employees.length === 0}
+                      onClick={() => void handleProvisionEmployeeAccounts()}
+                      type="button"
+                    >
+                      {employeeProvisioning.isProvisioning ? 'Creation des comptes...' : 'Creer les comptes depuis les salaries'}
+                    </button>
+                  </div>
+                  {employeeProvisioning.error ? <small className="account-error">{employeeProvisioning.error}</small> : null}
+                  {employeeProvisioning.result ? (
+                    <div className="employee-provisioning-result">
+                      <div className="settings-list-header">
+                        <h4>Resultat du provisioning</h4>
+                        <small>
+                          {employeeProvisioning.result.createdCount} cree(s), {employeeProvisioning.result.skippedCount} ignore(s)
+                        </small>
+                      </div>
+                      {employeeProvisioning.result.createdAccounts.length > 0 ? (
+                        <div className="sessions-history-table">
+                          <div className="sessions-history-header employee-provisioning-header">
+                            <span>Salarie</span>
+                            <span>Login</span>
+                            <span>Mot de passe temporaire</span>
+                            <span>Statut</span>
+                          </div>
+                          {employeeProvisioning.result.createdAccounts.map((item) => (
+                            <div className="sessions-history-row employee-provisioning-row" key={item.employeeId}>
+                              <strong>{item.displayName}</strong>
+                              <span>{item.login ?? '-'}</span>
+                              <code className="temporary-password-code">{item.temporaryPassword ?? '-'}</code>
+                              <span>{item.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <form className="settings-form settings-create-form" onSubmit={handleCreateEmployee}>
                     <label>
                       <span>ID source Lucca</span>

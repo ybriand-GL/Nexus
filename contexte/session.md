@@ -955,6 +955,15 @@ Ordre cible de construction:
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - `POST /newNexus/api/settings/employees/provision-accounts` retourne `401 Unauthorized` sans authentification
+  - `GET http://192.168.60.158/newNexus/` retourne `200 text/html`
+  - `GET http://192.168.50.102/newNexus/` retourne `200 text/html`
+  - bundles publies: `index-6cWOpYS8.css` et `index-CavBLcNU.js`
 
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
@@ -1502,3 +1511,28 @@ Ordre cible de construction:
   - `GET /newNexus/api` retourne `200 application/json`
   - `GET /newNexus/favicon.svg` retourne `200 image/svg+xml`
   - bundles publies: `index-7PCJa-8p.css` et `index-C36CU3qJ.js`
+
+## 2026-05-05 - Backlog creation comptes depuis salaries
+
+- demande:
+  - reprise du backlog apres la passe sessions utilisateurs
+  - prochain item traite: `Transverse | Creation auto des comptes depuis salaries`
+- choix fonctionnel:
+  - provisioning local sans dependance Lucca reelle
+  - seuls les salaries actifs sont traites
+  - un salarie deja rattache a un compte via son matricule est ignore
+  - les comptes crees restent actifs mais sans profil NewNexus, donc sans droit applicatif tant qu'un profil n'est pas affecte
+  - un mot de passe temporaire est genere et le changement est force a la premiere connexion
+- corrections API:
+  - ajout de `POST /api/settings/employees/provision-accounts`
+  - generation d'un login unique depuis email, matricule, source Lucca ou nom
+  - retour detaille: comptes crees, salaries ignores, login et mot de passe temporaire
+- corrections UI:
+  - ajout d'un bloc `Creation automatique des comptes` dans `Administration > Parametres > Salaries`
+  - bouton `Creer les comptes depuis les salaries`
+  - affichage du resultat de provisioning et des mots de passe temporaires generes
+- backlog:
+  - `Creation auto des comptes depuis salaries` passe de `A_DEVELOPPER` a `A_TESTER`
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK

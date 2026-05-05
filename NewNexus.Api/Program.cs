@@ -1574,6 +1574,89 @@ app.MapPost("/api/settings/employees", async (UpsertEmployeeRequest request, New
     return Results.Created($"/api/settings/employees/{employee.Id}", new { employee.Id });
 }).RequireAuthorization("RequireInformatique");
 
+app.MapPost("/api/settings/employees/provision-accounts", async (NewNexusDbContext dbContext) =>
+{
+    var employees = await dbContext.Employees
+        .AsNoTracking()
+        .Where(employee => employee.IsActive)
+        .OrderBy(employee => employee.DisplayName)
+        .ToListAsync();
+
+    var existingAccounts = await dbContext.UserAccounts
+        .AsNoTracking()
+        .Select(account => new
+        {
+            account.Login,
+            account.EmployeeNumber
+        })
+        .ToListAsync();
+
+    var existingEmployeeNumbers = existingAccounts
+        .Where(account => !string.IsNullOrWhiteSpace(account.EmployeeNumber))
+        .Select(account => account.EmployeeNumber!)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var usedLogins = existingAccounts
+        .Select(account => account.Login)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    var createdAccounts = new List<EmployeeAccountProvisioningItem>();
+    var skippedEmployees = new List<EmployeeAccountProvisioningItem>();
+    var now = DateTime.UtcNow;
+
+    foreach (var employee in employees)
+    {
+        if (existingEmployeeNumbers.Contains(employee.EmployeeNumber))
+        {
+            skippedEmployees.Add(new EmployeeAccountProvisioningItem(
+                employee.Id,
+                employee.EmployeeNumber,
+                employee.DisplayName,
+                null,
+                null,
+                "Compte deja existant pour ce matricule."));
+            continue;
+        }
+
+        var login = GenerateUniqueLoginForEmployee(employee, usedLogins);
+        var temporaryPassword = GenerateTemporaryPassword();
+        var account = new UserAccount
+        {
+            Id = Guid.NewGuid(),
+            Login = login,
+            DisplayName = employee.DisplayName,
+            Email = NormalizeOptionalText(employee.Email),
+            EmployeeNumber = employee.EmployeeNumber,
+            PasswordHash = PasswordHasher.HashPassword(temporaryPassword),
+            MustChangePassword = true,
+            SessionTimeoutMinutes = 60,
+            SecurityProfileId = null,
+            IsActive = true,
+            CreatedAtUtc = now
+        };
+
+        usedLogins.Add(login);
+        existingEmployeeNumbers.Add(employee.EmployeeNumber);
+        dbContext.UserAccounts.Add(account);
+        createdAccounts.Add(new EmployeeAccountProvisioningItem(
+            employee.Id,
+            employee.EmployeeNumber,
+            employee.DisplayName,
+            login,
+            temporaryPassword,
+            "Compte cree sans profil."));
+    }
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        CreatedCount = createdAccounts.Count,
+        SkippedCount = skippedEmployees.Count,
+        CreatedAccounts = createdAccounts,
+        SkippedEmployees = skippedEmployees
+    });
+}).RequireAuthorization("RequireInformatique");
+
 app.MapPut("/api/settings/employees/{employeeId:guid}", async (
     Guid employeeId,
     UpsertEmployeeRequest request,
@@ -2550,6 +2633,40 @@ static string GenerateTemporaryPassword()
     return password.ToString();
 }
 
+static string GenerateUniqueLoginForEmployee(Employee employee, ISet<string> usedLogins)
+{
+    var preferredLogin = FirstNonEmpty(
+        employee.Email?.Split('@', 2, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(),
+        employee.EmployeeNumber,
+        employee.SourceEmployeeId,
+        employee.DisplayName);
+    var baseLogin = NormalizeLoginCandidate(preferredLogin ?? "salarie");
+    var candidate = baseLogin;
+    var index = 2;
+
+    while (usedLogins.Contains(candidate))
+    {
+        candidate = $"{baseLogin}{index}";
+        index++;
+    }
+
+    return candidate;
+}
+
+static string NormalizeLoginCandidate(string value)
+{
+    var builder = new StringBuilder();
+    foreach (var character in value.Trim().ToLowerInvariant())
+    {
+        if (char.IsLetterOrDigit(character) || character is '.' or '_' or '-')
+        {
+            builder.Append(character);
+        }
+    }
+
+    return builder.Length == 0 ? "salarie" : builder.ToString();
+}
+
 static string HashPasswordResetToken(string token)
 {
     return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token.Trim())));
@@ -2926,6 +3043,13 @@ internal sealed record UpsertEmployeeRequest(
     bool IsDriver,
     bool IsActive,
     DateTime? LastSyncedAtUtc);
+internal sealed record EmployeeAccountProvisioningItem(
+    Guid EmployeeId,
+    string EmployeeNumber,
+    string DisplayName,
+    string? Login,
+    string? TemporaryPassword,
+    string Status);
 internal sealed record UpsertThirdPartyRequest(
     string TypeCode,
     string DisplayName,

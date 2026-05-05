@@ -1370,6 +1370,35 @@
   background: rgba(255, 255, 255, 0.9);
 }
 
+.employee-provisioning-banner {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.employee-provisioning-banner strong,
+.employee-provisioning-banner span {
+  grid-column: 1;
+}
+
+.employee-provisioning-banner button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.employee-provisioning-result {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(247, 217, 138, 0.22);
+  background: rgba(247, 217, 138, 0.08);
+}
+
+.employee-provisioning-header,
+.employee-provisioning-row {
+  grid-template-columns: minmax(160px, 1fr) minmax(120px, 0.6fr) minmax(180px, 0.8fr) minmax(140px, 0.6fr);
+}
+
 .integration-credentials-card {
   gap: 20px;
 }

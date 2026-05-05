@@ -96,7 +96,7 @@ Derniere mise a jour: 2026-05-05
 | Transverse | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
 | Transverse | Salaries | A_TESTER | Table, endpoints create/update et UI de creation/liste disponibles; import reel Lucca suspendu au contrat API |
 | Transverse | Distinction conducteurs | A_TESTER | Champ local `IsDriver` ajoute au referentiel salaries; mapping definitif Lucca a arbitrer |
-| Transverse | Creation auto des comptes depuis salaries | A_DEVELOPPER | Regle cadree: compte cree depuis Lucca sans droit tant qu'un profil NewNexus n'est pas affecte; depend de l'import salaries |
+| Transverse | Creation auto des comptes depuis salaries | A_TESTER | Endpoint et action UI disponibles dans `Parametres > Salaries`: creation des comptes actifs sans profil depuis les salaries actifs, avec mot de passe temporaire et rattachement matricule |
 | Transverse | Tiers | A_TESTER | Table, endpoints create/update, UI de creation/liste et types de tiers disponibles; cas hors SIRENE a arbitrer |
 | Transverse | Rattachement multi-analytiques des tiers | A_TESTER | Table de liaison tiers/analytiques et selection multiple UI disponibles |
 | Transverse | Materiels | A_TESTER | Table, endpoints create/update, UI de creation/liste, numero de parc unique et rattachement exploitation disponibles |

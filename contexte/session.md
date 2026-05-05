@@ -447,6 +447,12 @@ Ordre cible de construction:
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-CR47EbIp.css` et `index-NGWJKcpM.js`
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
   - bundle publie: `index-CBrLA0Vs.css` et `index-_1Qy3qcp.js`
   - controle source/publie sans `Vos acces sont proteges`, `Connexion securisee`, `Socle premium`, `Importer depuis Nexus`, `admin`/`NewNexus!2026` pre-remplis
   - `dotnet build C:\dev\NewNexus\NewNexus.slnx -c Release --verbosity minimal` OK
@@ -1687,3 +1693,17 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-DCYKUqRU.css` et `index-BAmCwOmk.js`
+
+## 2026-05-05 - Sous-menus visibles dans la navigation laterale
+
+- demande:
+  - les sous-menus n'etaient pas visibles dans la navigation principale
+- correction:
+  - ajout de sous-entrees directement dans la barre laterale pour Administration, Donnees Communes, Exploitation et Gestion administrative
+  - chaque sous-entree ouvre directement la bonne rubrique et conserve l'etat actif
+  - style dedie ajoute pour distinguer parent, sous-menu et sous-entree active
+  - les sous-menus restent tries alphabetiquement selon la regle absolue posee
+- backlog:
+  - item `Navigation alphabetique absolue` precise avec sous-menus visibles dans la navigation laterale
+- validation technique:
+  - `npm run build` OK

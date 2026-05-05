@@ -689,6 +689,23 @@ function App() {
   const visibleWorkspaceModules = selectedWorkspaceSection === 'Accueil'
     ? currentWorkspaceModules
     : currentWorkspaceModules.filter((module) => module.label === selectedWorkspaceSection)
+  const sidebarSubmenus = useMemo(() => {
+    const exploitationEntries = [
+      'Accueil',
+      ...(modulesByGroup.Exploitation ?? []).map((module) => module.label).sort((left, right) => left.localeCompare(right, 'fr')),
+    ]
+    const administrativeEntries = [
+      'Accueil',
+      ...(modulesByGroup['Gestion administrative'] ?? []).map((module) => module.label).sort((left, right) => left.localeCompare(right, 'fr')),
+    ]
+
+    return {
+      Administration: isInformatique ? [...administrationSubmenuEntries] : [],
+      [commonDataNavigationLabel]: isInformatique ? [...commonDataNavigationEntries] : [],
+      Exploitation: exploitationEntries,
+      'Gestion administrative': administrativeEntries,
+    } as Record<string, string[]>
+  }, [isInformatique, modulesByGroup])
 
   const scheduledTasks = useMemo(
     () => [
@@ -1228,6 +1245,63 @@ function App() {
     sessionStorage.removeItem(postAuthLoaderStorageKey)
     setShowPostAuthLoader(false)
     resetSessionState()
+  }
+
+  function activateMainNavigation(entry: string) {
+    setSelectedNavigation(entry)
+    if (entry === 'Administration') {
+      setSelectedAdministrationSection('Accueil')
+      setSelectedSettingsSection('Accueil')
+      setSelectedToolsSection('Accueil')
+    }
+    if (entry === commonDataNavigationLabel) {
+      setSelectedSettingsSection('Accueil')
+    }
+    if (entry === 'Exploitation' || entry === 'Gestion administrative') {
+      setSelectedWorkspaceSection('Accueil')
+    }
+  }
+
+  function activateSidebarSubmenu(parentEntry: string, submenuEntry: string) {
+    setSelectedNavigation(parentEntry)
+
+    if (parentEntry === 'Administration' && administrationSubmenuEntries.includes(submenuEntry as (typeof administrationSubmenuEntries)[number])) {
+      const administrationEntry = submenuEntry as (typeof administrationSubmenuEntries)[number]
+      setSelectedAdministrationSection(administrationEntry)
+      if (administrationEntry === 'Outils') {
+        setSelectedToolsSection('Accueil')
+      }
+      if (administrationEntry === administrationSettingsSection) {
+        setSelectedSettingsSection('Accueil')
+      }
+      return
+    }
+
+    if (parentEntry === commonDataNavigationLabel && commonDataNavigationEntries.includes(submenuEntry as (typeof commonDataNavigationEntries)[number])) {
+      setSelectedSettingsSection(submenuEntry)
+      return
+    }
+
+    if (parentEntry === 'Exploitation' || parentEntry === 'Gestion administrative') {
+      setSelectedWorkspaceSection(submenuEntry)
+    }
+  }
+
+  function isSidebarSubmenuActive(parentEntry: string, submenuEntry: string) {
+    if (selectedNavigation !== parentEntry) {
+      return false
+    }
+    if (parentEntry === 'Administration') {
+      return selectedAdministrationSection === submenuEntry
+    }
+    if (parentEntry === commonDataNavigationLabel) {
+      return selectedSettingsSection === submenuEntry
+    }
+    if (parentEntry === 'Exploitation' || parentEntry === 'Gestion administrative') {
+      return selectedWorkspaceSection === submenuEntry
+    }
+
+    return false
   }
 
   function openForgotPasswordModal() {
@@ -2806,29 +2880,36 @@ function App() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Navigation principale">
-          {visibleNavigationEntries.map((entry) => (
-            <button
-              key={entry}
-              className={`sidebar-link ${selectedNavigation === entry ? 'sidebar-link-active' : ''}`}
-              onClick={() => {
-                setSelectedNavigation(entry)
-                if (entry === 'Administration') {
-                  setSelectedAdministrationSection('Accueil')
-                  setSelectedSettingsSection('Accueil')
-                  setSelectedToolsSection('Accueil')
-                }
-                if (entry === commonDataNavigationLabel) {
-                  setSelectedSettingsSection('Accueil')
-                }
-                if (entry === 'Exploitation' || entry === 'Gestion administrative') {
-                  setSelectedWorkspaceSection('Accueil')
-                }
-              }}
-              type="button"
-            >
-              {entry}
-            </button>
-          ))}
+          {visibleNavigationEntries.map((entry) => {
+            const submenuEntries = sidebarSubmenus[entry] ?? []
+
+            return (
+              <div className="sidebar-nav-group" key={entry}>
+                <button
+                  className={`sidebar-link ${selectedNavigation === entry ? 'sidebar-link-active' : ''}`}
+                  onClick={() => activateMainNavigation(entry)}
+                  type="button"
+                >
+                  <span>{entry}</span>
+                  {submenuEntries.length > 0 ? <span className="sidebar-link-chevron" aria-hidden="true">›</span> : null}
+                </button>
+                {submenuEntries.length > 0 ? (
+                  <div className="sidebar-subnav" aria-label={`Sous-menu ${entry}`}>
+                    {submenuEntries.map((submenuEntry) => (
+                      <button
+                        className={`sidebar-subnav-link ${isSidebarSubmenuActive(entry, submenuEntry) ? 'sidebar-subnav-link-active' : ''}`}
+                        key={`${entry}-${submenuEntry}`}
+                        onClick={() => activateSidebarSubmenu(entry, submenuEntry)}
+                        type="button"
+                      >
+                        {submenuEntry}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
         </nav>
 
         <div className="sidebar-status">
@@ -2965,7 +3046,7 @@ function App() {
                       <button
                         key={entry}
                         className="dashboard-action-card"
-                        onClick={() => setSelectedNavigation(entry)}
+                        onClick={() => activateMainNavigation(entry)}
                         type="button"
                       >
                         <span className="eyebrow">{entry}</span>

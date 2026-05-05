@@ -447,7 +447,29 @@ Ordre cible de construction:
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-N4AU1MMi.css` et `index-DMssxsT0.js`
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-B60YdiUg.css` et `index-DnQ12cYL.js`
+
+## 2026-05-05 - Accordéon premium et listes déroulantes sombres
+
+- demande:
+  - adoucir l'ouverture des accordéons de navigation latérale
+  - retirer `Accueil` des sous-menus car le clic sur le menu mere affiche deja l'accueil
+  - corriger les listes déroulantes dont le fond gris ne respecte pas la charte
+- correction:
+  - sous-menus lateraux conserves dans le DOM et animes via `max-height`, opacite et translation verticale
+  - sous-entrees `Accueil` retirees des accordéons lateraux
+  - clic sur un menu mere conserve l'ouverture de son accueil de rubrique
+  - styles sombres ajoutes sur les `select` et leurs `option` dans les formulaires, modales et pages d'administration
+- backlog:
+  - item `Navigation alphabetique absolue` precise avec accordéon anime et sans entree Accueil
+- validation technique:
+  - `npm run build` OK
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
 - validation publication:

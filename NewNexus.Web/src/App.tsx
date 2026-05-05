@@ -692,17 +692,15 @@ function App() {
     : currentWorkspaceModules.filter((module) => module.label === selectedWorkspaceSection)
   const sidebarSubmenus = useMemo(() => {
     const exploitationEntries = [
-      'Accueil',
       ...(modulesByGroup.Exploitation ?? []).map((module) => module.label).sort((left, right) => left.localeCompare(right, 'fr')),
     ]
     const administrativeEntries = [
-      'Accueil',
       ...(modulesByGroup['Gestion administrative'] ?? []).map((module) => module.label).sort((left, right) => left.localeCompare(right, 'fr')),
     ]
 
     return {
-      Administration: isInformatique ? [...administrationSubmenuEntries] : [],
-      [commonDataNavigationLabel]: isInformatique ? [...commonDataNavigationEntries] : [],
+      Administration: isInformatique ? administrationSubmenuEntries.filter((entry) => entry !== 'Accueil') : [],
+      [commonDataNavigationLabel]: isInformatique ? commonDataNavigationEntries.filter((entry) => entry !== 'Accueil') : [],
       Exploitation: exploitationEntries,
       'Gestion administrative': administrativeEntries,
     } as Record<string, string[]>
@@ -2900,13 +2898,19 @@ function App() {
                   <span>{entry}</span>
                   {submenuEntries.length > 0 ? <span className="sidebar-link-chevron" aria-hidden="true">{isExpanded ? '\u2303' : '\u2304'}</span> : null}
                 </button>
-                {submenuEntries.length > 0 && isExpanded ? (
-                  <div className="sidebar-subnav" id={`sidebar-submenu-${entry}`} aria-label={`Sous-menu ${entry}`}>
+                {submenuEntries.length > 0 ? (
+                  <div
+                    aria-hidden={!isExpanded}
+                    aria-label={`Sous-menu ${entry}`}
+                    className={`sidebar-subnav ${isExpanded ? 'sidebar-subnav-expanded' : ''}`}
+                    id={`sidebar-submenu-${entry}`}
+                  >
                     {submenuEntries.map((submenuEntry) => (
                       <button
                         className={`sidebar-subnav-link ${isSidebarSubmenuActive(entry, submenuEntry) ? 'sidebar-subnav-link-active' : ''}`}
                         key={`${entry}-${submenuEntry}`}
                         onClick={() => activateSidebarSubmenu(entry, submenuEntry)}
+                        tabIndex={isExpanded ? 0 : -1}
                         type="button"
                       >
                         {submenuEntry}

@@ -447,7 +447,31 @@ Ordre cible de construction:
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-BOero0j2.css` et `index-BNVeubKI.js`
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-N4AU1MMi.css` et `index-DMssxsT0.js`
+
+## 2026-05-05 - Disponibilite recherche SIRENE en creation Societe
+
+- demande:
+  - en ajout de societe, la recherche SIRENE n'etait pas disponible
+- diagnostic:
+  - le bouton etait desactive tant que le champ ne contenait pas exactement 9 caracteres
+  - un SIREN colle avec espaces, points ou tirets pouvait etre tronque par `maxLength=9` avant normalisation
+  - test direct de l'API publique Recherche d'Entreprises sur `552100554`: HTTP 200
+- correction:
+  - suppression du verrou bloquant sur la longueur pour le bouton `Rechercher SIRENE`
+  - la recherche reste cliquable et affiche le message metier si le SIREN normalise ne contient pas 9 chiffres
+  - `maxLength` du champ SIREN augmente pour accepter les collages avec espaces/separateurs
+  - aide de saisie ajoutee sous le champ SIREN
+- backlog:
+  - item `Societes Groupe Laure` precise avec bouton SIRENE disponible et saisie tolerante
+- validation technique:
+  - `npm run build` OK
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
 - validation publication:

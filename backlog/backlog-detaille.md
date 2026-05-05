@@ -92,7 +92,7 @@ Derniere mise a jour: 2026-05-05
 |---|---|---|---|
 | Donnees Communes | Schema donnees communes V1 | TERMINE | Document redige |
 | Donnees Communes | Navigation alphabetique absolue | A_TESTER | Entrees principales et sous-menus tries alphabetiquement; sous-menus lateraux en accordeon anime, fermes par defaut, sans entree Accueil |
-| Donnees Communes | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, liste + modale ajout/modification, recherche SIRENE obligatoire avant creation et validation backend SIRENE en place |
+| Donnees Communes | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, liste + modale ajout/modification, recherche SIRENE obligatoire avant creation, bouton toujours disponible et saisie SIREN tolerante aux espaces/separateurs |
 | Donnees Communes | Analytiques | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
 | Donnees Communes | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
 | Donnees Communes | Salaries | A_TESTER | Table enrichie telephone, endpoints create/update, liste avec modales ajout/modification et import Lucca disponibles |

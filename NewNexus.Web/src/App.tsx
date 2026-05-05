@@ -1924,7 +1924,7 @@ function App() {
   }
 
   async function handleLookupNewCompanySirene() {
-    const siren = companyForm.siren.trim()
+    const siren = companyForm.siren.replace(/\D/g, '')
     if (siren.length !== 9) {
       setCompanyForm((current) => ({ ...current, error: 'Saisissez un SIREN de 9 chiffres avant la recherche SIRENE.' }))
       return
@@ -4643,16 +4643,19 @@ function App() {
                   <input
                     disabled={Boolean(editingCompany)}
                     inputMode="numeric"
-                    maxLength={9}
-                    placeholder="123456789"
+                    maxLength={32}
+                    placeholder="123 456 789"
                     value={companyForm.siren}
                     onChange={(event) => handleNewCompanyFieldChange('siren', event)}
                   />
+                  {!editingCompany ? (
+                    <small className="settings-field-help">Saisissez ou collez le SIREN: espaces, points et tirets sont acceptés.</small>
+                  ) : null}
                 </label>
                 {!editingCompany ? (
                   <button
                     className="secondary-button settings-lookup-button"
-                    disabled={isLookingUpNewCompany || companyForm.siren.length !== 9}
+                    disabled={isLookingUpNewCompany || companyForm.isSaving}
                     onClick={() => void handleLookupNewCompanySirene()}
                     type="button"
                   >

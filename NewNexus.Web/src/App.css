@@ -1766,6 +1766,12 @@
   color: var(--nexus-muted);
 }
 
+.settings-field-help {
+  color: var(--nexus-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .settings-row-meta,
 .settings-inline-actions {
   display: flex;

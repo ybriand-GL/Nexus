@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -1690,7 +1691,9 @@ app.MapPost("/api/settings/employees/import-lucca", async (
         });
     }
 
-    var path = string.IsNullOrWhiteSpace(configuredPath) ? "/lucca-api/employees" : configuredPath.Trim();
+    var path = string.IsNullOrWhiteSpace(configuredPath)
+        ? "/api/v3/users?fields=id,firstName,lastName,displayName,mail,employeeNumber,dtContractEnd,login,modifiedAt&paging=0,1000"
+        : configuredPath.Trim();
     var requestUri = BuildLuccaEmployeesUri(baseUri, path);
     var client = httpClientFactory.CreateClient("Lucca");
     var imported = 0;
@@ -1703,8 +1706,16 @@ app.MapPost("/api/settings/employees/import-lucca", async (
     while (requestUri is not null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
-        request.Headers.TryAddWithoutValidation("Api-Version", "2025-01-01");
+        var isLegacyApi = IsLuccaLegacyApi(requestUri);
+        if (isLegacyApi)
+        {
+            request.Headers.TryAddWithoutValidation("Authorization", $"lucca application={apiKey}");
+        }
+        else
+        {
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            request.Headers.TryAddWithoutValidation("Api-Version", "2025-01-01");
+        }
 
         using var response = await client.SendAsync(request, httpContext.RequestAborted);
         if (!response.IsSuccessStatusCode)
@@ -1717,15 +1728,16 @@ app.MapPost("/api/settings/employees/import-lucca", async (
         }
 
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(httpContext.RequestAborted));
-        if (!document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+        var items = EnumerateLuccaEmployeeItems(document.RootElement).ToList();
+        if (items.Count == 0)
         {
             return Results.Problem(
                 title: "Import Lucca impossible",
-                detail: "La reponse Lucca ne contient pas de collection items.",
+                detail: "La reponse Lucca ne contient aucun salarie exploitable. Verifiez le chemin Lucca et les droits de la cle.",
                 statusCode: StatusCodes.Status502BadGateway);
         }
 
-        foreach (var item in items.EnumerateArray())
+        foreach (var item in items)
         {
             var mapped = MapLuccaEmployee(item);
             if (mapped is null)
@@ -1766,7 +1778,7 @@ app.MapPost("/api/settings/employees/import-lucca", async (
             imported++;
         }
 
-        requestUri = GetLuccaNextPageUri(baseUri, document.RootElement);
+        requestUri = isLegacyApi ? null : GetLuccaNextPageUri(baseUri, document.RootElement);
     }
 
     await dbContext.SaveChangesAsync(httpContext.RequestAborted);
@@ -2431,10 +2443,18 @@ static Uri BuildLuccaEmployeesUri(Uri baseUri, string path)
     var builder = new UriBuilder(new Uri(baseUri, relativePath));
     if (string.IsNullOrWhiteSpace(builder.Query))
     {
-        builder.Query = "limit=100&include=totalCount";
+        builder.Query = IsLuccaLegacyApi(builder.Uri)
+            ? "paging=0,1000"
+            : "limit=100&include=totalCount";
     }
 
     return builder.Uri;
+}
+
+static bool IsLuccaLegacyApi(Uri requestUri)
+{
+    return requestUri.AbsolutePath.Contains("/api/v3/", StringComparison.OrdinalIgnoreCase) ||
+           requestUri.AbsolutePath.Contains("/api/v4/", StringComparison.OrdinalIgnoreCase);
 }
 
 static Uri? GetLuccaNextPageUri(Uri baseUri, JsonElement root)
@@ -2456,16 +2476,62 @@ static Uri? GetLuccaNextPageUri(Uri baseUri, JsonElement root)
     return null;
 }
 
+static IEnumerable<JsonElement> EnumerateLuccaEmployeeItems(JsonElement root)
+{
+    if (root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+    {
+        foreach (var item in items.EnumerateArray())
+        {
+            yield return item;
+        }
+    }
+
+    if (!root.TryGetProperty("data", out var data))
+    {
+        yield break;
+    }
+
+    if (data.ValueKind == JsonValueKind.Array)
+    {
+        foreach (var item in data.EnumerateArray())
+        {
+            yield return item;
+        }
+
+        yield break;
+    }
+
+    if (data.ValueKind == JsonValueKind.Object &&
+        data.TryGetProperty("items", out var dataItems) &&
+        dataItems.ValueKind == JsonValueKind.Array)
+    {
+        foreach (var item in dataItems.EnumerateArray())
+        {
+            yield return item;
+        }
+    }
+}
+
 static LuccaMappedEmployee? MapLuccaEmployee(JsonElement item)
 {
-    var luccaId = GetJsonString(item, "id");
-    var remoteId = GetJsonString(item, "remoteId");
-    var employeeNumber = FirstNonEmpty(GetJsonString(item, "employeeNumber"), remoteId, luccaId);
+    var luccaId = GetJsonScalarString(item, "id");
+    var remoteId = GetJsonScalarString(item, "remoteId");
+    var employeeNumber = FirstNonEmpty(
+        GetJsonScalarString(item, "employeeNumber"),
+        GetJsonScalarString(item, "login"),
+        remoteId,
+        luccaId);
     var sourceEmployeeId = FirstNonEmpty(remoteId, luccaId, employeeNumber);
-    var givenName = GetJsonString(item, "givenName");
-    var familyName = GetJsonString(item, "familyName");
+    var givenName = FirstNonEmpty(GetJsonScalarString(item, "givenName"), GetJsonScalarString(item, "firstName"));
+    var familyName = FirstNonEmpty(GetJsonScalarString(item, "familyName"), GetJsonScalarString(item, "lastName"));
     var fullName = string.Join(' ', new[] { givenName, familyName }.Where(value => !string.IsNullOrWhiteSpace(value)));
-    var displayName = FirstNonEmpty(fullName, GetJsonString(item, "name"), GetJsonString(item, "email"), employeeNumber);
+    var displayName = FirstNonEmpty(
+        fullName,
+        GetJsonScalarString(item, "displayName"),
+        GetJsonScalarString(item, "name"),
+        GetJsonScalarString(item, "mail"),
+        GetJsonScalarString(item, "email"),
+        employeeNumber);
 
     if (string.IsNullOrWhiteSpace(sourceEmployeeId) ||
         string.IsNullOrWhiteSpace(employeeNumber) ||
@@ -2474,14 +2540,18 @@ static LuccaMappedEmployee? MapLuccaEmployee(JsonElement item)
         return null;
     }
 
-    var status = GetJsonString(item, "status");
+    var status = GetJsonScalarString(item, "status");
+    var contractEnd = GetJsonScalarString(item, "dtContractEnd");
     return new LuccaMappedEmployee(
         sourceEmployeeId,
         employeeNumber,
         displayName,
-        NormalizeOptionalText(GetJsonString(item, "email")),
-        NormalizeOptionalText(GetJsonString(item, "phoneNumber")),
-        !string.Equals(status, "deactivated", StringComparison.OrdinalIgnoreCase));
+        NormalizeOptionalText(FirstNonEmpty(GetJsonScalarString(item, "email"), GetJsonScalarString(item, "mail"))),
+        NormalizeOptionalText(FirstNonEmpty(
+            GetJsonScalarString(item, "phoneNumber"),
+            GetJsonScalarString(item, "mobilePhone"),
+            GetJsonScalarString(item, "directLine"))),
+        !string.Equals(status, "deactivated", StringComparison.OrdinalIgnoreCase) && !IsPastDate(contractEnd));
 }
 
 static string MaskSecret(string? value)
@@ -2886,6 +2956,29 @@ static string? GetJsonString(JsonElement element, string propertyName)
     return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
         ? value.GetString()
         : null;
+}
+
+static string? GetJsonScalarString(JsonElement element, string propertyName)
+{
+    if (!element.TryGetProperty(propertyName, out var value))
+    {
+        return null;
+    }
+
+    return value.ValueKind switch
+    {
+        JsonValueKind.String => NormalizeOptionalText(value.GetString()),
+        JsonValueKind.Number => value.GetRawText(),
+        JsonValueKind.True => "true",
+        JsonValueKind.False => "false",
+        _ => null
+    };
+}
+
+static bool IsPastDate(string? value)
+{
+    return DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed) &&
+           parsed.Date < DateTime.UtcNow.Date;
 }
 
 static bool IsDatabaseUnavailableException(Exception exception)

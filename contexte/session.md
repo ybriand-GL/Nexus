@@ -956,6 +956,35 @@ Ordre cible de construction:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
 - publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK via `powershell.exe -ExecutionPolicy Bypass -File`
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - `POST /newNexus/api/settings/employees/import-lucca` retourne `401 Unauthorized` sans authentification, attendu
+  - bundles publies: `index-DCYKUqRU.css` et `index-CcTKVuIe.js`
+
+## 2026-05-05 - Diagnostic import Lucca
+
+- demande:
+  - message utilisateur: `Import Lucca impossible`
+- diagnostic:
+  - l'import precedent appelait uniquement l'API Lucca v5 `/lucca-api/employees` avec authentification Bearer
+  - les cles reprises depuis Nexus legacy sont tres probablement des cles applicatives Lucca historiques
+  - l'UI affichait seulement le titre `Import Lucca impossible` et masquait le detail technique renvoye par l'API
+- corrections API:
+  - chemin Lucca par defaut repasse sur `/api/v3/users?...&paging=0,1000`
+  - authentification legacy ajoutee avec `Authorization: lucca application=...`
+  - compatibilite v5 conservee avec Bearer et `Api-Version: 2025-01-01` si le chemin cible `/lucca-api/...`
+  - lecture des collections Lucca dans `items`, `data` ou `data.items`
+  - mapping champs v3/v5: `firstName/lastName/displayName/mail/login/dtContractEnd` et `givenName/familyName/email/remoteId/status`
+- corrections UI:
+  - `getRequestError` affiche maintenant le `detail` des ProblemDetails backend en plus du `title`
+- backlog:
+  - `Interfaces | LUCCA` precise la compatibilite legacy/v5 et reste en `A_TESTER`
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+- publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`

@@ -112,7 +112,7 @@ Derniere mise a jour: 2026-05-05
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Interfaces | SIRENE | A_TESTER | Creation societes et recherche SIRENE actives; readiness diagnostics ajoutee, enrichissement complet a poursuivre |
-| Interfaces | LUCCA | A_TESTER | Import `GET /lucca-api/employees` branche sur les cles Lucca; mapping id/remoteId, matricule, nom, email, telephone et statut actif disponible |
+| Interfaces | LUCCA | A_TESTER | Import compatible Lucca legacy `/api/v3/users` et API v5 `/lucca-api/employees`; authentification application-key ou Bearer, mapping champs v3/v5 et message d'erreur detaille disponibles; recette avec cle reelle a faire |
 | Interfaces | Truckonline | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client metier a raccorder apres validation contrat API |
 | Interfaces | YellowBox | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client telematique a raccorder apres validation contrat API |
 | Interfaces | Geocodage | A_DEVELOPPER | Emplacements Geoapify/Google et readiness disponibles; choix fournisseur et cle active a confirmer |

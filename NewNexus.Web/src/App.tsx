@@ -5228,11 +5228,13 @@ function buildSettingsReferencePayload(form: SettingsReferenceFormState) {
 async function getRequestError(response: Response, fallback: string) {
   const payload = (await response.json().catch(() => null)) as {
     title?: string
+    detail?: string
     errors?: Record<string, string[]>
   } | null
 
   const validationMessage = Object.values(payload?.errors ?? {}).flat()[0]
-  return validationMessage ?? payload?.title ?? fallback
+  const problemMessage = [payload?.title, payload?.detail].filter(Boolean).join(' - ')
+  return validationMessage ?? (problemMessage || fallback)
 }
 
 function translateAccessLevel(accessLevel: string) {

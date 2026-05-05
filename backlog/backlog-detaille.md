@@ -124,7 +124,7 @@ Derniere mise a jour: 2026-05-05
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Module | Gestion des contraventions | A_TESTER | Module V1 branche: table `administration.Contravention`, endpoints droits `CONTRAVENTIONS`, liste, creation, edition, statuts, rattachements conducteur/materiel et traces metier |
-| Module | Carte des points chargements/dechargements | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: points, geocodage, rattachements societes/exploitations et prochaine etape |
+| Module | Carte des points chargements/dechargements | A_TESTER | Module V1 local branche: table `exploitation.LoadingPoint`, endpoints droits `CARTE_POINTS_CHARGEMENT_DECHARGEMENT`, liste, creation, edition, types chargement/dechargement/mixte, rattachements tiers/exploitation et coordonnees manuelles |
 | Module | Les indicateurs conducteurs | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: donnees Lucca, qualification conducteur et indicateurs a definir |
 | Module | Les indicateurs des tracteurs | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: donnees materiels, TruckOnline, YellowBox et modele parc a definir |
 
@@ -156,6 +156,7 @@ Derniere mise a jour: 2026-05-05
 | Technique | Migration sessions utilisateurs | TERMINE | `UserSessionsAndTimeouts` generee et appliquee localement |
 | Technique | Migration telephone salaries | TERMINE | `EmployeePhoneAndLuccaImport` generee et appliquee localement |
 | Technique | Migration traces applicatives | TERMINE | `ApplicationTraces` generee et appliquee localement |
+| Technique | Migration points chargement/dechargement | TERMINE | `LoadingPointsModule` generee et appliquee localement |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 | Technique | Endpoint diagnostics administration | TERMINE | `GET /api/admin/diagnostics` publie pour le profil Informatique |
 | Technique | Import cles Nexus legacy | TERMINE | 22 valeurs importees depuis `LOCATIF_DEV` et rechiffrees avec le trousseau IIS NewNexus |

@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using NewNexus.Data.Postgres;
 using NewNexus.Domain.Administration;
+using NewNexus.Domain.Modules;
 using NewNexus.Domain.Security;
 using NewNexus.Domain.Transverse;
 
@@ -1681,6 +1682,189 @@ app.MapPut("/api/modules/contraventions/{contraventionId:guid}", async (
         "Contravention mise a jour.",
         $"Avis={contravention.NoticeNumber}; statut={contravention.StatusCode}; montant={contravention.Amount}.",
         contravention.NoticeNumber);
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    return Results.NoContent();
+}).RequireAuthorization();
+
+app.MapGet("/api/modules/loading-points", async (
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CARTE_POINTS_CHARGEMENT_DECHARGEMENT", ModuleAccessLevel.Read))
+    {
+        return Results.Forbid();
+    }
+
+    var points = await dbContext.LoadingPoints
+        .AsNoTracking()
+        .Include(item => item.ThirdParty)
+        .Include(item => item.Exploitation)
+        .OrderBy(item => item.City)
+        .ThenBy(item => item.Label)
+        .ToListAsync();
+
+    return Results.Ok(points.Select(BuildLoadingPointResponse));
+}).RequireAuthorization();
+
+app.MapGet("/api/modules/loading-points/referentials", async (
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CARTE_POINTS_CHARGEMENT_DECHARGEMENT", ModuleAccessLevel.Read))
+    {
+        return Results.Forbid();
+    }
+
+    var thirdParties = await dbContext.ThirdParties
+        .AsNoTracking()
+        .Where(item => item.IsActive)
+        .OrderBy(item => item.DisplayName)
+        .Select(item => new
+        {
+            item.Id,
+            item.TypeCode,
+            item.DisplayName,
+            item.Siren,
+            item.VatNumber,
+            item.ExternalReference,
+            item.IsForeignCompany,
+            item.IsActive,
+            item.CreatedAtUtc,
+            Analytics = Array.Empty<object>()
+        })
+        .ToListAsync();
+
+    var exploitations = await dbContext.Exploitations
+        .AsNoTracking()
+        .Include(item => item.Company)
+        .Where(item => item.IsActive)
+        .OrderBy(item => item.Code)
+        .Select(item => new
+        {
+            item.Id,
+            item.Code,
+            item.Label,
+            item.IsActive,
+            Company = new
+            {
+                item.Company!.Id,
+                item.Company.Siren,
+                item.Company.DisplayName
+            }
+        })
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        ThirdParties = thirdParties,
+        Exploitations = exploitations
+    });
+}).RequireAuthorization();
+
+app.MapPost("/api/modules/loading-points", async (
+    UpsertLoadingPointRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CARTE_POINTS_CHARGEMENT_DECHARGEMENT", ModuleAccessLevel.Write))
+    {
+        return Results.Forbid();
+    }
+
+    var validationErrors = await ValidateLoadingPointRequestAsync(request, dbContext);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var now = DateTime.UtcNow;
+    var loadingPoint = new LoadingPoint
+    {
+        Id = Guid.NewGuid(),
+        Code = request.Code.Trim().ToUpperInvariant(),
+        Label = request.Label.Trim(),
+        PointTypeCode = NormalizeLoadingPointType(request.PointTypeCode),
+        AddressLine = request.AddressLine.Trim(),
+        PostalCode = request.PostalCode.Trim(),
+        City = request.City.Trim(),
+        CountryCode = NormalizeCountryCode(request.CountryCode),
+        Latitude = request.Latitude,
+        Longitude = request.Longitude,
+        ThirdPartyId = request.ThirdPartyId,
+        ExploitationId = request.ExploitationId,
+        IsActive = request.IsActive,
+        Notes = NormalizeOptionalText(request.Notes),
+        CreatedAtUtc = now,
+        UpdatedAtUtc = now
+    };
+
+    dbContext.LoadingPoints.Add(loadingPoint);
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "MODULE_EVENTS",
+        "LOADING_POINT_CREATED",
+        "Info",
+        "Point de chargement/dechargement cree.",
+        $"Code={loadingPoint.Code}; type={loadingPoint.PointTypeCode}; ville={loadingPoint.City}.",
+        loadingPoint.Code);
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    return Results.Created($"/api/modules/loading-points/{loadingPoint.Id}", new { loadingPoint.Id });
+}).RequireAuthorization();
+
+app.MapPut("/api/modules/loading-points/{loadingPointId:guid}", async (
+    Guid loadingPointId,
+    UpsertLoadingPointRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CARTE_POINTS_CHARGEMENT_DECHARGEMENT", ModuleAccessLevel.Write))
+    {
+        return Results.Forbid();
+    }
+
+    var loadingPoint = await dbContext.LoadingPoints.SingleOrDefaultAsync(item => item.Id == loadingPointId);
+    if (loadingPoint is null)
+    {
+        return Results.NotFound();
+    }
+
+    var validationErrors = await ValidateLoadingPointRequestAsync(request, dbContext, loadingPointId);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    loadingPoint.Code = request.Code.Trim().ToUpperInvariant();
+    loadingPoint.Label = request.Label.Trim();
+    loadingPoint.PointTypeCode = NormalizeLoadingPointType(request.PointTypeCode);
+    loadingPoint.AddressLine = request.AddressLine.Trim();
+    loadingPoint.PostalCode = request.PostalCode.Trim();
+    loadingPoint.City = request.City.Trim();
+    loadingPoint.CountryCode = NormalizeCountryCode(request.CountryCode);
+    loadingPoint.Latitude = request.Latitude;
+    loadingPoint.Longitude = request.Longitude;
+    loadingPoint.ThirdPartyId = request.ThirdPartyId;
+    loadingPoint.ExploitationId = request.ExploitationId;
+    loadingPoint.IsActive = request.IsActive;
+    loadingPoint.Notes = NormalizeOptionalText(request.Notes);
+    loadingPoint.UpdatedAtUtc = DateTime.UtcNow;
+
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "MODULE_EVENTS",
+        "LOADING_POINT_UPDATED",
+        "Info",
+        "Point de chargement/dechargement mis a jour.",
+        $"Code={loadingPoint.Code}; type={loadingPoint.PointTypeCode}; actif={loadingPoint.IsActive}.",
+        loadingPoint.Code);
     await dbContext.SaveChangesAsync(httpContext.RequestAborted);
 
     return Results.NoContent();
@@ -3742,6 +3926,44 @@ static object BuildContraventionResponse(Contravention contravention)
     };
 }
 
+static object BuildLoadingPointResponse(LoadingPoint loadingPoint)
+{
+    return new
+    {
+        loadingPoint.Id,
+        loadingPoint.Code,
+        loadingPoint.Label,
+        loadingPoint.PointTypeCode,
+        PointTypeLabel = FormatLoadingPointType(loadingPoint.PointTypeCode),
+        loadingPoint.AddressLine,
+        loadingPoint.PostalCode,
+        loadingPoint.City,
+        loadingPoint.CountryCode,
+        loadingPoint.Latitude,
+        loadingPoint.Longitude,
+        loadingPoint.IsActive,
+        loadingPoint.Notes,
+        loadingPoint.CreatedAtUtc,
+        loadingPoint.UpdatedAtUtc,
+        ThirdParty = loadingPoint.ThirdParty is null
+            ? null
+            : new
+            {
+                loadingPoint.ThirdParty.Id,
+                loadingPoint.ThirdParty.TypeCode,
+                loadingPoint.ThirdParty.DisplayName
+            },
+        Exploitation = loadingPoint.Exploitation is null
+            ? null
+            : new
+            {
+                loadingPoint.Exploitation.Id,
+                loadingPoint.Exploitation.Code,
+                loadingPoint.Exploitation.Label
+            }
+    };
+}
+
 static ProfileRightsBuildResult TryBuildDesiredRights(
     IReadOnlyCollection<ProfileModuleRightRequest> requestedRights,
     IReadOnlyCollection<SecurityModule> modules)
@@ -4407,6 +4629,111 @@ static string FormatContraventionStatus(string statusCode)
     };
 }
 
+static async Task<Dictionary<string, string[]>> ValidateLoadingPointRequestAsync(
+    UpsertLoadingPointRequest request,
+    NewNexusDbContext dbContext,
+    Guid? currentLoadingPointId = null)
+{
+    var errors = new Dictionary<string, string[]>();
+    var code = request.Code.Trim().ToUpperInvariant();
+    var label = request.Label.Trim();
+    var pointTypeCode = NormalizeLoadingPointType(request.PointTypeCode);
+    var countryCode = NormalizeCountryCode(request.CountryCode);
+
+    if (string.IsNullOrWhiteSpace(code))
+    {
+        errors["code"] = ["Le code du point est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(label))
+    {
+        errors["label"] = ["Le libelle du point est obligatoire."];
+    }
+
+    if (!GetLoadingPointTypes().Contains(pointTypeCode))
+    {
+        errors["pointTypeCode"] = ["Le type du point doit etre CHARGEMENT, DECHARGEMENT ou MIXTE."];
+    }
+
+    if (string.IsNullOrWhiteSpace(request.AddressLine))
+    {
+        errors["addressLine"] = ["L'adresse est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(request.PostalCode))
+    {
+        errors["postalCode"] = ["Le code postal est obligatoire."];
+    }
+
+    if (string.IsNullOrWhiteSpace(request.City))
+    {
+        errors["city"] = ["La ville est obligatoire."];
+    }
+
+    if (countryCode.Length != 2)
+    {
+        errors["countryCode"] = ["Le pays doit etre un code ISO sur 2 caracteres."];
+    }
+
+    if (request.Latitude is not null && (request.Latitude < -90 || request.Latitude > 90))
+    {
+        errors["latitude"] = ["La latitude doit etre comprise entre -90 et 90."];
+    }
+
+    if (request.Longitude is not null && (request.Longitude < -180 || request.Longitude > 180))
+    {
+        errors["longitude"] = ["La longitude doit etre comprise entre -180 et 180."];
+    }
+
+    if (await dbContext.LoadingPoints.AnyAsync(item =>
+            item.Code == code &&
+            item.Id != currentLoadingPointId))
+    {
+        errors["code"] = ["Ce code point existe deja."];
+    }
+
+    if (request.ThirdPartyId is not null &&
+        !await dbContext.ThirdParties.AnyAsync(item => item.Id == request.ThirdPartyId.Value && item.IsActive))
+    {
+        errors["thirdPartyId"] = ["Le tiers selectionne est introuvable ou inactif."];
+    }
+
+    if (request.ExploitationId is not null &&
+        !await dbContext.Exploitations.AnyAsync(item => item.Id == request.ExploitationId.Value && item.IsActive))
+    {
+        errors["exploitationId"] = ["L'exploitation selectionnee est introuvable ou inactive."];
+    }
+
+    return errors;
+}
+
+static string[] GetLoadingPointTypes()
+{
+    return ["CHARGEMENT", "DECHARGEMENT", "MIXTE"];
+}
+
+static string NormalizeLoadingPointType(string? pointTypeCode)
+{
+    var normalized = NormalizeTechnicalCode(pointTypeCode);
+    return string.IsNullOrWhiteSpace(normalized) ? "MIXTE" : normalized;
+}
+
+static string NormalizeCountryCode(string? countryCode)
+{
+    var normalized = NormalizeOptionalText(countryCode)?.ToUpperInvariant() ?? "FR";
+    return normalized.Length <= 2 ? normalized : normalized[..2];
+}
+
+static string FormatLoadingPointType(string pointTypeCode)
+{
+    return NormalizeLoadingPointType(pointTypeCode) switch
+    {
+        "CHARGEMENT" => "Chargement",
+        "DECHARGEMENT" => "Dechargement",
+        _ => "Mixte"
+    };
+}
+
 internal sealed record LoginRequest(string Login, string Password);
 internal sealed record ForgotPasswordRequest(string LoginOrEmail);
 internal sealed record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
@@ -4499,6 +4826,20 @@ internal sealed record UpsertContraventionRequest(
     string? Notes,
     Guid? DriverEmployeeId,
     Guid? MaterialId);
+internal sealed record UpsertLoadingPointRequest(
+    string Code,
+    string Label,
+    string PointTypeCode,
+    string AddressLine,
+    string PostalCode,
+    string City,
+    string? CountryCode,
+    decimal? Latitude,
+    decimal? Longitude,
+    Guid? ThirdPartyId,
+    Guid? ExploitationId,
+    bool IsActive,
+    string? Notes);
 internal sealed record ProfileRightsBuildResult(bool IsValid, Dictionary<string, string[]> Errors, Dictionary<Guid, ModuleAccessLevel> RightsByModuleId);
 internal sealed record UpsertIntegrationCredentialRequest(
     string ProviderCode,

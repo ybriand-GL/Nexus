@@ -396,6 +396,52 @@ type ContraventionFormState = {
   error: string | null
 }
 
+type LoadingPointItem = {
+  id: string
+  code: string
+  label: string
+  pointTypeCode: string
+  pointTypeLabel: string
+  addressLine: string
+  postalCode: string
+  city: string
+  countryCode: string
+  latitude: number | null
+  longitude: number | null
+  isActive: boolean
+  notes: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  thirdParty: {
+    id: string
+    typeCode: string
+    displayName: string
+  } | null
+  exploitation: {
+    id: string
+    code: string
+    label: string
+  } | null
+}
+
+type LoadingPointFormState = {
+  code: string
+  label: string
+  pointTypeCode: string
+  addressLine: string
+  postalCode: string
+  city: string
+  countryCode: string
+  latitude: string
+  longitude: string
+  thirdPartyId: string
+  exploitationId: string
+  isActive: boolean
+  notes: string
+  isSaving: boolean
+  error: string | null
+}
+
 type EditableAccountState = {
   login: string
   displayName: string
@@ -539,12 +585,18 @@ const thirdPartySettingsSection = 'Tiers'
 const materialSettingsSection = 'Mat\u00e9riels'
 const settingsNavigationEntries = [...settingsSubmenuEntries] as const
 const contraventionsModuleCode = 'CONTRAVENTIONS'
+const loadingPointsModuleCode = 'CARTE_POINTS_CHARGEMENT_DECHARGEMENT'
 const contraventionStatuses = [
   { code: 'A_TRAITER', label: 'A traiter' },
   { code: 'EN_CONTESTATION', label: 'En contestation' },
   { code: 'A_PAYER', label: 'A payer' },
   { code: 'PAYEE', label: 'Payee' },
   { code: 'CLASSEE', label: 'Classee' },
+]
+const loadingPointTypes = [
+  { code: 'CHARGEMENT', label: 'Chargement' },
+  { code: 'DECHARGEMENT', label: 'Dechargement' },
+  { code: 'MIXTE', label: 'Mixte' },
 ]
 const commonDataNavigationEntries = ['Accueil', materialSettingsSection, employeeSettingsSection, thirdPartySettingsSection] as const
 const toolsSubmenuEntries = [
@@ -603,6 +655,7 @@ function App() {
   const [thirdParties, setThirdParties] = useState<ThirdPartyItem[]>([])
   const [materials, setMaterials] = useState<MaterialItem[]>([])
   const [contraventions, setContraventions] = useState<ContraventionItem[]>([])
+  const [loadingPoints, setLoadingPoints] = useState<LoadingPointItem[]>([])
   const [adminDiagnostics, setAdminDiagnostics] = useState<AdminDiagnostics | null>(null)
   const [integrationCredentials, setIntegrationCredentials] = useState<IntegrationCredentialItem[]>([])
   const [userSessions, setUserSessions] = useState<UserSessionsPayload>({ active: [], history: [] })
@@ -628,11 +681,13 @@ function App() {
   const [newThirdParty, setNewThirdParty] = useState<ThirdPartyFormState>(createEmptyThirdPartyForm())
   const [newMaterial, setNewMaterial] = useState<MaterialFormState>(createEmptyMaterialForm())
   const [contraventionForm, setContraventionForm] = useState<ContraventionFormState>(createEmptyContraventionForm())
+  const [loadingPointForm, setLoadingPointForm] = useState<LoadingPointFormState>(createEmptyLoadingPointForm())
   const [editingEmployee, setEditingEmployee] = useState<EmployeeItem | null>(null)
   const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null)
   const [editingThirdParty, setEditingThirdParty] = useState<ThirdPartyItem | null>(null)
   const [editingMaterial, setEditingMaterial] = useState<MaterialItem | null>(null)
   const [editingContravention, setEditingContravention] = useState<ContraventionItem | null>(null)
+  const [editingLoadingPoint, setEditingLoadingPoint] = useState<LoadingPointItem | null>(null)
   const [employeeForm, setEmployeeForm] = useState<EmployeeFormState>(createEmptyEmployeeForm())
   const [companyForm, setCompanyForm] = useState<CompanyFormState>(createEmptyCompanyForm())
   const [sireneCompanySearch, setSireneCompanySearch] = useState<SireneCompanySearchFormState>(createEmptySireneCompanySearchForm())
@@ -641,6 +696,7 @@ function App() {
   const [isThirdPartyModalOpen, setIsThirdPartyModalOpen] = useState(false)
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false)
   const [isContraventionModalOpen, setIsContraventionModalOpen] = useState(false)
+  const [isLoadingPointModalOpen, setIsLoadingPointModalOpen] = useState(false)
   const [changePassword, setChangePassword] = useState<ChangePasswordState>(createEmptyChangePasswordForm())
   const [forgotPassword, setForgotPassword] = useState<ForgotPasswordState>(createEmptyForgotPasswordForm())
   const [accountPasswordReset, setAccountPasswordReset] = useState<AccountPasswordResetState>(createEmptyAccountPasswordResetState())
@@ -691,6 +747,7 @@ function App() {
   const [scheduledTasksError, setScheduledTasksError] = useState<string | null>(null)
   const [runningScheduledTaskCode, setRunningScheduledTaskCode] = useState<string | null>(null)
   const [contraventionsError, setContraventionsError] = useState<string | null>(null)
+  const [loadingPointsError, setLoadingPointsError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -757,6 +814,8 @@ function App() {
 
   const contraventionsAccessLevel = rightsByModuleCode.get(contraventionsModuleCode) ?? 'None'
   const canWriteContraventions = contraventionsAccessLevel === 'Write'
+  const loadingPointsAccessLevel = rightsByModuleCode.get(loadingPointsModuleCode) ?? 'None'
+  const canWriteLoadingPoints = loadingPointsAccessLevel === 'Write'
 
   const modulesByGroup = useMemo(() => {
     return visibleModules.reduce<Record<string, SecurityModuleItem[]>>((groups, module) => {
@@ -1149,11 +1208,15 @@ function App() {
     const hasContraventionsAccess = user.rights.some(
       (right) => right.moduleCode === contraventionsModuleCode && canAccessModule(right.accessLevel),
     )
+    const hasLoadingPointsAccess = user.rights.some(
+      (right) => right.moduleCode === loadingPointsModuleCode && canAccessModule(right.accessLevel),
+    )
 
     if (user.profile?.code === 'INFORMATIQUE') {
       await Promise.all([
         loadAdminSecurityData(),
         hasContraventionsAccess ? loadContraventionsData() : Promise.resolve(),
+        hasLoadingPointsAccess ? loadLoadingPointsData() : Promise.resolve(),
       ])
       return
     }
@@ -1172,6 +1235,12 @@ function App() {
     } else {
       setContraventions([])
       setContraventionsError(null)
+    }
+    if (hasLoadingPointsAccess) {
+      await loadLoadingPointsData()
+    } else {
+      setLoadingPoints([])
+      setLoadingPointsError(null)
     }
     setAdminDiagnostics(null)
     setIntegrationCredentials([])
@@ -1255,6 +1324,38 @@ function App() {
     } catch (contraventionsLoadError) {
       setContraventionsError(
         contraventionsLoadError instanceof Error ? contraventionsLoadError.message : 'Erreur de chargement des contraventions.',
+      )
+    }
+  }
+
+  async function loadLoadingPointsData() {
+    setLoadingPointsError(null)
+
+    try {
+      const [pointsResponse, referentialsResponse] = await Promise.all([
+        fetch(apiPath('api/modules/loading-points')),
+        fetch(apiPath('api/modules/loading-points/referentials')),
+      ])
+
+      const failedResponse = [pointsResponse, referentialsResponse].find((response) => !response.ok)
+      if (failedResponse) {
+        throw new Error(await getRequestError(failedResponse, 'Impossible de charger les points.'))
+      }
+
+      const [pointsPayload, referentialsPayload] = await Promise.all([
+        pointsResponse.json() as Promise<LoadingPointItem[]>,
+        referentialsResponse.json() as Promise<{
+          thirdParties: ThirdPartyItem[]
+          exploitations: ExploitationItem[]
+        }>,
+      ])
+
+      setLoadingPoints(pointsPayload)
+      setThirdParties((current) => (current.length > 0 ? current : referentialsPayload.thirdParties))
+      setExploitations((current) => (current.length > 0 ? current : referentialsPayload.exploitations))
+    } catch (pointsLoadError) {
+      setLoadingPointsError(
+        pointsLoadError instanceof Error ? pointsLoadError.message : 'Erreur de chargement des points.',
       )
     }
   }
@@ -2956,6 +3057,66 @@ function App() {
     }
   }
 
+  function openCreateLoadingPointModal() {
+    setEditingLoadingPoint(null)
+    setLoadingPointForm(createEmptyLoadingPointForm())
+    setIsLoadingPointModalOpen(true)
+  }
+
+  function openEditLoadingPointModal(point: LoadingPointItem) {
+    setEditingLoadingPoint(point)
+    setLoadingPointForm(buildLoadingPointFormFromItem(point))
+    setIsLoadingPointModalOpen(true)
+  }
+
+  function closeLoadingPointModal() {
+    if (loadingPointForm.isSaving) {
+      return
+    }
+
+    setEditingLoadingPoint(null)
+    setIsLoadingPointModalOpen(false)
+    setLoadingPointForm(createEmptyLoadingPointForm())
+  }
+
+  function handleLoadingPointFormChange(
+    field: keyof Omit<LoadingPointFormState, 'isSaving' | 'error'>,
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+  ) {
+    const value = field === 'code' || field === 'countryCode' ? event.target.value.toUpperCase() : event.target.value
+    setLoadingPointForm((current) => ({ ...current, [field]: value, error: null }))
+  }
+
+  function handleLoadingPointStatusChange(event: ChangeEvent<HTMLInputElement>) {
+    setLoadingPointForm((current) => ({ ...current, isActive: event.target.checked, error: null }))
+  }
+
+  async function handleSaveLoadingPoint(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setLoadingPointForm((current) => ({ ...current, isSaving: true, error: null }))
+
+    try {
+      const response = await fetch(apiPath(editingLoadingPoint ? `api/modules/loading-points/${editingLoadingPoint.id}` : 'api/modules/loading-points'), {
+        method: editingLoadingPoint ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildLoadingPointPayload(loadingPointForm)),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, editingLoadingPoint ? 'La mise a jour du point a echoue.' : 'La creation du point a echoue.'))
+      }
+
+      await loadLoadingPointsData()
+      closeLoadingPointModal()
+    } catch (saveError) {
+      setLoadingPointForm((current) => ({
+        ...current,
+        isSaving: false,
+        error: saveError instanceof Error ? saveError.message : 'Erreur de sauvegarde.',
+      }))
+    }
+  }
+
   function handlePostAuthLoaderComplete() {
     sessionStorage.removeItem(postAuthLoaderStorageKey)
     setShowPostAuthLoader(false)
@@ -3502,6 +3663,98 @@ function App() {
                 {visibleWorkspaceModules.map((module) => {
                   const blueprint = getFunctionalModuleBlueprint(module.code)
                   const accessLevel = rightsByModuleCode.get(module.code) ?? 'None'
+
+                  if (module.code === loadingPointsModuleCode) {
+                    const activeCount = loadingPoints.filter((point) => point.isActive).length
+                    const geocodedCount = loadingPoints.filter((point) => point.latitude != null && point.longitude != null).length
+                    const cityCount = new Set(loadingPoints.map((point) => point.city.toUpperCase())).size
+
+                    return (
+                      <article className="functional-module-card loading-points-module-card" key={`workspace-${module.code}`}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{module.code}</span>
+                            <h3>{module.label}</h3>
+                          </div>
+                          <span className="profile-status-badge is-active">A tester</span>
+                        </header>
+                        <p>{blueprint.intent}</p>
+                        <div className="contraventions-toolbar">
+                          <div className="contraventions-kpis" aria-label="Synthese points">
+                            <span><strong>{loadingPoints.length}</strong> points</span>
+                            <span><strong>{activeCount}</strong> actifs</span>
+                            <span><strong>{geocodedCount}</strong> coordonnes</span>
+                            <span><strong>{cityCount}</strong> villes</span>
+                          </div>
+                          {canWriteLoadingPoints ? (
+                            <button className="primary-button" onClick={openCreateLoadingPointModal} type="button">
+                              Ajouter
+                            </button>
+                          ) : null}
+                        </div>
+                        {loadingPointsError ? <p className="form-error">{loadingPointsError}</p> : null}
+                        <div className="loading-points-layout">
+                          <div className="loading-points-map" aria-label="Carte locale des points">
+                            {loadingPoints.length === 0 ? (
+                              <span className="loading-points-map-empty">Aucun point declare</span>
+                            ) : (
+                              loadingPoints.slice(0, 18).map((point) => (
+                                <button
+                                  key={`pin-${point.id}`}
+                                  className={`loading-point-pin pin-${point.pointTypeCode.toLowerCase()}`}
+                                  disabled={!canWriteLoadingPoints}
+                                  onClick={() => canWriteLoadingPoints && openEditLoadingPointModal(point)}
+                                  type="button"
+                                >
+                                  <strong>{point.code}</strong>
+                                  <span>{point.city}</span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                          <div className="contraventions-table">
+                            {loadingPoints.length === 0 ? (
+                              <div className="workspace-empty">
+                                <strong>Aucun point charge/decharge</strong>
+                                <span>Le module est pret a enregistrer les sites, tiers, exploitations et coordonnees.</span>
+                              </div>
+                            ) : (
+                              loadingPoints.map((point) => (
+                                <article className="contravention-row" key={point.id}>
+                                  <div>
+                                    <strong>{point.code} - {point.label}</strong>
+                                    <span>{point.pointTypeLabel}</span>
+                                  </div>
+                                  <div>
+                                    <span>{point.addressLine}</span>
+                                    <span>{point.postalCode} {point.city} ({point.countryCode})</span>
+                                  </div>
+                                  <div>
+                                    <span>{point.thirdParty?.displayName ?? 'Tiers non rattache'}</span>
+                                    <span>{point.exploitation ? `${point.exploitation.code} - ${point.exploitation.label}` : 'Exploitation non rattachee'}</span>
+                                  </div>
+                                  <div>
+                                    <strong>{point.latitude != null && point.longitude != null ? `${point.latitude}, ${point.longitude}` : 'Coordonnees a completer'}</strong>
+                                    <span>{point.isActive ? 'Actif' : 'Inactif'}</span>
+                                  </div>
+                                  <div className="contravention-row-actions">
+                                    <span className={`profile-status-badge ${point.isActive ? 'is-active' : 'is-inactive'}`}>
+                                      {point.isActive ? 'Actif' : 'Inactif'}
+                                    </span>
+                                    {canWriteLoadingPoints ? (
+                                      <button className="secondary-button" onClick={() => openEditLoadingPointModal(point)} type="button">
+                                        Modifier
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </article>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    )
+                  }
 
                   if (module.code === contraventionsModuleCode) {
                     const openCount = contraventions.filter((item) => !['PAYEE', 'CLASSEE'].includes(item.statusCode)).length
@@ -5674,6 +5927,103 @@ function App() {
           </div>
         ) : null}
 
+        {isLoadingPointModalOpen || editingLoadingPoint ? (
+          <div className="modal-overlay" onClick={closeLoadingPointModal} role="presentation">
+            <section
+              aria-labelledby="loading-point-modal-title"
+              className="modal-card profile-modal-card"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="modal-header">
+                <div>
+                  <span className="eyebrow">{editingLoadingPoint ? 'Site' : 'Creation'}</span>
+                  <h2 id="loading-point-modal-title">{editingLoadingPoint ? 'Modifier le point' : 'Ajouter un point'}</h2>
+                </div>
+                <button className="modal-close-button" onClick={closeLoadingPointModal} type="button">
+                  Fermer
+                </button>
+              </div>
+
+              <form className="settings-form settings-create-form" onSubmit={handleSaveLoadingPoint}>
+                <label>
+                  <span>Code</span>
+                  <input value={loadingPointForm.code} onChange={(event) => handleLoadingPointFormChange('code', event)} />
+                </label>
+                <label>
+                  <span>Type</span>
+                  <select value={loadingPointForm.pointTypeCode} onChange={(event) => handleLoadingPointFormChange('pointTypeCode', event)}>
+                    {loadingPointTypes.map((type) => (
+                      <option key={type.code} value={type.code}>{type.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Libelle</span>
+                  <input value={loadingPointForm.label} onChange={(event) => handleLoadingPointFormChange('label', event)} />
+                </label>
+                <label>
+                  <span>Adresse</span>
+                  <input value={loadingPointForm.addressLine} onChange={(event) => handleLoadingPointFormChange('addressLine', event)} />
+                </label>
+                <label>
+                  <span>Code postal</span>
+                  <input value={loadingPointForm.postalCode} onChange={(event) => handleLoadingPointFormChange('postalCode', event)} />
+                </label>
+                <label>
+                  <span>Ville</span>
+                  <input value={loadingPointForm.city} onChange={(event) => handleLoadingPointFormChange('city', event)} />
+                </label>
+                <label>
+                  <span>Pays</span>
+                  <input maxLength={2} value={loadingPointForm.countryCode} onChange={(event) => handleLoadingPointFormChange('countryCode', event)} />
+                </label>
+                <label>
+                  <span>Tiers</span>
+                  <select value={loadingPointForm.thirdPartyId} onChange={(event) => handleLoadingPointFormChange('thirdPartyId', event)}>
+                    <option value="">Non rattache</option>
+                    {thirdParties.map((thirdParty) => (
+                      <option key={thirdParty.id} value={thirdParty.id}>{thirdParty.displayName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Exploitation</span>
+                  <select value={loadingPointForm.exploitationId} onChange={(event) => handleLoadingPointFormChange('exploitationId', event)}>
+                    <option value="">Non rattachee</option>
+                    {exploitations.map((exploitation) => (
+                      <option key={exploitation.id} value={exploitation.id}>{exploitation.code} - {exploitation.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Latitude</span>
+                  <input inputMode="decimal" value={loadingPointForm.latitude} onChange={(event) => handleLoadingPointFormChange('latitude', event)} />
+                </label>
+                <label>
+                  <span>Longitude</span>
+                  <input inputMode="decimal" value={loadingPointForm.longitude} onChange={(event) => handleLoadingPointFormChange('longitude', event)} />
+                </label>
+                <label className="toggle-label">
+                  <input checked={loadingPointForm.isActive} onChange={handleLoadingPointStatusChange} type="checkbox" />
+                  <span>Actif</span>
+                </label>
+                <label className="settings-form-wide">
+                  <span>Notes</span>
+                  <textarea value={loadingPointForm.notes} onChange={(event) => handleLoadingPointFormChange('notes', event)} />
+                </label>
+                <div className="profile-action-row">
+                  <button className="primary-button" disabled={loadingPointForm.isSaving} type="submit">
+                    {loadingPointForm.isSaving ? 'Enregistrement...' : editingLoadingPoint ? 'Enregistrer' : 'Ajouter'}
+                  </button>
+                  {loadingPointForm.error ? <small className="account-error">{loadingPointForm.error}</small> : null}
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
         {isCreateAccountModalOpen ? (
           <div className="modal-overlay" onClick={closeCreateAccountModal} role="presentation">
             <section
@@ -6418,6 +6768,74 @@ function buildContraventionPayload(form: ContraventionFormState) {
 
 function toDateInputValue(value: string) {
   return value.slice(0, 10)
+}
+
+function createEmptyLoadingPointForm(): LoadingPointFormState {
+  return {
+    code: '',
+    label: '',
+    pointTypeCode: 'MIXTE',
+    addressLine: '',
+    postalCode: '',
+    city: '',
+    countryCode: 'FR',
+    latitude: '',
+    longitude: '',
+    thirdPartyId: '',
+    exploitationId: '',
+    isActive: true,
+    notes: '',
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildLoadingPointFormFromItem(point: LoadingPointItem): LoadingPointFormState {
+  return {
+    code: point.code,
+    label: point.label,
+    pointTypeCode: point.pointTypeCode,
+    addressLine: point.addressLine,
+    postalCode: point.postalCode,
+    city: point.city,
+    countryCode: point.countryCode,
+    latitude: point.latitude == null ? '' : String(point.latitude),
+    longitude: point.longitude == null ? '' : String(point.longitude),
+    thirdPartyId: point.thirdParty?.id ?? '',
+    exploitationId: point.exploitation?.id ?? '',
+    isActive: point.isActive,
+    notes: point.notes ?? '',
+    isSaving: false,
+    error: null,
+  }
+}
+
+function buildLoadingPointPayload(form: LoadingPointFormState) {
+  return {
+    code: form.code.trim(),
+    label: form.label.trim(),
+    pointTypeCode: form.pointTypeCode,
+    addressLine: form.addressLine.trim(),
+    postalCode: form.postalCode.trim(),
+    city: form.city.trim(),
+    countryCode: form.countryCode.trim() || 'FR',
+    latitude: parseOptionalDecimal(form.latitude),
+    longitude: parseOptionalDecimal(form.longitude),
+    thirdPartyId: form.thirdPartyId || null,
+    exploitationId: form.exploitationId || null,
+    isActive: form.isActive,
+    notes: form.notes.trim() || null,
+  }
+}
+
+function parseOptionalDecimal(value: string) {
+  const normalized = value.trim().replace(',', '.')
+  if (!normalized) {
+    return null
+  }
+
+  const parsed = Number.parseFloat(normalized)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function buildCompanyPayload(form: CompanyFormState) {

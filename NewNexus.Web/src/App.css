@@ -868,6 +868,10 @@
   grid-column: 1 / -1;
 }
 
+.loading-points-module-card {
+  grid-column: 1 / -1;
+}
+
 .contraventions-toolbar,
 .contravention-row,
 .contravention-row-actions,
@@ -933,6 +937,67 @@
 .contravention-row-actions {
   justify-content: end;
   flex-wrap: wrap;
+}
+
+.loading-points-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, .82fr) minmax(0, 1.4fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.loading-points-map {
+  min-height: 360px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background:
+    linear-gradient(rgba(255, 255, 255, .04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .04) 1px, transparent 1px),
+    rgba(0, 0, 0, .18);
+  background-size: 36px 36px;
+}
+
+.loading-points-map-empty {
+  align-self: center;
+  justify-self: center;
+  color: var(--nexus-muted);
+  font-weight: 700;
+}
+
+.loading-point-pin {
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(247, 217, 138, .22);
+  background: rgba(255, 255, 255, .08);
+  color: var(--nexus-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.loading-point-pin span {
+  color: var(--nexus-muted);
+  font-size: .82rem;
+}
+
+.loading-point-pin:disabled {
+  cursor: default;
+}
+
+.pin-chargement {
+  border-color: rgba(91, 192, 222, .42);
+}
+
+.pin-dechargement {
+  border-color: rgba(215, 164, 73, .48);
 }
 
 .profile-grid {

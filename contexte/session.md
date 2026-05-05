@@ -1918,3 +1918,46 @@ Ordre cible de construction:
   - `GET /newNexus/api/system/info` retourne `200 application/json`
   - `GET /newNexus/api/modules/contraventions` retourne `401` sans session
   - `GET /newNexus/api/modules/contraventions/referentials` retourne `401` sans session
+
+## 2026-05-05 - Module carte des points chargements/dechargements
+
+- demande:
+  - continuer le backlog et mettre a jour le contexte
+  - publication IIS systematique maintenue
+- choix de perimetre:
+  - V1 locale sans dependance fournisseur
+  - coordonnees latitude/longitude saisies manuellement en attendant geocodage/cartographie reelle
+  - module rendu testable sans attendre Geoapify, Google ou OpenStreetMap
+- corrections domaine / donnees:
+  - ajout de l'entite `LoadingPoint`
+  - ajout de la table `exploitation.LoadingPoint`
+  - types supportes: `CHARGEMENT`, `DECHARGEMENT`, `MIXTE`
+  - rattachements optionnels vers `ThirdParty` et `Exploitation`
+  - coordonnees optionnelles `Latitude` / `Longitude`
+- corrections API:
+  - ajout de `GET /api/modules/loading-points`
+  - ajout de `GET /api/modules/loading-points/referentials`
+  - ajout de `POST /api/modules/loading-points`
+  - ajout de `PUT /api/modules/loading-points/{loadingPointId}`
+  - controle backend par droit module `CARTE_POINTS_CHARGEMENT_DECHARGEMENT`
+  - traces metier `LOADING_POINT_CREATED` et `LOADING_POINT_UPDATED` dans `MODULE_EVENTS`
+- corrections UI:
+  - remplacement de la carte scaffold par un ecran operationnel dans `Exploitation > Carte des points chargements/dechargements`
+  - synthese points / actifs / coordonnes / villes
+  - carte locale grillee avec pins de points
+  - liste detaillee des points avec adresse, tiers, exploitation, coordonnees et statut
+  - modale creation / edition avec type, adresse, coordonnees et rattachements
+- backlog:
+  - `Carte des points chargements/dechargements` passe de `SCAFFOLDE` a `A_TESTER`
+  - migration technique `LoadingPointsModule` ajoutee en `TERMINE`
+- validation technique:
+  - `dotnet ef migrations add LoadingPointsModule --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+- validation publication:
+  - `scripts\publish_newnexus_iis.ps1` OK
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api/system/info` retourne `200 application/json`
+  - `GET /newNexus/api/modules/loading-points` retourne `401` sans session
+  - `GET /newNexus/api/modules/loading-points/referentials` retourne `401` sans session

@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using NewNexus.Data.Postgres.Administration;
+using NewNexus.Data.Postgres.Modules;
 using NewNexus.Data.Postgres.Security;
 using NewNexus.Data.Postgres.Transverse;
 using NewNexus.Domain.Administration;
+using NewNexus.Domain.Modules;
 using NewNexus.Domain.Security;
 using NewNexus.Domain.Transverse;
 
@@ -25,6 +27,7 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<ApplicationTrace> ApplicationTraces => Set<ApplicationTrace>();
     public DbSet<Contravention> Contraventions => Set<Contravention>();
+    public DbSet<LoadingPoint> LoadingPoints => Set<LoadingPoint>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,5 +46,6 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
         modelBuilder.ApplyConfiguration(new IntegrationCredentialConfiguration());
         modelBuilder.ApplyConfiguration(new ApplicationTraceConfiguration());
         modelBuilder.ApplyConfiguration(new ContraventionConfiguration());
+        modelBuilder.ApplyConfiguration(new LoadingPointConfiguration());
     }
 }

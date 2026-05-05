@@ -1,5 +1,5 @@
 # Backlog detaille NewNexus
-Derniere mise a jour: 2026-05-04
+Derniere mise a jour: 2026-05-05
 
 ## Legende des statuts
 
@@ -47,6 +47,7 @@ Derniere mise a jour: 2026-05-04
 | UX | Harmonisation gabarits et menus sombres | TERMINE | Auth recalibree sur les proportions finales de la maquette, sous-menus administration sombres et blocs principaux uniformises entre entrees |
 | UX | Verrouillage bandeaux titres | TERMINE | Hauteur et grille interne des titres de pages uniformisees entre Accueil, Administration, Exploitation et Gestion administrative |
 | UX | Stabilisation cartes et textes | TERMINE | Regles anti-debordement ajoutees sur cartes, grilles et modales pour eviter chevauchements et textes sortants |
+| UX | Corrections ergonomiques administration | TERMINE | Boutons de fermeture modales sombres, badges `Aucun` rouges et favicon Nexus verifie apres publication |
 | Transverse | Outils cles API par logiciel | TERMINE | Import manuel retire de l'UI; liste regroupee a une carte par fournisseur logiciel |
 | Transverse | Outils cles API en modal | TERMINE | Fonctionnement aligne sur Profils: liste des logiciels, bouton ajouter une cle et configuration en modale |
 | UX | Maquettes UI haute fidelite | CADRE | Design system V1 et readiness diagnostics posent le cadre; captures haute fidelite a produire ensuite |
@@ -62,9 +63,9 @@ Derniere mise a jour: 2026-05-04
 | Securite | Entites domaine securite | TERMINE | `SecurityModule`, `SecurityProfile`, `SecurityProfileModuleRight`, `UserAccount` crees |
 | Securite | Authentification applicative | TERMINE | Login/logout/me par cookie operationnels |
 | Securite | Connexion SSO reelle | A_FAIRE | Brancher le bouton SSO sur le fournisseur d'identite Groupe Laure, gerer le retour d'authentification et le rattachement au compte NewNexus |
-| Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
+| Securite | Gestion des sessions | A_TESTER | Table `UserSession`, expiration par compte, suivi actif/historique et deconnexion forcee disponibles dans `Administration > Outils > Sessions` |
 | Securite | Gestion des profils | A_TESTER | Creation, edition, suppression backend et UI de synthese disponibles; readiness diagnostics ajoutee |
-| Securite | Gestion des comptes | A_TESTER | Lecture, creation, edition complete, activation, reset admin temporaire disponibles; SSO et mot de passe oublie mail exclus de cette passe |
+| Securite | Gestion des comptes | A_TESTER | Lecture, creation, edition complete, activation, reset admin temporaire et delai de deconnexion automatique par compte disponibles; SSO et mot de passe oublie mail exclus de cette passe |
 | Securite | Mot de passe oublie | EN_COURS | Demande utilisateur, jeton temporaire hashe, expiration, endpoint de reset et modale auth en place; envoi du lien a raccorder au service mail/SSO |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
@@ -74,7 +75,7 @@ Derniere mise a jour: 2026-05-04
 | Securite | Protection frontend par droits | TERMINE | Navigation et dashboard filtres selon les droits reels |
 | Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
 | Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
-| Securite | Ecran administration des comptes | A_TESTER | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: cartes, configuration, creation, modales corrigees, cycle de vie du compte et reset admin temporaire |
+| Securite | Ecran administration des comptes | A_TESTER | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: cartes, configuration, creation, modales corrigees, bouton fermer sombre, cycle de vie, timeout session et reset admin temporaire |
 | Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
@@ -100,7 +101,7 @@ Derniere mise a jour: 2026-05-04
 | Transverse | Rattachement multi-analytiques des tiers | A_TESTER | Table de liaison tiers/analytiques et selection multiple UI disponibles |
 | Transverse | Materiels | A_TESTER | Table, endpoints create/update, UI de creation/liste, numero de parc unique et rattachement exploitation disponibles |
 | Transverse | Parametrage des interfaces | A_TESTER | Table `IntegrationCredential`, UI Outils, import des cles Nexus legacy et readiness par fournisseur disponibles |
-| Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
+| Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Sessions, Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
 | Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
 | Transverse | Requeteur SQL controle | SCAFFOLDE | Catalogue de requetes nommees prepare; execution SQL libre exclue, lecture seule et journalisation a developper avant activation |
 | Transverse | Consultation des traces | SCAFFOLDE | Flux Authentification, Actions administrateur, Integrations et Erreurs applicatives prepares; collecte, stockage et masquage des secrets a developper |
@@ -151,6 +152,7 @@ Derniere mise a jour: 2026-05-04
 | Technique | Migration transverse Parametres | TERMINE | `TransverseSettingsSocle` generee et appliquee |
 | Technique | Migration cles integrations | TERMINE | `IntegrationCredentials` generee et appliquee |
 | Technique | Migration referentiels metier transverses | TERMINE | `TransverseBusinessReferentials` generee et appliquee localement |
+| Technique | Migration sessions utilisateurs | TERMINE | `UserSessionsAndTimeouts` generee et appliquee localement |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 | Technique | Endpoint diagnostics administration | TERMINE | `GET /api/admin/diagnostics` publie pour le profil Informatique |
 | Technique | Import cles Nexus legacy | TERMINE | 22 valeurs importees depuis `LOCATIF_DEV` et rechiffrees avec le trousseau IIS NewNexus |

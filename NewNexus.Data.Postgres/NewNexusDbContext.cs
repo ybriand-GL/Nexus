@@ -12,6 +12,7 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
     public DbSet<SecurityProfile> SecurityProfiles => Set<SecurityProfile>();
     public DbSet<SecurityProfileModuleRight> SecurityProfileModuleRights => Set<SecurityProfileModuleRight>();
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Analytic> Analytics => Set<Analytic>();
     public DbSet<Exploitation> Exploitations => Set<Exploitation>();
@@ -27,6 +28,7 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
         modelBuilder.ApplyConfiguration(new SecurityProfileConfiguration());
         modelBuilder.ApplyConfiguration(new SecurityProfileModuleRightConfiguration());
         modelBuilder.ApplyConfiguration(new UserAccountConfiguration());
+        modelBuilder.ApplyConfiguration(new UserSessionConfiguration());
         modelBuilder.ApplyConfiguration(new CompanyConfiguration());
         modelBuilder.ApplyConfiguration(new AnalyticConfiguration());
         modelBuilder.ApplyConfiguration(new ExploitationConfiguration());

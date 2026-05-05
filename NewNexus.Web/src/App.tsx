@@ -74,6 +74,7 @@ type AccountItem = {
   employeeNumber: string | null
   isActive: boolean
   mustChangePassword: boolean
+  sessionTimeoutMinutes: number
   createdAtUtc: string
   lastLoginAtUtc: string | null
   lastSyncedAtUtc: string | null
@@ -82,6 +83,28 @@ type AccountItem = {
     code: string
     label: string
   } | null
+}
+
+type UserSessionItem = {
+  id: string
+  userAccountId: string
+  login: string | null
+  displayName: string | null
+  profileLabel: string | null
+  loginAtUtc: string
+  lastSeenAtUtc: string
+  expiresAtUtc: string
+  logoutAtUtc: string | null
+  revokedAtUtc: string | null
+  ipAddress: string | null
+  userAgent: string | null
+  isActive: boolean
+  durationMinutes: number
+}
+
+type UserSessionsPayload = {
+  active: UserSessionItem[]
+  history: UserSessionItem[]
 }
 
 type AccountPasswordResetState = {
@@ -254,6 +277,7 @@ type EditableAccountState = {
   profileId: string
   isActive: boolean
   mustChangePassword: boolean
+  sessionTimeoutMinutes: string
   isSaving: boolean
   error: string | null
 }
@@ -420,6 +444,7 @@ function App() {
   const [materials, setMaterials] = useState<MaterialItem[]>([])
   const [adminDiagnostics, setAdminDiagnostics] = useState<AdminDiagnostics | null>(null)
   const [integrationCredentials, setIntegrationCredentials] = useState<IntegrationCredentialItem[]>([])
+  const [userSessions, setUserSessions] = useState<UserSessionsPayload>({ active: [], history: [] })
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
   const [editableProfiles, setEditableProfiles] = useState<Record<string, EditableProfileState>>({})
   const [editableCompanies, setEditableCompanies] = useState<Record<string, CompanyFormState>>({})
@@ -462,6 +487,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [credentialsError, setCredentialsError] = useState<string | null>(null)
+  const [sessionsError, setSessionsError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -841,6 +867,7 @@ function App() {
             profileId: account.profile?.id ?? '',
             isActive: account.isActive,
             mustChangePassword: account.mustChangePassword,
+            sessionTimeoutMinutes: String(account.sessionTimeoutMinutes || 60),
             isSaving: false,
             error: null,
           },
@@ -978,6 +1005,7 @@ function App() {
     setMaterials([])
     setAdminDiagnostics(null)
     setIntegrationCredentials([])
+    setUserSessions({ active: [], history: [] })
     setEditableAccounts({})
     setEditableProfiles({})
     setEditableCompanies({})
@@ -1026,7 +1054,7 @@ function App() {
   }
 
   async function loadAdminToolsData() {
-    await Promise.all([loadAdminDiagnostics(), loadIntegrationCredentials()])
+    await Promise.all([loadAdminDiagnostics(), loadIntegrationCredentials(), loadUserSessions()])
   }
 
   async function loadAdminDiagnostics() {
@@ -1048,6 +1076,7 @@ function App() {
 
   async function loadIntegrationCredentials() {
     setCredentialsError(null)
+    setSessionsError(null)
 
     try {
       const response = await fetch(apiPath('api/admin/integrations/credentials'))
@@ -1064,6 +1093,39 @@ function App() {
       setCredentialsError(
         credentialsLoadError instanceof Error ? credentialsLoadError.message : 'Erreur de chargement des clés API.',
       )
+    }
+  }
+
+  async function loadUserSessions() {
+    setSessionsError(null)
+
+    try {
+      const response = await fetch(apiPath('api/admin/sessions'))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de charger les sessions.'))
+      }
+
+      setUserSessions((await response.json()) as UserSessionsPayload)
+    } catch (sessionsLoadError) {
+      setSessionsError(sessionsLoadError instanceof Error ? sessionsLoadError.message : 'Sessions indisponibles.')
+    }
+  }
+
+  async function handleDisconnectUserSession(sessionId: string) {
+    setSessionsError(null)
+
+    try {
+      const response = await fetch(apiPath(`api/admin/sessions/${sessionId}/disconnect`), {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de deconnecter cette session.'))
+      }
+
+      await loadUserSessions()
+    } catch (disconnectError) {
+      setSessionsError(disconnectError instanceof Error ? disconnectError.message : 'Deconnexion impossible.')
     }
   }
 
@@ -1222,6 +1284,7 @@ function App() {
     setThirdParties([])
     setMaterials([])
     setIntegrationCredentials([])
+    setUserSessions({ active: [], history: [] })
     setEditableAccounts({})
     setEditableProfiles({})
     setEditableCompanies({})
@@ -1233,6 +1296,7 @@ function App() {
     setCredentialForm(createEmptyIntegrationCredentialForm())
     setDiagnosticsError(null)
     setCredentialsError(null)
+    setSessionsError(null)
   }
 
   function handleCredentialSelectionChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -1327,7 +1391,7 @@ function App() {
 
   function handleEditableAccountFieldChange(
     accountId: string,
-    field: 'login' | 'displayName' | 'email' | 'employeeNumber' | 'password' | 'profileId',
+    field: 'login' | 'displayName' | 'email' | 'employeeNumber' | 'password' | 'profileId' | 'sessionTimeoutMinutes',
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) {
     updateEditableAccount(accountId, (current) => ({
@@ -1350,7 +1414,7 @@ function App() {
   }
 
   function handleNewAccountFieldChange(
-    field: 'login' | 'displayName' | 'email' | 'employeeNumber' | 'password' | 'profileId',
+    field: 'login' | 'displayName' | 'email' | 'employeeNumber' | 'password' | 'profileId' | 'sessionTimeoutMinutes',
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) {
     setNewAccount((current) => ({
@@ -3633,6 +3697,13 @@ function App() {
                 Les outils techniques sont regroupés par usage pour éviter une page unique fourre-tout.
               </p>
               <section className="admin-subnav tools-subnav" aria-label="Sous-menu outils">
+                <button
+                  className={`admin-subnav-link ${selectedToolsSection === 'Sessions' ? 'admin-subnav-link-active' : ''}`}
+                  onClick={() => setSelectedToolsSection('Sessions')}
+                  type="button"
+                >
+                  Sessions
+                </button>
                 {toolsSubmenuEntries.map((entry) => (
                   <button
                     key={entry}
@@ -3647,6 +3718,15 @@ function App() {
 
               {selectedToolsSection === 'Accueil' ? (
                 <div className="dashboard-actions tools-dashboard-actions">
+                  <button
+                    className="dashboard-action-card"
+                    onClick={() => setSelectedToolsSection('Sessions')}
+                    type="button"
+                  >
+                    <span className="eyebrow">Sessions</span>
+                    <strong>Sessions utilisateurs</strong>
+                    <p>Utilisateurs connectes, historique des connexions et deconnexion forcee.</p>
+                  </button>
                   {toolsSubmenuEntries
                     .filter((entry) => entry !== 'Accueil')
                     .map((entry) => (
@@ -3664,6 +3744,108 @@ function App() {
                 </div>
               ) : null}
             </article>
+
+            {selectedToolsSection === 'Sessions' ? (
+              <article className="panel-card panel-card-wide admin-tools-card sessions-card">
+                <div className="panel-heading">
+                  <span className="eyebrow">Outils</span>
+                  <h2>Sessions utilisateurs</h2>
+                </div>
+                <p className="profiles-toolbar-copy">
+                  Supervision des utilisateurs connectes, historique des connexions et deconnexion forcee.
+                </p>
+                <div className="administration-synthesis-actions">
+                  <button className="secondary-button" onClick={() => void loadUserSessions()} type="button">
+                    Rafraichir les sessions
+                  </button>
+                </div>
+
+                {sessionsError ? (
+                  <div className="status-banner status-banner-error">
+                    <strong>Sessions indisponibles</strong>
+                    <span>{sessionsError}</span>
+                  </div>
+                ) : null}
+
+                <div className="metrics-grid">
+                  <article className="metric-card metric-card-navy">
+                    <span className="metric-label">Connectes</span>
+                    <strong>{userSessions.active.length}</strong>
+                  </article>
+                  <article className="metric-card metric-card-champagne">
+                    <span className="metric-label">Historique</span>
+                    <strong>{userSessions.history.length}</strong>
+                  </article>
+                  <article className="metric-card metric-card-gold">
+                    <span className="metric-label">Expiration defaut</span>
+                    <strong>1h</strong>
+                  </article>
+                  <article className="metric-card metric-card-cyan">
+                    <span className="metric-label">Parametrage</span>
+                    <strong>Par compte</strong>
+                  </article>
+                </div>
+
+                <section className="sessions-section">
+                  <div className="settings-list-header">
+                    <h3>Utilisateurs connectes</h3>
+                    <small>{userSessions.active.length} session(s)</small>
+                  </div>
+                  <div className="sessions-list">
+                    {userSessions.active.length > 0 ? (
+                      userSessions.active.map((session) => (
+                        <article className="session-row-card" key={session.id}>
+                          <div>
+                            <span className="eyebrow">{session.profileLabel ?? 'Sans profil'}</span>
+                            <strong>{session.displayName ?? session.login ?? 'Utilisateur inconnu'}</strong>
+                            <small>{session.login ?? 'Login non renseigne'} - {session.ipAddress ?? 'IP inconnue'}</small>
+                          </div>
+                          <div className="session-row-meta">
+                            <span>Connexion: {new Date(session.loginAtUtc).toLocaleString()}</span>
+                            <span>Derniere activite: {new Date(session.lastSeenAtUtc).toLocaleString()}</span>
+                            <span>Expiration: {new Date(session.expiresAtUtc).toLocaleString()}</span>
+                          </div>
+                          <button className="secondary-button danger-button" onClick={() => void handleDisconnectUserSession(session.id)} type="button">
+                            Deconnecter
+                          </button>
+                        </article>
+                      ))
+                    ) : (
+                      <div className="settings-empty">Aucun utilisateur connecte.</div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="sessions-section">
+                  <div className="settings-list-header">
+                    <h3>Historique des connexions</h3>
+                    <small>{userSessions.history.length} entree(s)</small>
+                  </div>
+                  <div className="sessions-history-table">
+                    <div className="sessions-history-header">
+                      <span>Utilisateur</span>
+                      <span>Connexion</span>
+                      <span>Duree</span>
+                      <span>Statut</span>
+                    </div>
+                    {userSessions.history.length > 0 ? (
+                      userSessions.history.map((session) => (
+                        <div className="sessions-history-row" key={`history-${session.id}`}>
+                          <strong>{session.displayName ?? session.login ?? 'Utilisateur inconnu'}</strong>
+                          <span>{new Date(session.loginAtUtc).toLocaleString()}</span>
+                          <span>{formatDurationMinutes(session.durationMinutes)}</span>
+                          <span className={`profile-status-badge ${session.isActive ? 'is-active' : 'is-inactive'}`}>
+                            {session.isActive ? 'Active' : session.revokedAtUtc ? 'Deconnectee' : session.logoutAtUtc ? 'Fermee' : 'Expiree'}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="settings-empty">Aucun historique de connexion.</div>
+                    )}
+                  </div>
+                </section>
+              </article>
+            ) : null}
 
             {selectedToolsSection === 'Diagnostics' ? (
             <article className="panel-card panel-card-wide admin-tools-card">
@@ -4044,6 +4226,7 @@ function App() {
             ) : null}
 
             {selectedToolsSection !== 'Accueil' &&
+            selectedToolsSection !== 'Sessions' &&
             selectedToolsSection !== toolsSubmenuEntries[3] &&
             selectedToolsSection !== toolsSubmenuEntries[4] &&
             selectedToolsSection !== 'Clés API' &&
@@ -4204,6 +4387,16 @@ function App() {
                     <span>Mot de passe initial</span>
                     <input type="password" value={newAccount.password} onChange={(event) => handleNewAccountFieldChange('password', event)} />
                   </label>
+                  <label>
+                    <span>Deconnexion auto (minutes)</span>
+                    <input
+                      min="5"
+                      max="1440"
+                      type="number"
+                      value={newAccount.sessionTimeoutMinutes}
+                      onChange={(event) => handleNewAccountFieldChange('sessionTimeoutMinutes', event)}
+                    />
+                  </label>
                   <label className="toggle-label settings-toggle">
                     <input checked={newAccount.isActive} onChange={(event) => handleNewAccountBooleanChange('isActive', event)} type="checkbox" />
                     <span>{newAccount.isActive ? 'Compte actif' : 'Compte inactif'}</span>
@@ -4355,6 +4548,16 @@ function App() {
                       type="password"
                       value={editingEditableAccount.password}
                       onChange={(event) => handleEditableAccountFieldChange(editingAccount.id, 'password', event)}
+                    />
+                  </label>
+                  <label>
+                    <span>Deconnexion auto (minutes)</span>
+                    <input
+                      min="5"
+                      max="1440"
+                      type="number"
+                      value={editingEditableAccount.sessionTimeoutMinutes}
+                      onChange={(event) => handleEditableAccountFieldChange(editingAccount.id, 'sessionTimeoutMinutes', event)}
                     />
                   </label>
                   <label className="toggle-label settings-toggle">
@@ -4580,6 +4783,7 @@ function createEmptyAccountForm(): EditableAccountState {
     profileId: '',
     isActive: true,
     mustChangePassword: true,
+    sessionTimeoutMinutes: '60',
     isSaving: false,
     error: null,
   }
@@ -4669,6 +4873,7 @@ function buildAccountPayload(account: EditableAccountState, isCreation: boolean)
     securityProfileId: account.profileId || null,
     isActive: account.isActive,
     mustChangePassword: account.mustChangePassword,
+    sessionTimeoutMinutes: Number.parseInt(account.sessionTimeoutMinutes, 10) || 60,
   }
 }
 
@@ -4870,6 +5075,18 @@ function getToolsSectionDescription(section: string) {
     default:
       return 'Vue d’ensemble des outils techniques disponibles.'
   }
+}
+
+function formatDurationMinutes(totalMinutes: number) {
+  const safeMinutes = Math.max(0, totalMinutes)
+  const hours = Math.floor(safeMinutes / 60)
+  const minutes = safeMinutes % 60
+
+  if (hours === 0) {
+    return `${minutes} min`
+  }
+
+  return `${hours}h ${String(minutes).padStart(2, '0')}`
 }
 
 function getSettingsSectionDescription(section: string) {

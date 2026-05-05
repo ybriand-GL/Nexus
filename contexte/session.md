@@ -1458,3 +1458,47 @@ Ordre cible de construction:
   - `GET http://192.168.60.158/newNexus/` retourne `200 text/html`
   - `GET http://192.168.50.102/newNexus/` retourne `200 text/html`
   - bundles publies: `index-DyRnIfVN.css` et `index-Cp348Y8u.js`
+
+## 2026-05-05 - Ergonomie comptes, sessions utilisateurs et favicon
+
+- demande:
+  - corriger le bouton blanc de fermeture dans la modale de configuration de compte
+  - rendre le libelle `Aucun` lisible en rouge sur les profils
+  - ajouter dans Outils les utilisateurs connectes, l'historique des connexions, le temps de connexion et la deconnexion forcee
+  - rendre le delai de deconnexion automatique parametrable par utilisateur, avec 1h par defaut
+  - verifier le favicon Nexus
+- corrections UX:
+  - bouton `Fermer` des modales passe en rendu sombre premium
+  - badges `Aucun`/droits `None` passent en rouge lisible
+  - styles ajoutes pour `Administration > Outils > Sessions`
+  - favicon `favicon.svg` verifie et servi par IIS en `image/svg+xml`
+- securite sessions:
+  - ajout de l'entite `UserSession`
+  - ajout du champ `SessionTimeoutMinutes` sur `UserAccount`, defaut 60 minutes
+  - creation d'une session a chaque login avec expiration par compte
+  - validation cookie rattachee a la session serveur: session expiree, fermee ou revoquee => cookie refuse
+  - logout utilisateur historise via `LogoutAtUtc`
+  - endpoint `GET /api/admin/sessions` pour sessions actives et historique
+  - endpoint `POST /api/admin/sessions/{sessionId}/disconnect` pour deconnecter une session
+- UI administration:
+  - champ `Deconnexion auto (minutes)` ajoute aux modales ajout/configuration de compte
+  - nouvelle entree visuelle `Sessions` dans `Administration > Outils`
+  - affichage des sessions actives avec IP, derniere activite, expiration et action `Deconnecter`
+  - historique des 100 dernieres sessions avec duree et statut
+- migration:
+  - `UserSessionsAndTimeouts` generee et appliquee localement
+- backlog:
+  - gestion des sessions passee a `A_TESTER`
+  - gestion des comptes enrichie avec le timeout par utilisateur
+  - centre d'outils enrichi avec la rubrique Sessions
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - `GET /newNexus/favicon.svg` retourne `200 image/svg+xml`
+  - bundles publies: `index-7PCJa-8p.css` et `index-C36CU3qJ.js`

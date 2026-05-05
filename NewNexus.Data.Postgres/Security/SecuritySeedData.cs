@@ -147,6 +147,7 @@ internal static class SecuritySeedData
             EmployeeNumber = null,
             PasswordHash = BootstrapAdminPasswordHash,
             MustChangePassword = true,
+            SessionTimeoutMinutes = 60,
             SecurityProfileId = ProfileInformatiqueId,
             IsActive = true,
             CreatedAtUtc = new DateTime(2026, 4, 29, 0, 0, 0, DateTimeKind.Utc),

@@ -32,6 +32,9 @@ internal sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAc
         builder.Property(entity => entity.PasswordResetTokenHash)
             .HasMaxLength(128);
 
+        builder.Property(entity => entity.SessionTimeoutMinutes)
+            .HasDefaultValue(60);
+
         builder.HasIndex(entity => entity.Login)
             .IsUnique();
 

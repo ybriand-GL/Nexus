@@ -1087,8 +1087,8 @@
 
 .profile-status-badge.is-inactive,
 .access-pill.access-none {
-  background: rgba(0, 0, 0, 0.08);
-  color: rgba(0, 0, 0, 0.74);
+  background: rgba(185, 28, 28, 0.14);
+  color: #b91c1c;
 }
 
 .access-pill.access-read {
@@ -1253,9 +1253,9 @@
   min-height: 40px;
   padding: 0 14px;
   border-radius: 14px;
-  border: 1px solid var(--nexus-border);
-  background: white;
-  color: var(--nexus-text);
+  border: 1px solid rgba(247, 217, 138, 0.24);
+  background: linear-gradient(180deg, rgba(10, 14, 22, 0.96), rgba(4, 6, 10, 0.96));
+  color: var(--nexus-gold-soft);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -1297,6 +1297,77 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
+}
+
+.sessions-card {
+  gap: 24px;
+}
+
+.sessions-section,
+.sessions-list,
+.sessions-history-table {
+  display: grid;
+  gap: 14px;
+}
+
+.session-row-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--nexus-border);
+  background:
+    radial-gradient(circle at top left, rgba(247, 217, 138, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 249, 252, 0.9));
+}
+
+.session-row-card strong,
+.session-row-card small,
+.session-row-meta span {
+  display: block;
+}
+
+.session-row-card small,
+.session-row-meta {
+  color: var(--nexus-muted);
+}
+
+.session-row-meta {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.danger-button {
+  border-color: rgba(185, 28, 28, 0.24);
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+}
+
+.sessions-history-header,
+.sessions-history-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.8fr) minmax(90px, 0.4fr) minmax(120px, 0.4fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.sessions-history-header {
+  padding: 0 14px;
+  color: var(--nexus-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sessions-history-row {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--nexus-border);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .integration-credentials-card {

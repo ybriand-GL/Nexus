@@ -70,6 +70,39 @@ builder.Services
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return Task.CompletedTask;
         };
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var sessionClaim = context.Principal?.FindFirst("session_id")?.Value;
+            if (!Guid.TryParse(sessionClaim, out var sessionId))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            var dbContext = context.HttpContext.RequestServices.GetRequiredService<NewNexusDbContext>();
+            var session = await dbContext.UserSessions
+                .Include(userSession => userSession.UserAccount)
+                .SingleOrDefaultAsync(userSession => userSession.Id == sessionId);
+
+            var now = DateTime.UtcNow;
+            if (session?.UserAccount is null ||
+                !session.UserAccount.IsActive ||
+                session.LogoutAtUtc is not null ||
+                session.RevokedAtUtc is not null ||
+                session.ExpiresAtUtc <= now)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            if (session.LastSeenAtUtc < now.AddMinutes(-1))
+            {
+                session.LastSeenAtUtc = now;
+                await dbContext.SaveChangesAsync();
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -525,14 +558,29 @@ app.MapPost("/api/auth/login", async (LoginRequest request, NewNexusDbContext db
         return Results.Unauthorized();
     }
 
-    account.LastLoginAtUtc = DateTime.UtcNow;
+    var now = DateTime.UtcNow;
+    var sessionTimeoutMinutes = NormalizeSessionTimeoutMinutes(account.SessionTimeoutMinutes);
+    var session = new UserSession
+    {
+        Id = Guid.NewGuid(),
+        UserAccountId = account.Id,
+        LoginAtUtc = now,
+        LastSeenAtUtc = now,
+        ExpiresAtUtc = now.AddMinutes(sessionTimeoutMinutes),
+        IpAddress = httpContext.Connection.RemoteIpAddress?.ToString(),
+        UserAgent = httpContext.Request.Headers.UserAgent.ToString()
+    };
+
+    account.LastLoginAtUtc = now;
+    dbContext.UserSessions.Add(session);
     await dbContext.SaveChangesAsync();
 
     var claims = new List<Claim>
     {
         new(ClaimTypes.NameIdentifier, account.Id.ToString()),
         new(ClaimTypes.Name, account.DisplayName),
-        new("login", account.Login)
+        new("login", account.Login),
+        new("session_id", session.Id.ToString())
     };
 
     if (account.SecurityProfile is not null)
@@ -544,13 +592,32 @@ app.MapPost("/api/auth/login", async (LoginRequest request, NewNexusDbContext db
 
     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
     var principal = new ClaimsPrincipal(identity);
-    await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+    await httpContext.SignInAsync(
+        CookieAuthenticationDefaults.AuthenticationScheme,
+        principal,
+        new AuthenticationProperties
+        {
+            IsPersistent = false,
+            ExpiresUtc = new DateTimeOffset(session.ExpiresAtUtc)
+        });
 
     return Results.Ok(BuildAuthenticatedUser(account));
 });
 
-app.MapPost("/api/auth/logout", async (HttpContext httpContext) =>
+app.MapPost("/api/auth/logout", async (HttpContext httpContext, NewNexusDbContext dbContext) =>
 {
+    var sessionId = GetSessionId(httpContext.User);
+    if (sessionId is not null)
+    {
+        var session = await dbContext.UserSessions.SingleOrDefaultAsync(userSession => userSession.Id == sessionId.Value);
+        if (session is not null && session.LogoutAtUtc is null)
+        {
+            session.LogoutAtUtc = DateTime.UtcNow;
+            session.LastSeenAtUtc = DateTime.UtcNow;
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
     await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.NoContent();
 });
@@ -939,6 +1006,7 @@ app.MapGet("/api/security/accounts", async (NewNexusDbContext dbContext) =>
             account.EmployeeNumber,
             account.IsActive,
             account.MustChangePassword,
+            account.SessionTimeoutMinutes,
             account.CreatedAtUtc,
             account.LastLoginAtUtc,
             account.LastSyncedAtUtc,
@@ -973,6 +1041,7 @@ app.MapPost("/api/security/accounts", async (CreateUserAccountRequest request, N
         EmployeeNumber = NormalizeOptionalText(request.EmployeeNumber),
         PasswordHash = PasswordHasher.HashPassword(request.Password),
         MustChangePassword = request.MustChangePassword,
+        SessionTimeoutMinutes = NormalizeSessionTimeoutMinutes(request.SessionTimeoutMinutes),
         SecurityProfileId = request.SecurityProfileId,
         IsActive = request.IsActive,
         CreatedAtUtc = DateTime.UtcNow
@@ -1018,6 +1087,7 @@ app.MapPut("/api/security/accounts/{accountId:guid}", async (
     account.Email = NormalizeOptionalText(request.Email);
     account.EmployeeNumber = NormalizeOptionalText(request.EmployeeNumber);
     account.MustChangePassword = request.MustChangePassword;
+    account.SessionTimeoutMinutes = NormalizeSessionTimeoutMinutes(request.SessionTimeoutMinutes);
     account.SecurityProfileId = request.SecurityProfileId;
     account.IsActive = request.IsActive;
 
@@ -1075,6 +1145,61 @@ app.MapPost("/api/security/accounts/{accountId:guid}/reset-password", async (
         TemporaryPassword = temporaryPassword,
         Message = "Mot de passe temporaire genere. L'utilisateur devra le changer a la prochaine connexion."
     });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapGet("/api/admin/sessions", async (NewNexusDbContext dbContext) =>
+{
+    var now = DateTime.UtcNow;
+    var activeSessions = await dbContext.UserSessions
+        .AsNoTracking()
+        .Include(session => session.UserAccount!)
+            .ThenInclude(account => account.SecurityProfile)
+        .Where(session => session.LogoutAtUtc == null && session.RevokedAtUtc == null && session.ExpiresAtUtc > now)
+        .OrderByDescending(session => session.LastSeenAtUtc)
+        .ToListAsync();
+
+    var historySessions = await dbContext.UserSessions
+        .AsNoTracking()
+        .Include(session => session.UserAccount!)
+            .ThenInclude(account => account.SecurityProfile)
+        .OrderByDescending(session => session.LoginAtUtc)
+        .Take(100)
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        Active = activeSessions
+            .Select(session => BuildUserSessionResponse(session, now))
+            .ToList(),
+        History = historySessions
+            .Select(session => BuildUserSessionResponse(session, now))
+            .ToList()
+    });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/admin/sessions/{sessionId:guid}/disconnect", async (
+    Guid sessionId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    var session = await dbContext.UserSessions.SingleOrDefaultAsync(userSession => userSession.Id == sessionId);
+    if (session is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (session.LogoutAtUtc is not null || session.RevokedAtUtc is not null)
+    {
+        return Results.NoContent();
+    }
+
+    var now = DateTime.UtcNow;
+    session.RevokedAtUtc = now;
+    session.LastSeenAtUtc = now;
+    session.RevokedByUserAccountId = GetUserId(principal);
+    await dbContext.SaveChangesAsync();
+
+    return Results.NoContent();
 }).RequireAuthorization("RequireInformatique");
 
 app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
@@ -2144,6 +2269,17 @@ static Guid? GetUserId(ClaimsPrincipal principal)
     return Guid.TryParse(rawValue, out var userId) ? userId : null;
 }
 
+static Guid? GetSessionId(ClaimsPrincipal principal)
+{
+    var rawValue = principal.FindFirstValue("session_id");
+    return Guid.TryParse(rawValue, out var sessionId) ? sessionId : null;
+}
+
+static int NormalizeSessionTimeoutMinutes(int value)
+{
+    return Math.Clamp(value <= 0 ? 60 : value, 5, 1440);
+}
+
 static string NormalizeProfileCode(string rawValue)
 {
     return string.Concat(
@@ -2203,6 +2339,7 @@ static object BuildAuthenticatedUser(UserAccount account)
         account.Email,
         account.EmployeeNumber,
         account.MustChangePassword,
+        account.SessionTimeoutMinutes,
         account.LastLoginAtUtc,
         Profile = profile == null
             ? null
@@ -2213,6 +2350,30 @@ static object BuildAuthenticatedUser(UserAccount account)
                 profile.Label
             },
         Rights = rights
+    };
+}
+
+static object BuildUserSessionResponse(UserSession session, DateTime now)
+{
+    var endAtUtc = session.LogoutAtUtc ?? session.RevokedAtUtc ?? (session.ExpiresAtUtc <= now ? session.ExpiresAtUtc : null);
+    var duration = (endAtUtc ?? now) - session.LoginAtUtc;
+
+    return new
+    {
+        session.Id,
+        session.UserAccountId,
+        Login = session.UserAccount?.Login,
+        DisplayName = session.UserAccount?.DisplayName,
+        ProfileLabel = session.UserAccount?.SecurityProfile?.Label,
+        session.LoginAtUtc,
+        session.LastSeenAtUtc,
+        session.ExpiresAtUtc,
+        session.LogoutAtUtc,
+        session.RevokedAtUtc,
+        session.IpAddress,
+        session.UserAgent,
+        IsActive = session.LogoutAtUtc is null && session.RevokedAtUtc is null && session.ExpiresAtUtc > now,
+        DurationMinutes = Math.Max(0, (int)Math.Round(duration.TotalMinutes))
     };
 }
 
@@ -2284,6 +2445,7 @@ static async Task<Dictionary<string, string[]>> ValidateCreateUserAccountRequest
         request.Login,
         request.DisplayName,
         request.Email,
+        request.SessionTimeoutMinutes,
         request.SecurityProfileId,
         dbContext);
 
@@ -2304,6 +2466,7 @@ static async Task<Dictionary<string, string[]>> ValidateUpdateUserAccountRequest
         request.Login,
         request.DisplayName,
         request.Email,
+        request.SessionTimeoutMinutes,
         request.SecurityProfileId,
         dbContext,
         currentAccountId);
@@ -2439,6 +2602,7 @@ static async Task<Dictionary<string, string[]>> ValidateUserAccountCoreAsync(
     string login,
     string displayName,
     string? email,
+    int sessionTimeoutMinutes,
     Guid? securityProfileId,
     NewNexusDbContext dbContext,
     Guid? currentAccountId = null)
@@ -2461,6 +2625,11 @@ static async Task<Dictionary<string, string[]>> ValidateUserAccountCoreAsync(
     if (!string.IsNullOrWhiteSpace(normalizedEmail) && !normalizedEmail.Contains('@'))
     {
         errors["email"] = ["L'adresse email est invalide."];
+    }
+
+    if (sessionTimeoutMinutes < 5 || sessionTimeoutMinutes > 1440)
+    {
+        errors["sessionTimeoutMinutes"] = ["Le delai de deconnexion doit etre compris entre 5 et 1440 minutes."];
     }
 
     var loginExists = await dbContext.UserAccounts.AnyAsync(account =>
@@ -2731,7 +2900,8 @@ internal sealed record CreateUserAccountRequest(
     string Password,
     Guid? SecurityProfileId,
     bool IsActive,
-    bool MustChangePassword);
+    bool MustChangePassword,
+    int SessionTimeoutMinutes);
 internal sealed record UpdateUserAccountRequest(
     string Login,
     string DisplayName,
@@ -2740,7 +2910,8 @@ internal sealed record UpdateUserAccountRequest(
     string? NewPassword,
     Guid? SecurityProfileId,
     bool IsActive,
-    bool MustChangePassword);
+    bool MustChangePassword,
+    int SessionTimeoutMinutes);
 internal sealed record ProfileModuleRightRequest(Guid SecurityModuleId, string AccessLevel);
 internal sealed record CreateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);
 internal sealed record UpdateSecurityProfileRequest(string Label, bool IsActive, List<ProfileModuleRightRequest> ModuleRights);

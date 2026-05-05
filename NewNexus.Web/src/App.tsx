@@ -138,6 +138,19 @@ type AdminDiagnostics = {
       provider: string
     }
   }
+  readiness: {
+    ux: AdminReadinessItem[]
+    security: AdminReadinessItem[]
+    settings: AdminReadinessItem[]
+    interfaces: AdminReadinessItem[]
+  }
+}
+
+type AdminReadinessItem = {
+  label: string
+  status: string
+  detail: string
+  nextStep: string
 }
 
 type IntegrationCredentialItem = {
@@ -3388,6 +3401,40 @@ function App() {
                       <small>{adminDiagnostics.settings.exploitationCount} exploitation(s)</small>
                     </article>
                   </div>
+                  <div className="tools-safety-banner">
+                    <strong>Readiness backlog 1 + 2 hors SSO/mail + 3 + 5</strong>
+                    <span>Vue de pilotage consolidee pour verifier ce qui est testable et ce qui reste conditionne par arbitrage ou contrat API externe.</span>
+                  </div>
+                  {[
+                    ['UX', adminDiagnostics.readiness.ux],
+                    ['Securite et administration', adminDiagnostics.readiness.security],
+                    ['Parametres transverses', adminDiagnostics.readiness.settings],
+                    ['Interfaces', adminDiagnostics.readiness.interfaces],
+                  ].map(([sectionLabel, items]) => (
+                    <section className="readiness-section" key={sectionLabel as string}>
+                      <div className="settings-list-header">
+                        <h3>{sectionLabel as string}</h3>
+                        <small>{(items as AdminReadinessItem[]).length} chantier(s)</small>
+                      </div>
+                      <div className="tools-catalog-grid readiness-grid">
+                        {(items as AdminReadinessItem[]).map((item) => (
+                          <article className="tool-blueprint-card readiness-card" key={`${sectionLabel}-${item.label}`}>
+                            <header>
+                              <div>
+                                <span className="eyebrow">{item.status}</span>
+                                <h3>{item.label}</h3>
+                              </div>
+                            </header>
+                            <p>{item.detail}</p>
+                            <div className="profile-summary-right">
+                              <span>Prochaine etape</span>
+                              <strong>{item.nextStep}</strong>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
                 </>
               ) : (
                 <div className="settings-empty">Chargement des diagnostics...</div>

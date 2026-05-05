@@ -31,10 +31,10 @@ Derniere mise a jour: 2026-05-04
 |---|---|---|---|
 | UX | Cadrage UX V1 | TERMINE | Document redige |
 | UX | Wireframes V1 | TERMINE | Document redige |
-| UX | Dashboard par profil | EN_COURS | Remplace progressivement par des vues de travail par entree, personnalisation a poursuivre |
+| UX | Dashboard par profil | A_TESTER | Accueil, vues de travail et readiness diagnostics disponibles; personnalisation fine par profil a poursuivre apres recette |
 | UX | Coque frontend premium initiale | TERMINE | Shell Nexus 4C integre et branche au socle |
 | UX | Integration identite visuelle Nexus | TERMINE | Assets officiels SVG, palette graphite/champagne et tokens centralises appliques depuis le prompt Nexus |
-| UX | Qualite accents et libelles UTF-8 | EN_COURS | Normalisation visible des libelles mojibake ajoutee cote interface; nettoyage source complet a poursuivre |
+| UX | Qualite accents et libelles UTF-8 | A_TESTER | Normalisation visible des libelles mojibake ajoutee cote interface; nettoyage source complet a poursuivre apres recette |
 | UX | Tokens officiels du handoff | TERMINE | `nexus-theme.css`, `design-tokens.css` et `design-tokens.json` alignes sur l'identite Nexus sombre |
 | UX | Animation post-authentification | TERMINE | Transition `Groupe Laure × Nexus` integree, affichage unique après login |
 | UX | Favicon et identite navigateur | TERMINE | Icônes 16/32/180/192/512 et manifest publies |
@@ -49,7 +49,7 @@ Derniere mise a jour: 2026-05-04
 | UX | Stabilisation cartes et textes | TERMINE | Regles anti-debordement ajoutees sur cartes, grilles et modales pour eviter chevauchements et textes sortants |
 | Transverse | Outils cles API par logiciel | TERMINE | Import manuel retire de l'UI; liste regroupee a une carte par fournisseur logiciel |
 | Transverse | Outils cles API en modal | TERMINE | Fonctionnement aligne sur Profils: liste des logiciels, bouton ajouter une cle et configuration en modale |
-| UX | Maquettes UI haute fidelite | A_FAIRE | Etape ulterieure |
+| UX | Maquettes UI haute fidelite | CADRE | Design system V1 et readiness diagnostics posent le cadre; captures haute fidelite a produire ensuite |
 | UX | Design system NewNexus | SCAFFOLDE | Document V1 cree dans `docs/newnexus-design-system-v1.md`; a enrichir avec composants et captures |
 
 ## 3. Securite et droits
@@ -63,43 +63,43 @@ Derniere mise a jour: 2026-05-04
 | Securite | Authentification applicative | TERMINE | Login/logout/me par cookie operationnels |
 | Securite | Connexion SSO reelle | A_FAIRE | Brancher le bouton SSO sur le fournisseur d'identite Groupe Laure, gerer le retour d'authentification et le rattachement au compte NewNexus |
 | Securite | Gestion des sessions | TERMINE | Session cookie applicative en place |
-| Securite | Gestion des profils | EN_COURS | Creation, edition et suppression backend en place, finalisation UI a poursuivre |
-| Securite | Gestion des comptes | EN_COURS | Lecture, creation, edition complete, changement de mot de passe utilisateur et reinitialisation admin par mot de passe temporaire disponibles; recuperation mot de passe oublie par email a raccorder |
+| Securite | Gestion des profils | A_TESTER | Creation, edition, suppression backend et UI de synthese disponibles; readiness diagnostics ajoutee |
+| Securite | Gestion des comptes | A_TESTER | Lecture, creation, edition complete, activation, reset admin temporaire disponibles; SSO et mot de passe oublie mail exclus de cette passe |
 | Securite | Mot de passe oublie | EN_COURS | Demande utilisateur, jeton temporaire hashe, expiration, endpoint de reset et modale auth en place; envoi du lien a raccorder au service mail/SSO |
 | Securite | Endpoints lecture modules/profils | TERMINE | `modules`, `profiles`, `bootstrap` exposes |
 | Securite | Endpoint lecture comptes | TERMINE | `GET /api/security/accounts` expose |
 | Securite | Endpoints creation / edition comptes | TERMINE | `POST /api/security/accounts` et `PUT /api/security/accounts/{id}` exposes |
 | Securite | Changement de mot de passe | TERMINE | Endpoint utilisateur et ecran force `mustChangePassword` en place |
-| Securite | Controle d'autorisation backend | EN_COURS | Policy `RequireInformatique` en place sur les endpoints securite |
+| Securite | Controle d'autorisation backend | A_TESTER | Policy `RequireInformatique` en place sur les endpoints administration/securite; tests automatises 401/403/200 a ajouter |
 | Securite | Protection frontend par droits | TERMINE | Navigation et dashboard filtres selon les droits reels |
 | Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
 | Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
-| Securite | Ecran administration des comptes | EN_COURS | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: cartes, configuration, creation, modales corrigees, cycle de vie du compte et reset admin temporaire |
+| Securite | Ecran administration des comptes | A_TESTER | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: cartes, configuration, creation, modales corrigees, cycle de vie du compte et reset admin temporaire |
 | Securite | Endpoint creation profil | TERMINE | `POST /api/security/profiles` publie et teste |
 | Securite | Endpoint mise a jour profil | TERMINE | `PUT /api/security/profiles/{id}` publie et teste |
 | Securite | Endpoint suppression profil | TERMINE | `DELETE /api/security/profiles/{id}` publie et teste |
-| Securite | Ecran administration des profils | EN_COURS | Vue synthese par profil, creation via modale, edition directe et etat vide en place |
-| Securite | Ecran administration des parametres | EN_COURS | Mini-accueil Parametres, entrees separees et recherche SIRENE par SIREN pour pre-remplir les societes |
-| Securite | Ecran administration des outils | EN_COURS | Diagnostics application, PostgreSQL, securite, parametres, SIRENE, cles API, Taches planifiees, Requeteur SQL et Traces en place |
-| UX | Sortie du mode tout-dashboard | EN_COURS | Navigation laterale reliee a des vues de travail distinctes; Administration et Parametres disposent maintenant d'accueils de choix |
-| UX | Accueil par profil | EN_COURS | Entree `Accueil` retablie comme page d'arrivee; personnalisation par profil a approfondir |
-| UX | Responsive tablette / smartphone / PC | SCAFFOLDE | Passe CSS responsive initiale appliquee sur shell, menus, grilles, formulaires et modales; recette multi-format a poursuivre |
+| Securite | Ecran administration des profils | A_TESTER | Vue synthese par profil, creation via modale, edition directe et etat vide en place |
+| Securite | Ecran administration des parametres | A_TESTER | Mini-accueil Parametres, entrees separees, recherche SIRENE par SIREN et readiness diagnostics disponibles |
+| Securite | Ecran administration des outils | A_TESTER | Diagnostics application, PostgreSQL, securite, parametres, readiness backlog, SIRENE, cles API, Taches planifiees, Requeteur SQL et Traces en place |
+| UX | Sortie du mode tout-dashboard | A_TESTER | Navigation laterale reliee a des vues de travail distinctes; Administration, Parametres et Outils disposent d'accueils de choix |
+| UX | Accueil par profil | A_TESTER | Entree `Accueil` retablie comme page d'arrivee; personnalisation fine par profil a approfondir apres recette |
+| UX | Responsive tablette / smartphone / PC | A_TESTER | Passe CSS responsive initiale appliquee sur shell, menus, grilles, formulaires et modales; recette multi-format a effectuer |
 
 ## 4. Transverse
 
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
 | Transverse | Schema transverse V1 | TERMINE | Document redige |
-| Transverse | Societes Groupe Laure | EN_COURS | Tables, endpoints create/update, UI create/update et recherche SIRENE par SIREN en place; enrichissement complet SIRENE a poursuivre |
-| Transverse | Analytiques | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place |
-| Transverse | Exploitations | EN_COURS | Tables, endpoints create/update et UI create/update dans `Administration > Parametres` en place |
-| Transverse | Salaries | SCAFFOLDE | Entree `Parametres > Salaries` preparee: source unique Lucca, aucun import reel active |
+| Transverse | Societes Groupe Laure | A_TESTER | Tables, endpoints create/update, UI create/update, recherche SIRENE par SIREN et readiness diagnostics en place; enrichissement complet SIRENE a poursuivre |
+| Transverse | Analytiques | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
+| Transverse | Exploitations | A_TESTER | Tables, endpoints create/update, UI create/update et readiness diagnostics dans `Administration > Parametres` en place |
+| Transverse | Salaries | A_DEVELOPPER | Entree `Parametres > Salaries` et readiness Lucca preparees; import reel suspendu au contrat API Lucca |
 | Transverse | Distinction conducteurs | SCAFFOLDE | Regle de qualification conducteur cadree dans l'ecran Salaries; modele local a developper |
-| Transverse | Creation auto des comptes depuis salaries | SCAFFOLDE | Regle cadree: compte cree depuis Lucca sans droit tant qu'un profil NewNexus n'est pas affecte |
+| Transverse | Creation auto des comptes depuis salaries | A_DEVELOPPER | Regle cadree: compte cree depuis Lucca sans droit tant qu'un profil NewNexus n'est pas affecte; depend de l'import salaries |
 | Transverse | Tiers | SCAFFOLDE | Entree `Parametres > Tiers` preparee: multi-types, limites SIRENE et cas particuliers a arbitrer |
 | Transverse | Rattachement multi-analytiques des tiers | SCAFFOLDE | Cadrage affiche dans `Tiers`; table de liaison tiers/societes/analytiques a developper |
 | Transverse | Materiels | SCAFFOLDE | Entree `Parametres > Materiels` preparee: numero de parc unique, TruckOnline et YellowBox a raccorder |
-| Transverse | Parametrage des interfaces | EN_COURS | Table `IntegrationCredential`, UI Outils et import des cles Nexus legacy en place |
+| Transverse | Parametrage des interfaces | A_TESTER | Table `IntegrationCredential`, UI Outils, import des cles Nexus legacy et readiness par fournisseur disponibles |
 | Transverse | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Taches planifiees, Requeteur SQL, Traces et Diagnostics prepares |
 | Transverse | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
 | Transverse | Requeteur SQL controle | SCAFFOLDE | Catalogue de requetes nommees prepare; execution SQL libre exclue, lecture seule et journalisation a developper avant activation |
@@ -110,12 +110,12 @@ Derniere mise a jour: 2026-05-04
 
 | Domaine | Fonctionnalite | Statut | Commentaire |
 |---|---|---|---|
-| Interfaces | SIRENE | EN_COURS | Creation societes active; client ID legacy importe dans les cles API |
-| Interfaces | LUCCA | EN_COURS | Parametres legacy importes; ecran Salaries et tache provisioning comptes prepares, integration metier a developper |
-| Interfaces | Truckonline | EN_COURS | Parametres et secrets legacy importes; ecran Materiels prepare, integration metier a developper |
-| Interfaces | YellowBox | EN_COURS | Parametres et secrets legacy importes; ecran Materiels prepare, integration metier a developper |
-| Interfaces | Geocodage | EN_COURS | Emplacements Geoapify/Google disponibles dans Outils; aucune valeur legacy renseignee detectee |
-| Interfaces | Cartographie | EN_COURS | OpenStreetMap/Nominatim reference dans Outils; pas de cle legacy requise detectee |
+| Interfaces | SIRENE | A_TESTER | Creation societes et recherche SIRENE actives; readiness diagnostics ajoutee, enrichissement complet a poursuivre |
+| Interfaces | LUCCA | A_DEVELOPPER | Parametres legacy importes, ecran Salaries, tache provisioning et readiness disponibles; client metier a raccorder apres validation contrat API |
+| Interfaces | Truckonline | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client metier a raccorder apres validation contrat API |
+| Interfaces | YellowBox | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client telematique a raccorder apres validation contrat API |
+| Interfaces | Geocodage | A_DEVELOPPER | Emplacements Geoapify/Google et readiness disponibles; choix fournisseur et cle active a confirmer |
+| Interfaces | Cartographie | A_DEVELOPPER | OpenStreetMap/Nominatim reference dans Outils et readiness disponible; raccord carte depend du modele des points |
 
 ## 6. Modules fonctionnels V1
 

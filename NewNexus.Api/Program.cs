@@ -215,6 +215,24 @@ app.MapGet("/api/admin/diagnostics", async (NewNexusDbContext dbContext, HttpCon
     var companyCount = canConnect ? await dbContext.Companies.CountAsync() : 0;
     var analyticCount = canConnect ? await dbContext.Analytics.CountAsync() : 0;
     var exploitationCount = canConnect ? await dbContext.Exploitations.CountAsync() : 0;
+    var credentialProviderStatus = canConnect
+        ? await dbContext.IntegrationCredentials
+            .AsNoTracking()
+            .GroupBy(credential => credential.ProviderCode)
+            .Select(group => new CredentialProviderStatus(
+                group.Key,
+                group.Count(),
+                group.Count(credential => credential.ProtectedValue != string.Empty),
+                group.Count(credential => credential.IsActive && credential.ProtectedValue != string.Empty)))
+            .ToListAsync()
+        : new List<CredentialProviderStatus>();
+
+    bool HasActiveCredential(params string[] providerCodes)
+    {
+        return credentialProviderStatus.Any(provider =>
+            providerCodes.Any(code => string.Equals(provider.ProviderCode, code, StringComparison.OrdinalIgnoreCase)) &&
+            provider.ActiveConfiguredCount > 0);
+    }
 
     return Results.Ok(new
     {
@@ -249,6 +267,126 @@ app.MapGet("/api/admin/diagnostics", async (NewNexusDbContext dbContext, HttpCon
             {
                 Status = "configured",
                 Provider = "API Recherche d'Entreprises"
+            }
+        },
+        Readiness = new
+        {
+            Ux = new[]
+            {
+                new
+                {
+                    Label = "Libelles et accents",
+                    Status = "A_TESTER",
+                    Detail = "Normalisation visible active; nettoyage source complet a poursuivre.",
+                    NextStep = "Recette ecrans critiques puis suppression progressive des chaines historiques cassees."
+                },
+                new
+                {
+                    Label = "Responsive",
+                    Status = "A_TESTER",
+                    Detail = "Passe CSS tablette/mobile appliquee.",
+                    NextStep = "Verifier les formats desktop, tablette et smartphone sur IIS."
+                },
+                new
+                {
+                    Label = "Design system",
+                    Status = "SCAFFOLDE",
+                    Detail = "Document V1 disponible avec tokens, composants et regles d'usage.",
+                    NextStep = "Ajouter captures et composants reutilisables lors des prochains ecrans."
+                }
+            },
+            Security = new[]
+            {
+                new
+                {
+                    Label = "Profils",
+                    Status = profileCount > 0 ? "A_TESTER" : "A_COMPLETER",
+                    Detail = $"{profileCount} profil(s) disponibles; creation, edition et suppression non systeme exposees.",
+                    NextStep = "Recetter les droits par module avec les profils metier."
+                },
+                new
+                {
+                    Label = "Comptes utilisateurs",
+                    Status = accountCount > 0 ? "A_TESTER" : "A_COMPLETER",
+                    Detail = $"{accountCount} compte(s) disponible(s); creation, edition, activation et reset temporaire exposes.",
+                    NextStep = "Recetter le cycle de vie complet hors SSO et hors mot de passe oublie par mail."
+                },
+                new
+                {
+                    Label = "Autorisation backend",
+                    Status = "A_TESTER",
+                    Detail = "Les endpoints administration sensibles exigent le profil Informatique.",
+                    NextStep = "Ajouter des tests automatises 401/403/200."
+                }
+            },
+            Settings = new[]
+            {
+                new
+                {
+                    Label = "Societes",
+                    Status = "A_TESTER",
+                    Detail = $"{companyCount} societe(s); creation, edition et recherche SIRENE par SIREN disponibles.",
+                    NextStep = "Completer l'enrichissement SIRENE au-dela des champs de base."
+                },
+                new
+                {
+                    Label = "Analytiques",
+                    Status = "A_TESTER",
+                    Detail = $"{analyticCount} analytique(s); creation et edition rattachees aux societes.",
+                    NextStep = "Valider le modele de codification metier."
+                },
+                new
+                {
+                    Label = "Exploitations",
+                    Status = "A_TESTER",
+                    Detail = $"{exploitationCount} exploitation(s); creation et edition rattachees aux societes.",
+                    NextStep = "Valider la granularite d'exploitation avec les utilisateurs metier."
+                }
+            },
+            Interfaces = new[]
+            {
+                new
+                {
+                    Label = "SIRENE",
+                    Status = "A_TESTER",
+                    Detail = "Recherche societe active via API Recherche d'Entreprises.",
+                    NextStep = "Finaliser l'enrichissement et gerer les cas hors SIRENE."
+                },
+                new
+                {
+                    Label = "Lucca",
+                    Status = HasActiveCredential("LUCCA") ? "PRET_A_RACCORDER" : "CLE_A_COMPLETER",
+                    Detail = "Cles parametrees dans Outils; import salaries non active.",
+                    NextStep = "Brancher le client Lucca lorsque le contrat API cible est valide."
+                },
+                new
+                {
+                    Label = "TruckOnline",
+                    Status = HasActiveCredential("TRUCKONLINE", "TRUCK_ONLINE") ? "PRET_A_RACCORDER" : "CLE_A_COMPLETER",
+                    Detail = "Cles parametrees dans Outils; synchronisation parc non activee.",
+                    NextStep = "Valider endpoints TruckOnline et mapping materiels."
+                },
+                new
+                {
+                    Label = "YellowBox",
+                    Status = HasActiveCredential("YELLOWBOX", "YELLOW_BOX") ? "PRET_A_RACCORDER" : "CLE_A_COMPLETER",
+                    Detail = "Cles parametrees dans Outils; telematique non activee.",
+                    NextStep = "Valider endpoints YellowBox et mapping telematique."
+                },
+                new
+                {
+                    Label = "Geocodage",
+                    Status = HasActiveCredential("GEOAPIFY", "GOOGLE_MAPS") ? "PRET_A_RACCORDER" : "CLE_A_COMPLETER",
+                    Detail = "Geoapify ou Google utilisables selon cle declaree.",
+                    NextStep = "Choisir le fournisseur principal pour les points de chargement/dechargement."
+                },
+                new
+                {
+                    Label = "Cartographie",
+                    Status = "CADRE",
+                    Detail = "OpenStreetMap / Nominatim reference; aucune cle requise detectee.",
+                    NextStep = "Raccorder la carte lorsque le modele des points est valide."
+                }
             }
         }
     });
@@ -2235,5 +2373,10 @@ internal sealed record IntegrationCredentialDefinition(
     bool IsSecret,
     string? LegacyParameterKey,
     string? Notes);
+internal sealed record CredentialProviderStatus(
+    string ProviderCode,
+    int TotalCount,
+    int ConfiguredCount,
+    int ActiveConfiguredCount);
 internal sealed record LegacyAdminApiKeyRow(int ApiKeyId, string KeyValue, string ProviderName, string CreatedOn);
 internal sealed record LegacyImportResult(int ImportedCount, int SkippedCount, int FailedCount, List<string> Messages);

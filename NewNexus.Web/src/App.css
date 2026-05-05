@@ -1516,6 +1516,28 @@
   margin: 0;
 }
 
+.readiness-section {
+  display: grid;
+  gap: 14px;
+}
+
+.readiness-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.readiness-card {
+  min-height: 250px;
+}
+
+.readiness-card .profile-summary-right {
+  align-self: end;
+}
+
+.readiness-card .profile-summary-right strong {
+  font-size: .92rem;
+  line-height: 1.35;
+}
+
 .settings-list-section {
   align-content: start;
 }

@@ -1386,3 +1386,35 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api` retourne `200 application/json`
   - bundles publies: `index-DXVLchaD.css` et `index-PJT7jn-U.js`
+
+## 2026-05-04 - Passe consolidation backlog 1+2 hors SSO/mail + 3 + 5
+
+- perimetre traite:
+  - UX: qualite libelles, responsive, design system, maquettes cadre
+  - Securite / Administration: profils, comptes, autorisations backend, ecrans Administration
+  - Parametres transverses: societes, analytiques, exploitations et cadrage salaries
+  - Interfaces: SIRENE, Lucca, TruckOnline, YellowBox, geocodage et cartographie
+- exclusions demandees:
+  - SSO reel non traite
+  - envoi mail du mot de passe oublie non traite
+- corrections API:
+  - enrichissement de `GET /api/admin/diagnostics` avec un bloc `readiness`
+  - readiness exposee par chantiers: UX, securite, parametres et interfaces
+  - les statuts indiquent ce qui est testable, ce qui reste a developper et ce qui depend d'un contrat API externe
+- corrections UI:
+  - affichage de la readiness backlog dans `Administration > Outils > Diagnostics`
+  - cartes dediees avec statut, detail et prochaine etape pour chaque chantier
+  - aucune simulation de raccordement externe n'a ete ajoutee
+- backlog:
+  - passages en `A_TESTER`: dashboard/accueil, qualite libelles, responsive, profils, comptes, autorisation backend, ecrans administration, societes, analytiques, exploitations, parametrage interfaces, SIRENE
+  - passages en `A_DEVELOPPER`: salaries Lucca, creation auto des comptes depuis salaries, Lucca, TruckOnline, YellowBox, geocodage, cartographie
+  - `Maquettes UI haute fidelite` passe en `CADRE`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api` retourne `200 application/json`
+  - bundles publies: `index-DyRnIfVN.css` et `index-CNSem55a.js`

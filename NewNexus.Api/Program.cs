@@ -1401,6 +1401,106 @@ app.MapGet("/api/admin/traces", async (
     });
 }).RequireAuthorization("RequireInformatique");
 
+app.MapGet("/api/admin/scheduled-tasks", async (NewNexusDbContext dbContext) =>
+{
+    var definitions = GetScheduledTaskDefinitions();
+    var taskCodes = definitions.Select(task => task.Code).ToArray();
+    var lastRunTraces = await dbContext.ApplicationTraces
+        .AsNoTracking()
+        .Where(trace => trace.EventCode == "SCHEDULED_TASK_RUN" && trace.Subject != null && taskCodes.Contains(trace.Subject))
+        .OrderByDescending(trace => trace.CreatedAtUtc)
+        .Select(trace => new
+        {
+            trace.Subject,
+            trace.Level,
+            trace.Message,
+            trace.Detail,
+            trace.CreatedAtUtc
+        })
+        .ToListAsync();
+    var lastRunsByTaskCode = lastRunTraces
+        .GroupBy(item => item.Subject!, StringComparer.OrdinalIgnoreCase)
+        .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+    return Results.Ok(definitions.Select(task =>
+    {
+        lastRunsByTaskCode.TryGetValue(task.Code, out var lastRun);
+        return new
+        {
+            task.Code,
+            task.Label,
+            task.Scope,
+            task.Cadence,
+            task.Status,
+            task.Description,
+            task.IsRunnable,
+            LastRun = lastRun
+        };
+    }));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/admin/scheduled-tasks/{taskCode}/run", async (
+    string taskCode,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var normalizedTaskCode = NormalizeTechnicalCode(taskCode);
+    var task = GetScheduledTaskDefinitions().SingleOrDefault(item => item.Code == normalizedTaskCode);
+    if (task is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!task.IsRunnable)
+    {
+        await AddApplicationTraceAsync(
+            dbContext,
+            httpContext,
+            principal,
+            "INTEGRATION_RUNS",
+            "SCHEDULED_TASK_REFUSED",
+            "Warning",
+            "Tache planifiee non executable.",
+            "Le connecteur ou l'arbitrage metier requis n'est pas encore disponible.",
+            task.Code,
+            saveImmediately: true);
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["task"] = ["Cette tache reste a raccorder avant execution."]
+        });
+    }
+
+    object result;
+    if (task.Code == "LUCCA_ACCOUNT_PROVISIONING")
+    {
+        result = await ProvisionEmployeeAccountsAsync(dbContext, httpContext.RequestAborted);
+    }
+    else
+    {
+        result = new { Message = "Aucun executeur local n'est defini pour cette tache." };
+    }
+
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "INTEGRATION_RUNS",
+        "SCHEDULED_TASK_RUN",
+        "Info",
+        "Tache planifiee executee manuellement.",
+        task.Label,
+        task.Code,
+        saveImmediately: true);
+
+    return Results.Ok(new
+    {
+        Task = task,
+        Result = result,
+        ExecutedAtUtc = DateTime.UtcNow
+    });
+}).RequireAuthorization("RequireInformatique");
+
 app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
 {
     var companies = await dbContext.Companies
@@ -1817,87 +1917,25 @@ app.MapPost("/api/settings/employees", async (UpsertEmployeeRequest request, New
     return Results.Created($"/api/settings/employees/{employee.Id}", new { employee.Id });
 }).RequireAuthorization("RequireInformatique");
 
-app.MapPost("/api/settings/employees/provision-accounts", async (NewNexusDbContext dbContext) =>
+app.MapPost("/api/settings/employees/provision-accounts", async (
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
 {
-    var employees = await dbContext.Employees
-        .AsNoTracking()
-        .Where(employee => employee.IsActive)
-        .OrderBy(employee => employee.DisplayName)
-        .ToListAsync();
+    var result = await ProvisionEmployeeAccountsAsync(dbContext, httpContext.RequestAborted);
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "ADMIN_ACTIONS",
+        "EMPLOYEE_ACCOUNT_PROVISIONING",
+        "Info",
+        "Creation automatique des comptes depuis salaries.",
+        $"Crees={result.CreatedCount}; ignores={result.SkippedCount}.",
+        "LUCCA_ACCOUNT_PROVISIONING",
+        saveImmediately: true);
 
-    var existingAccounts = await dbContext.UserAccounts
-        .AsNoTracking()
-        .Select(account => new
-        {
-            account.Login,
-            account.EmployeeNumber
-        })
-        .ToListAsync();
-
-    var existingEmployeeNumbers = existingAccounts
-        .Where(account => !string.IsNullOrWhiteSpace(account.EmployeeNumber))
-        .Select(account => account.EmployeeNumber!)
-        .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    var usedLogins = existingAccounts
-        .Select(account => account.Login)
-        .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-    var createdAccounts = new List<EmployeeAccountProvisioningItem>();
-    var skippedEmployees = new List<EmployeeAccountProvisioningItem>();
-    var now = DateTime.UtcNow;
-
-    foreach (var employee in employees)
-    {
-        if (existingEmployeeNumbers.Contains(employee.EmployeeNumber))
-        {
-            skippedEmployees.Add(new EmployeeAccountProvisioningItem(
-                employee.Id,
-                employee.EmployeeNumber,
-                employee.DisplayName,
-                null,
-                null,
-                "Compte deja existant pour ce matricule."));
-            continue;
-        }
-
-        var login = GenerateUniqueLoginForEmployee(employee, usedLogins);
-        var temporaryPassword = GenerateTemporaryPassword();
-        var account = new UserAccount
-        {
-            Id = Guid.NewGuid(),
-            Login = login,
-            DisplayName = employee.DisplayName,
-            Email = NormalizeOptionalText(employee.Email),
-            EmployeeNumber = employee.EmployeeNumber,
-            PasswordHash = PasswordHasher.HashPassword(temporaryPassword),
-            MustChangePassword = true,
-            SessionTimeoutMinutes = 60,
-            SecurityProfileId = null,
-            IsActive = true,
-            CreatedAtUtc = now
-        };
-
-        usedLogins.Add(login);
-        existingEmployeeNumbers.Add(employee.EmployeeNumber);
-        dbContext.UserAccounts.Add(account);
-        createdAccounts.Add(new EmployeeAccountProvisioningItem(
-            employee.Id,
-            employee.EmployeeNumber,
-            employee.DisplayName,
-            login,
-            temporaryPassword,
-            "Compte cree sans profil."));
-    }
-
-    await dbContext.SaveChangesAsync();
-
-    return Results.Ok(new
-    {
-        CreatedCount = createdAccounts.Count,
-        SkippedCount = skippedEmployees.Count,
-        CreatedAccounts = createdAccounts,
-        SkippedEmployees = skippedEmployees
-    });
+    return Results.Ok(result);
 }).RequireAuthorization("RequireInformatique");
 
 app.MapPost("/api/settings/employees/import-lucca", async (
@@ -3297,6 +3335,103 @@ static IReadOnlyList<TraceStreamDefinition> GetTraceStreams()
     ];
 }
 
+static IReadOnlyList<ScheduledTaskDefinition> GetScheduledTaskDefinitions()
+{
+    return
+    [
+        new("SIRENE_COMPANY_SYNC", "Synchronisation SIRENE", "Societes", "A planifier", "A raccorder", "Mise a jour periodique des informations societes depuis SIRENE.", false),
+        new("LUCCA_EMPLOYEES_IMPORT", "Import salaries Lucca", "Ressources humaines", "Quotidienne cible", "A raccorder", "Import des salaries depuis Lucca apres validation du contrat API cible.", false),
+        new("LUCCA_ACCOUNT_PROVISIONING", "Provisioning comptes Lucca", "Ressources humaines", "Apres import salaries", "Disponible", "Creation automatique de comptes actifs sans profil depuis les salaries actifs.", true),
+        new("TRUCKONLINE_FLEET_SYNC", "Synchronisation TruckOnline", "Exploitation", "Horaire cible", "A raccorder", "Synchronisation des informations tracteurs et statuts techniques TruckOnline.", false),
+        new("YELLOWBOX_TELEMATICS_SYNC", "Synchronisation YellowBox", "Exploitation", "Horaire cible", "A raccorder", "Recuperation des donnees telematiques YellowBox.", false),
+        new("MATERIALS_IMPORT", "Import materiels", "Exploitation", "Apres cadrage parc", "A cadrer", "Preparation du referentiel materiels avec numero de parc unique.", false),
+        new("AUDIT_LOG_RETENTION", "Purge controlee des traces", "Technique", "Mensuelle cible", "A cadrer", "Politique de conservation des journaux applicatifs et techniques.", false)
+    ];
+}
+
+static async Task<EmployeeAccountProvisioningResult> ProvisionEmployeeAccountsAsync(
+    NewNexusDbContext dbContext,
+    CancellationToken cancellationToken)
+{
+    var employees = await dbContext.Employees
+        .AsNoTracking()
+        .Where(employee => employee.IsActive)
+        .OrderBy(employee => employee.DisplayName)
+        .ToListAsync(cancellationToken);
+
+    var existingAccounts = await dbContext.UserAccounts
+        .AsNoTracking()
+        .Select(account => new
+        {
+            account.Login,
+            account.EmployeeNumber
+        })
+        .ToListAsync(cancellationToken);
+
+    var existingEmployeeNumbers = existingAccounts
+        .Where(account => !string.IsNullOrWhiteSpace(account.EmployeeNumber))
+        .Select(account => account.EmployeeNumber!)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var usedLogins = existingAccounts
+        .Select(account => account.Login)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    var createdAccounts = new List<EmployeeAccountProvisioningItem>();
+    var skippedEmployees = new List<EmployeeAccountProvisioningItem>();
+    var now = DateTime.UtcNow;
+
+    foreach (var employee in employees)
+    {
+        if (existingEmployeeNumbers.Contains(employee.EmployeeNumber))
+        {
+            skippedEmployees.Add(new EmployeeAccountProvisioningItem(
+                employee.Id,
+                employee.EmployeeNumber,
+                employee.DisplayName,
+                null,
+                null,
+                "Compte deja existant pour ce matricule."));
+            continue;
+        }
+
+        var login = GenerateUniqueLoginForEmployee(employee, usedLogins);
+        var temporaryPassword = GenerateTemporaryPassword();
+        var account = new UserAccount
+        {
+            Id = Guid.NewGuid(),
+            Login = login,
+            DisplayName = employee.DisplayName,
+            Email = NormalizeOptionalText(employee.Email),
+            EmployeeNumber = employee.EmployeeNumber,
+            PasswordHash = PasswordHasher.HashPassword(temporaryPassword),
+            MustChangePassword = true,
+            SessionTimeoutMinutes = 60,
+            SecurityProfileId = null,
+            IsActive = true,
+            CreatedAtUtc = now
+        };
+
+        usedLogins.Add(login);
+        existingEmployeeNumbers.Add(employee.EmployeeNumber);
+        dbContext.UserAccounts.Add(account);
+        createdAccounts.Add(new EmployeeAccountProvisioningItem(
+            employee.Id,
+            employee.EmployeeNumber,
+            employee.DisplayName,
+            login,
+            temporaryPassword,
+            "Compte cree sans profil."));
+    }
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return new EmployeeAccountProvisioningResult(
+        createdAccounts.Count,
+        skippedEmployees.Count,
+        createdAccounts,
+        skippedEmployees);
+}
+
 static async Task AddApplicationTraceAsync(
     NewNexusDbContext dbContext,
     HttpContext httpContext,
@@ -3983,6 +4118,11 @@ internal sealed record EmployeeAccountProvisioningItem(
     string? Login,
     string? TemporaryPassword,
     string Status);
+internal sealed record EmployeeAccountProvisioningResult(
+    int CreatedCount,
+    int SkippedCount,
+    List<EmployeeAccountProvisioningItem> CreatedAccounts,
+    List<EmployeeAccountProvisioningItem> SkippedEmployees);
 internal sealed record LuccaMappedEmployee(
     string SourceEmployeeId,
     string EmployeeNumber,
@@ -4043,5 +4183,13 @@ internal sealed record TraceStreamDefinition(
     string Label,
     string Description,
     string Retention);
+internal sealed record ScheduledTaskDefinition(
+    string Code,
+    string Label,
+    string Scope,
+    string Cadence,
+    string Status,
+    string Description,
+    bool IsRunnable);
 internal sealed record LegacyAdminApiKeyRow(int ApiKeyId, string KeyValue, string ProviderName, string CreatedOn);
 internal sealed record LegacyImportResult(int ImportedCount, int SkippedCount, int FailedCount, List<string> Messages);

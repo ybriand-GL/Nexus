@@ -1859,3 +1859,25 @@ Ordre cible de construction:
 - validation publication:
   - `GET /newNexus/` retourne `200 text/html`
   - `GET /newNexus/api/system/info` retourne `200 application/json`
+
+## 2026-05-05 - Taches planifiees pilotables
+
+- demande:
+  - continuer le backlog apres commit/push
+  - prochain item traite: `Donnees Communes | Taches planifiees`
+- corrections API:
+  - ajout de `GET /api/admin/scheduled-tasks`
+  - ajout de `POST /api/admin/scheduled-tasks/{taskCode}/run`
+  - catalogue serveur des traitements SIRENE, Lucca, provisioning comptes, TruckOnline, YellowBox, materiels et retention traces
+  - historique de derniere execution lu depuis les traces `SCHEDULED_TASK_RUN`
+  - refus explicite des traitements non raccordes avec trace `SCHEDULED_TASK_REFUSED`
+  - premier executeur reel disponible: `LUCCA_ACCOUNT_PROVISIONING`, reutilisant la creation de comptes depuis salaries actifs
+- corrections UI:
+  - `Administration > Outils > Taches planifiees` charge le catalogue depuis l'API
+  - affichage du statut, de la cadence, de la derniere execution et de l'action disponible
+  - bouton `Executer maintenant` actif uniquement pour les taches raccordees
+- backlog:
+  - `Taches planifiees` passe de `SCAFFOLDE` a `A_TESTER`
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK

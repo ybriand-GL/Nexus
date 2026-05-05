@@ -150,6 +150,23 @@ type ApplicationTracesPayload = {
   limit: number
 }
 
+type ScheduledTaskItem = {
+  code: string
+  label: string
+  scope: string
+  cadence: string
+  status: string
+  description: string
+  isRunnable: boolean
+  lastRun: {
+    subject: string
+    level: string
+    message: string
+    detail: string | null
+    createdAtUtc: string
+  } | null
+}
+
 type AccountPasswordResetState = {
   accountId: string | null
   isResetting: boolean
@@ -543,6 +560,7 @@ function App() {
   const [controlledSqlResult, setControlledSqlResult] = useState<ControlledSqlQueryResult | null>(null)
   const [applicationTraces, setApplicationTraces] = useState<ApplicationTracesPayload>({ streams: [], traces: [], limit: 100 })
   const [selectedTraceStream, setSelectedTraceStream] = useState<string>('ALL')
+  const [scheduledTaskCatalog, setScheduledTaskCatalog] = useState<ScheduledTaskItem[]>([])
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
   const [editableProfiles, setEditableProfiles] = useState<Record<string, EditableProfileState>>({})
   const [editableAnalytics, setEditableAnalytics] = useState<Record<string, SettingsReferenceFormState>>({})
@@ -617,6 +635,8 @@ function App() {
   const [controlledSqlError, setControlledSqlError] = useState<string | null>(null)
   const [runningControlledSqlCode, setRunningControlledSqlCode] = useState<string | null>(null)
   const [tracesError, setTracesError] = useState<string | null>(null)
+  const [scheduledTasksError, setScheduledTasksError] = useState<string | null>(null)
+  const [runningScheduledTaskCode, setRunningScheduledTaskCode] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -829,6 +849,14 @@ function App() {
     ],
     [],
   )
+
+  const displayedScheduledTasks = scheduledTaskCatalog.length > 0
+    ? scheduledTaskCatalog
+    : scheduledTasks.map((task) => ({
+        ...task,
+        isRunnable: false,
+        lastRun: null,
+      }))
 
   const controlledSqlQueries = useMemo(
     () => [
@@ -1083,6 +1111,7 @@ function App() {
     setControlledSqlResult(null)
     setApplicationTraces({ streams: [], traces: [], limit: 100 })
     setSelectedTraceStream('ALL')
+    setScheduledTaskCatalog([])
     setEditableAccounts({})
     setEditableProfiles({})
     setEditableAnalytics({})
@@ -1136,6 +1165,7 @@ function App() {
       loadUserSessions(),
       loadControlledSqlCatalog(),
       loadApplicationTraces(selectedTraceStream),
+      loadScheduledTasks(),
     ])
   }
 
@@ -1242,6 +1272,44 @@ function App() {
       setApplicationTraces((await response.json()) as ApplicationTracesPayload)
     } catch (traceLoadError) {
       setTracesError(traceLoadError instanceof Error ? traceLoadError.message : 'Traces indisponibles.')
+    }
+  }
+
+  async function loadScheduledTasks() {
+    setScheduledTasksError(null)
+
+    try {
+      const response = await fetch(apiPath('api/admin/scheduled-tasks'))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de charger les tâches planifiées.'))
+      }
+
+      setScheduledTaskCatalog((await response.json()) as ScheduledTaskItem[])
+    } catch (scheduledTasksLoadError) {
+      setScheduledTasksError(
+        scheduledTasksLoadError instanceof Error ? scheduledTasksLoadError.message : 'Tâches planifiées indisponibles.',
+      )
+    }
+  }
+
+  async function handleRunScheduledTask(taskCode: string) {
+    setScheduledTasksError(null)
+    setRunningScheduledTaskCode(taskCode)
+
+    try {
+      const response = await fetch(apiPath(`api/admin/scheduled-tasks/${taskCode}/run`), {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Execution de la tâche impossible.'))
+      }
+
+      await Promise.all([loadScheduledTasks(), loadApplicationTraces(selectedTraceStream)])
+    } catch (taskRunError) {
+      setScheduledTasksError(taskRunError instanceof Error ? taskRunError.message : 'Execution de la tâche impossible.')
+    } finally {
+      setRunningScheduledTaskCode(null)
     }
   }
 
@@ -1513,6 +1581,8 @@ function App() {
     setControlledSqlError(null)
     setRunningControlledSqlCode(null)
     setTracesError(null)
+    setScheduledTasksError(null)
+    setRunningScheduledTaskCode(null)
   }
 
   function handleCredentialSelectionChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -4478,15 +4548,26 @@ function App() {
                 <p className="profiles-toolbar-copy">
                   Première vue de pilotage des traitements à automatiser. Les connecteurs restent à raccorder avant activation.
                 </p>
+                <div className="administration-synthesis-actions">
+                  <button className="secondary-button" onClick={() => void loadScheduledTasks()} type="button">
+                    Rafraîchir
+                  </button>
+                </div>
+                {scheduledTasksError ? (
+                  <div className="status-banner status-banner-error">
+                    <strong>Tâches indisponibles</strong>
+                    <span>{scheduledTasksError}</span>
+                  </div>
+                ) : null}
                 <div className="scheduled-tasks-grid">
-                  {scheduledTasks.map((task) => (
+                  {displayedScheduledTasks.map((task) => (
                     <article className="scheduled-task-card" key={task.code}>
                       <header>
                         <div>
                           <span className="eyebrow">{task.scope}</span>
                           <h3>{task.label}</h3>
                         </div>
-                        <span className="profile-status-badge is-inactive">{task.status}</span>
+                        <span className={`profile-status-badge ${task.isRunnable ? 'is-active' : 'is-inactive'}`}>{task.status}</span>
                       </header>
                       <p>{task.description}</p>
                       <div className="profile-summary-rights">
@@ -4498,7 +4579,19 @@ function App() {
                           <span>Code technique</span>
                           <strong>{task.code}</strong>
                         </div>
+                        <div className="profile-summary-right">
+                          <span>Dernière exécution</span>
+                          <strong>{task.lastRun ? new Date(task.lastRun.createdAtUtc).toLocaleString() : 'Jamais'}</strong>
+                        </div>
                       </div>
+                      <button
+                        className="secondary-button"
+                        disabled={!task.isRunnable || runningScheduledTaskCode === task.code}
+                        onClick={() => void handleRunScheduledTask(task.code)}
+                        type="button"
+                      >
+                        {runningScheduledTaskCode === task.code ? 'Exécution...' : task.isRunnable ? 'Exécuter maintenant' : 'À raccorder'}
+                      </button>
                     </article>
                   ))}
                 </div>

@@ -103,7 +103,7 @@ Derniere mise a jour: 2026-05-05
 | Donnees Communes | Materiels | A_TESTER | Table, endpoints create/update, liste + modales ajout/modification disponibles dans `Donnees Communes > Materiels`, numero de parc unique et rattachement exploitation disponibles |
 | Donnees Communes | Parametrage des interfaces | A_TESTER | Table `IntegrationCredential`, UI Outils, import des cles Nexus legacy et readiness par fournisseur disponibles |
 | Donnees Communes | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Diagnostics, Requeteur SQL, Sessions, Taches planifiees et Traces prepares |
-| Donnees Communes | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
+| Donnees Communes | Taches planifiees | A_TESTER | Catalogue serveur, UI Outils, historique par traces et lancement manuel disponibles; provisioning comptes depuis salaries executable, connecteurs externes restent a raccorder |
 | Donnees Communes | Requeteur SQL controle | A_TESTER | Catalogue backend de requetes nommees, execution lecture seule via DbContext, journalisation serveur et affichage tabulaire UI disponibles; SQL libre toujours exclu |
 | Donnees Communes | Consultation des traces | A_TESTER | Table `ApplicationTrace`, endpoint de consultation, UI Outils > Traces, premiers evenements auth/admin/integrations et masquage des secrets disponibles |
 | UX | Bandeaux titres applicatifs | TERMINE | Bloc lateral Session active retire visuellement et gabarit titre uniformise |

@@ -107,6 +107,49 @@ type UserSessionsPayload = {
   history: UserSessionItem[]
 }
 
+type ControlledSqlQuery = {
+  code: string
+  scope: string
+  label: string
+  description: string
+  columns: string[]
+}
+
+type ControlledSqlQueryResult = {
+  query: ControlledSqlQuery
+  rows: Record<string, string | number | boolean | null>[]
+  rowCount: number
+  executedAtUtc: string
+}
+
+type TraceStream = {
+  code: string
+  label: string
+  description: string
+  retention: string
+}
+
+type ApplicationTrace = {
+  id: string
+  streamCode: string
+  streamLabel: string
+  eventCode: string
+  level: string
+  message: string
+  detail: string | null
+  subject: string | null
+  actorUserAccountId: string | null
+  actorLogin: string | null
+  ipAddress: string | null
+  createdAtUtc: string
+}
+
+type ApplicationTracesPayload = {
+  streams: TraceStream[]
+  traces: ApplicationTrace[]
+  limit: number
+}
+
 type AccountPasswordResetState = {
   accountId: string | null
   isResetting: boolean
@@ -496,6 +539,10 @@ function App() {
   const [adminDiagnostics, setAdminDiagnostics] = useState<AdminDiagnostics | null>(null)
   const [integrationCredentials, setIntegrationCredentials] = useState<IntegrationCredentialItem[]>([])
   const [userSessions, setUserSessions] = useState<UserSessionsPayload>({ active: [], history: [] })
+  const [controlledSqlCatalog, setControlledSqlCatalog] = useState<ControlledSqlQuery[]>([])
+  const [controlledSqlResult, setControlledSqlResult] = useState<ControlledSqlQueryResult | null>(null)
+  const [applicationTraces, setApplicationTraces] = useState<ApplicationTracesPayload>({ streams: [], traces: [], limit: 100 })
+  const [selectedTraceStream, setSelectedTraceStream] = useState<string>('ALL')
   const [editableAccounts, setEditableAccounts] = useState<Record<string, EditableAccountState>>({})
   const [editableProfiles, setEditableProfiles] = useState<Record<string, EditableProfileState>>({})
   const [editableAnalytics, setEditableAnalytics] = useState<Record<string, SettingsReferenceFormState>>({})
@@ -567,6 +614,9 @@ function App() {
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [credentialsError, setCredentialsError] = useState<string | null>(null)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
+  const [controlledSqlError, setControlledSqlError] = useState<string | null>(null)
+  const [runningControlledSqlCode, setRunningControlledSqlCode] = useState<string | null>(null)
+  const [tracesError, setTracesError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -848,74 +898,6 @@ function App() {
     [],
   )
 
-  const controlledSqlCatalog = useMemo(
-    () => [
-      {
-        code: 'SECURITY_ACCOUNTS_OVERVIEW',
-        scope: 'S\u00e9curit\u00e9',
-        label: 'Synth\u00e8se des comptes utilisateurs',
-        status: '\u00c0 cadrer',
-        output: 'Comptes actifs, inactifs, profils rattach\u00e9s et derni\u00e8re connexion.',
-      },
-      {
-        code: 'MODULE_RIGHTS_MATRIX',
-        scope: 'Droits',
-        label: 'Matrice profils et modules',
-        status: '\u00c0 cadrer',
-        output: 'Lecture des droits par profil, module et niveau d\u2019acc\u00e8s.',
-      },
-      {
-        code: 'COMMON_DATA_REFERENTIALS',
-        scope: 'Param\u00e8tres',
-        label: 'Donn\u00e9es communes',
-        status: '\u00c0 cadrer',
-        output: 'Soci\u00e9t\u00e9s, analytiques et exploitations avec \u00e9tat actif.',
-      },
-      {
-        code: 'INTEGRATION_CREDENTIALS_AUDIT',
-        scope: 'Outils',
-        label: 'Audit des acc\u00e8s externes',
-        status: '\u00c0 cadrer',
-        output: 'Fournisseurs, cl\u00e9s renseign\u00e9es, secrets masqu\u00e9s et activation.',
-      },
-    ],
-    [],
-  )
-
-  const traceCatalog = useMemo(
-    () => [
-      {
-        code: 'AUTH_EVENTS',
-        scope: 'S\u00e9curit\u00e9',
-        label: 'Authentification',
-        retention: '90 jours cible',
-        description: 'Connexions, d\u00e9connexions, \u00e9checs de login et demandes de r\u00e9initialisation.',
-      },
-      {
-        code: 'ADMIN_ACTIONS',
-        scope: 'Administration',
-        label: 'Actions administrateur',
-        retention: '180 jours cible',
-        description: 'Cr\u00e9ation ou modification des comptes, profils, param\u00e8tres et cl\u00e9s API.',
-      },
-      {
-        code: 'INTEGRATION_RUNS',
-        scope: 'Interfaces',
-        label: 'Traitements d\u2019int\u00e9gration',
-        retention: '180 jours cible',
-        description: 'Ex\u00e9cutions SIRENE, Lucca, TruckOnline, YellowBox et erreurs de connecteurs.',
-      },
-      {
-        code: 'SYSTEM_ERRORS',
-        scope: 'Technique',
-        label: 'Erreurs applicatives',
-        retention: '365 jours cible',
-        description: 'Exceptions serveur, indisponibilit\u00e9s PostgreSQL et erreurs critiques.',
-      },
-    ],
-    [],
-  )
-
   useEffect(() => {
     if (visibleNavigationEntries.length === 0) {
       return
@@ -1097,6 +1079,10 @@ function App() {
     setAdminDiagnostics(null)
     setIntegrationCredentials([])
     setUserSessions({ active: [], history: [] })
+    setControlledSqlCatalog([])
+    setControlledSqlResult(null)
+    setApplicationTraces({ streams: [], traces: [], limit: 100 })
+    setSelectedTraceStream('ALL')
     setEditableAccounts({})
     setEditableProfiles({})
     setEditableAnalytics({})
@@ -1144,7 +1130,13 @@ function App() {
   }
 
   async function loadAdminToolsData() {
-    await Promise.all([loadAdminDiagnostics(), loadIntegrationCredentials(), loadUserSessions()])
+    await Promise.all([
+      loadAdminDiagnostics(),
+      loadIntegrationCredentials(),
+      loadUserSessions(),
+      loadControlledSqlCatalog(),
+      loadApplicationTraces(selectedTraceStream),
+    ])
   }
 
   async function loadAdminDiagnostics() {
@@ -1199,6 +1191,64 @@ function App() {
     } catch (sessionsLoadError) {
       setSessionsError(sessionsLoadError instanceof Error ? sessionsLoadError.message : 'Sessions indisponibles.')
     }
+  }
+
+  async function loadControlledSqlCatalog() {
+    setControlledSqlError(null)
+
+    try {
+      const response = await fetch(apiPath('api/admin/sql-queries'))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de charger le catalogue SQL.'))
+      }
+
+      setControlledSqlCatalog((await response.json()) as ControlledSqlQuery[])
+    } catch (catalogLoadError) {
+      setControlledSqlError(catalogLoadError instanceof Error ? catalogLoadError.message : 'Catalogue SQL indisponible.')
+    }
+  }
+
+  async function handleRunControlledSqlQuery(queryCode: string) {
+    setControlledSqlError(null)
+    setRunningControlledSqlCode(queryCode)
+
+    try {
+      const response = await fetch(apiPath(`api/admin/sql-queries/${queryCode}/run`), {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible d executer cette requete controlee.'))
+      }
+
+      setControlledSqlResult((await response.json()) as ControlledSqlQueryResult)
+    } catch (queryRunError) {
+      setControlledSqlError(queryRunError instanceof Error ? queryRunError.message : 'Execution SQL controlee impossible.')
+    } finally {
+      setRunningControlledSqlCode(null)
+    }
+  }
+
+  async function loadApplicationTraces(streamCode = selectedTraceStream) {
+    setTracesError(null)
+
+    try {
+      const query = streamCode && streamCode !== 'ALL' ? `?streamCode=${encodeURIComponent(streamCode)}` : ''
+      const response = await fetch(apiPath(`api/admin/traces${query}`))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de charger les traces.'))
+      }
+
+      setApplicationTraces((await response.json()) as ApplicationTracesPayload)
+    } catch (traceLoadError) {
+      setTracesError(traceLoadError instanceof Error ? traceLoadError.message : 'Traces indisponibles.')
+    }
+  }
+
+  function handleTraceStreamChange(event: ChangeEvent<HTMLSelectElement>) {
+    const streamCode = event.target.value
+    setSelectedTraceStream(streamCode)
+    void loadApplicationTraces(streamCode)
   }
 
   async function handleDisconnectUserSession(sessionId: string) {
@@ -1460,6 +1510,9 @@ function App() {
     setDiagnosticsError(null)
     setCredentialsError(null)
     setSessionsError(null)
+    setControlledSqlError(null)
+    setRunningControlledSqlCode(null)
+    setTracesError(null)
   }
 
   function handleCredentialSelectionChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -4459,12 +4512,18 @@ function App() {
                   <h2>Requ&ecirc;teur SQL</h2>
                 </div>
                 <p className="profiles-toolbar-copy">
-                  Espace de cadrage pour des requ&ecirc;tes contr&ocirc;l&eacute;es. Aucun SQL libre n&apos;est ex&eacute;cut&eacute; depuis l&apos;interface &agrave; ce stade.
+                  Ex&eacute;cution de requ&ecirc;tes nomm&eacute;es en lecture seule. Aucun SQL libre n&apos;est accept&eacute; depuis l&apos;interface.
                 </p>
                 <div className="tools-safety-banner">
-                  <strong>R&egrave;gles &agrave; verrouiller avant activation</strong>
-                  <span>Lecture seule, requ&ecirc;tes nomm&eacute;es, param&egrave;tres typ&eacute;s, journalisation et exclusion des secrets.</span>
+                  <strong>Cadre verrouill&eacute;</strong>
+                  <span>Catalogue serveur, lecture seule via le DbContext, secrets masqu&eacute;s et journalisation de chaque lancement.</span>
                 </div>
+                {controlledSqlError ? (
+                  <div className="status-banner status-banner-error">
+                    <strong>Requêteur indisponible</strong>
+                    <span>{controlledSqlError}</span>
+                  </div>
+                ) : null}
                 <div className="tools-catalog-grid">
                   {controlledSqlCatalog.map((query) => (
                     <article className="tool-blueprint-card" key={query.code}>
@@ -4473,16 +4532,58 @@ function App() {
                           <span className="eyebrow">{query.scope}</span>
                           <h3>{query.label}</h3>
                         </div>
-                        <span className="profile-status-badge is-inactive">{query.status}</span>
+                        <span className="profile-status-badge is-active">Disponible</span>
                       </header>
-                      <p>{query.output}</p>
+                      <p>{query.description}</p>
                       <div className="profile-summary-right">
                         <span>Code technique</span>
                         <strong>{query.code}</strong>
                       </div>
+                      <button
+                        className="secondary-button"
+                        disabled={runningControlledSqlCode === query.code}
+                        onClick={() => void handleRunControlledSqlQuery(query.code)}
+                        type="button"
+                      >
+                        {runningControlledSqlCode === query.code ? 'Exécution...' : 'Exécuter'}
+                      </button>
                     </article>
                   ))}
                 </div>
+                {controlledSqlCatalog.length === 0 && !controlledSqlError ? (
+                  <div className="settings-empty">Chargement du catalogue SQL...</div>
+                ) : null}
+                {controlledSqlResult ? (
+                  <section className="controlled-sql-result">
+                    <div className="settings-list-header">
+                      <div>
+                        <span className="eyebrow">Résultat</span>
+                        <h3>{controlledSqlResult.query.label}</h3>
+                      </div>
+                      <small>
+                        {controlledSqlResult.rowCount} ligne(s) - {new Date(controlledSqlResult.executedAtUtc).toLocaleString()}
+                      </small>
+                    </div>
+                    {controlledSqlResult.rows.length > 0 ? (
+                      <div className="controlled-sql-table">
+                        <div className="controlled-sql-table-head">
+                          {controlledSqlResult.query.columns.map((column) => (
+                            <span key={column}>{formatControlledSqlColumn(column)}</span>
+                          ))}
+                        </div>
+                        {controlledSqlResult.rows.map((row, rowIndex) => (
+                          <div className="controlled-sql-table-row" key={`${controlledSqlResult.query.code}-${rowIndex}`}>
+                            {controlledSqlResult.query.columns.map((column) => (
+                              <span key={column}>{formatControlledSqlValue(row[column])}</span>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="settings-empty">Aucune donnée pour cette requête.</div>
+                    )}
+                  </section>
+                ) : null}
               </article>
             ) : null}
 
@@ -4527,17 +4628,39 @@ function App() {
                   <h2>Traces</h2>
                 </div>
                 <p className="profiles-toolbar-copy">
-                  Pr&eacute;paration de la future consultation des journaux applicatifs et techniques, avec conservation ma&icirc;tris&eacute;e.
+                  Consultation des traces applicatives collect&eacute;es par flux, avec secrets masqu&eacute;s et conservation ma&icirc;tris&eacute;e.
                 </p>
+                <div className="administration-synthesis-actions">
+                  <label className="trace-stream-filter">
+                    <span>Flux</span>
+                    <select value={selectedTraceStream} onChange={handleTraceStreamChange}>
+                      <option value="ALL">Tous les flux</option>
+                      {applicationTraces.streams.map((stream) => (
+                        <option key={stream.code} value={stream.code}>
+                          {stream.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="secondary-button" onClick={() => void loadApplicationTraces()} type="button">
+                    Rafraîchir
+                  </button>
+                </div>
+                {tracesError ? (
+                  <div className="status-banner status-banner-error">
+                    <strong>Traces indisponibles</strong>
+                    <span>{tracesError}</span>
+                  </div>
+                ) : null}
                 <div className="tools-catalog-grid">
-                  {traceCatalog.map((stream) => (
+                  {applicationTraces.streams.map((stream) => (
                     <article className="tool-blueprint-card" key={stream.code}>
                       <header>
                         <div>
-                          <span className="eyebrow">{stream.scope}</span>
+                          <span className="eyebrow">{stream.code}</span>
                           <h3>{stream.label}</h3>
                         </div>
-                        <span className="profile-status-badge is-inactive">&Agrave; raccorder</span>
+                        <span className="profile-status-badge is-active">{stream.retention}</span>
                       </header>
                       <p>{stream.description}</p>
                       <div className="profile-summary-rights">
@@ -4553,9 +4676,42 @@ function App() {
                     </article>
                   ))}
                 </div>
+                <section className="trace-events-list">
+                  <div className="settings-list-header">
+                    <div>
+                      <span className="eyebrow">Journal</span>
+                      <h3>{applicationTraces.traces.length} trace(s)</h3>
+                    </div>
+                    <small>Limite: {applicationTraces.limit}</small>
+                  </div>
+                  {applicationTraces.traces.length > 0 ? (
+                    applicationTraces.traces.map((trace) => (
+                      <article className="trace-event-card" key={trace.id}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{trace.streamLabel} - {trace.eventCode}</span>
+                            <h3>{trace.message}</h3>
+                          </div>
+                          <span className={`profile-status-badge ${trace.level === 'Warning' ? 'is-inactive' : 'is-active'}`}>
+                            {trace.level}
+                          </span>
+                        </header>
+                        <div className="session-row-meta">
+                          <span>{new Date(trace.createdAtUtc).toLocaleString()}</span>
+                          <span>{trace.actorLogin ?? 'Systeme'}</span>
+                          <span>{trace.subject ?? 'Sans objet'}</span>
+                          <span>{trace.ipAddress ?? 'IP non renseignee'}</span>
+                        </div>
+                        {trace.detail ? <p>{trace.detail}</p> : null}
+                      </article>
+                    ))
+                  ) : (
+                    <div className="settings-empty">Aucune trace pour le filtre courant.</div>
+                  )}
+                </section>
                 <div className="trace-retention-strip">
                   <strong>Point de vigilance</strong>
-                  <span>Les traces devront masquer les secrets, filtrer les donn&eacute;es personnelles et conserver une piste d&apos;audit des consultations.</span>
+                  <span>Les traces masquent les secrets et ne stockent pas les mots de passe, jetons ou valeurs de cl&eacute;s API.</span>
                 </div>
               </article>
             ) : null}
@@ -5879,6 +6035,57 @@ function formatDurationMinutes(totalMinutes: number) {
   }
 
   return `${hours}h ${String(minutes).padStart(2, '0')}`
+}
+
+function formatControlledSqlColumn(column: string) {
+  const labels: Record<string, string> = {
+    accessLevel: 'Droit',
+    code: 'Code',
+    displayName: 'Nom',
+    hasValue: 'Valeur',
+    isSecret: 'Secret',
+    keyName: 'Clé',
+    label: 'Libellé',
+    lastLoginAtUtc: 'Dernière connexion',
+    lastSyncedAtUtc: 'Dernière synchro',
+    login: 'Login',
+    module: 'Module',
+    mustChangePassword: 'Mot de passe',
+    navigationGroup: 'Groupe',
+    parent: 'Rattachement',
+    profile: 'Profil',
+    profileStatus: 'État profil',
+    provider: 'Fournisseur',
+    referential: 'Référentiel',
+    sessionTimeoutMinutes: 'Expiration',
+    status: 'État',
+    updatedAtUtc: 'Mise à jour',
+  }
+
+  return labels[column] ?? column
+}
+
+function formatControlledSqlValue(value: string | number | boolean | null | undefined) {
+  if (value === null || value === undefined || value === '') {
+    return '-'
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'Oui' : 'Non'
+  }
+
+  if (typeof value === 'number') {
+    return String(value)
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const date = new Date(value)
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleString()
+    }
+  }
+
+  return value
 }
 
 function getSettingsSectionDescription(section: string) {

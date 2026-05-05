@@ -104,8 +104,8 @@ Derniere mise a jour: 2026-05-05
 | Donnees Communes | Parametrage des interfaces | A_TESTER | Table `IntegrationCredential`, UI Outils, import des cles Nexus legacy et readiness par fournisseur disponibles |
 | Donnees Communes | Centre d'outils | TERMINE | Accueil Outils et sous-menus Cles API, Diagnostics, Requeteur SQL, Sessions, Taches planifiees et Traces prepares |
 | Donnees Communes | Taches planifiees | SCAFFOLDE | Vue de pilotage initiale preparee pour SIRENE, Lucca, provisioning comptes, materiels, TruckOnline, YellowBox et retention des traces; executeur et planification reelle a developper |
-| Donnees Communes | Requeteur SQL controle | SCAFFOLDE | Catalogue de requetes nommees prepare; execution SQL libre exclue, lecture seule et journalisation a developper avant activation |
-| Donnees Communes | Consultation des traces | SCAFFOLDE | Flux Authentification, Actions administrateur, Integrations et Erreurs applicatives prepares; collecte, stockage et masquage des secrets a developper |
+| Donnees Communes | Requeteur SQL controle | A_TESTER | Catalogue backend de requetes nommees, execution lecture seule via DbContext, journalisation serveur et affichage tabulaire UI disponibles; SQL libre toujours exclu |
+| Donnees Communes | Consultation des traces | A_TESTER | Table `ApplicationTrace`, endpoint de consultation, UI Outils > Traces, premiers evenements auth/admin/integrations et masquage des secrets disponibles |
 | UX | Bandeaux titres applicatifs | TERMINE | Bloc lateral Session active retire visuellement et gabarit titre uniformise |
 
 ## 5. Interfaces
@@ -155,6 +155,7 @@ Derniere mise a jour: 2026-05-05
 | Technique | Migration referentiels metier Donnees Communes | TERMINE | Migration technique `TransverseBusinessReferentials` generee et appliquee localement |
 | Technique | Migration sessions utilisateurs | TERMINE | `UserSessionsAndTimeouts` generee et appliquee localement |
 | Technique | Migration telephone salaries | TERMINE | `EmployeePhoneAndLuccaImport` generee et appliquee localement |
+| Technique | Migration traces applicatives | TERMINE | `ApplicationTraces` generee et appliquee localement |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 | Technique | Endpoint diagnostics administration | TERMINE | `GET /api/admin/diagnostics` publie pour le profil Informatique |
 | Technique | Import cles Nexus legacy | TERMINE | 22 valeurs importees depuis `LOCATIF_DEV` et rechiffrees avec le trousseau IIS NewNexus |

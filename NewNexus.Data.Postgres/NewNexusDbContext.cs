@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using NewNexus.Data.Postgres.Administration;
 using NewNexus.Data.Postgres.Security;
 using NewNexus.Data.Postgres.Transverse;
+using NewNexus.Domain.Administration;
 using NewNexus.Domain.Security;
 using NewNexus.Domain.Transverse;
 
@@ -21,6 +23,7 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
     public DbSet<ThirdPartyAnalytic> ThirdPartyAnalytics => Set<ThirdPartyAnalytic>();
     public DbSet<Material> Materials => Set<Material>();
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
+    public DbSet<ApplicationTrace> ApplicationTraces => Set<ApplicationTrace>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,5 +40,6 @@ public sealed class NewNexusDbContext(DbContextOptions<NewNexusDbContext> option
         modelBuilder.ApplyConfiguration(new ThirdPartyAnalyticConfiguration());
         modelBuilder.ApplyConfiguration(new MaterialConfiguration());
         modelBuilder.ApplyConfiguration(new IntegrationCredentialConfiguration());
+        modelBuilder.ApplyConfiguration(new ApplicationTraceConfiguration());
     }
 }

@@ -11,6 +11,7 @@ $appPoolName = 'NewNexusPool'
 $siteName = 'Localaure'
 $appPath = '/newNexus'
 $appOfflineFile = Join-Path $publishRoot 'app_offline.htm'
+$parentWebConfig = 'C:\inetpub\locatif\web.config'
 
 Write-Host 'Building frontend...'
 Push-Location $webRoot
@@ -59,6 +60,29 @@ if (-not $appInfo) {
 else {
     & "$env:WinDir\System32\inetsrv\appcmd.exe" set app "$siteName$appPath" /applicationPool:$appPoolName
     & "$env:WinDir\System32\inetsrv\appcmd.exe" set vdir "$siteName$appPath/" /physicalPath:$publishRoot
+}
+
+Write-Host 'Ensuring parent SPA rewrite excludes /newNexus...'
+if (Test-Path $parentWebConfig) {
+    [xml]$parentConfig = Get-Content -LiteralPath $parentWebConfig
+    $rewriteRule = $parentConfig.configuration.'system.webServer'.rewrite.rules.rule |
+        Where-Object { $_.name -eq 'SPA Routes' } |
+        Select-Object -First 1
+
+    if ($rewriteRule -and $rewriteRule.conditions) {
+        $existingCondition = $rewriteRule.conditions.add |
+            Where-Object { $_.input -eq '{REQUEST_URI}' -and $_.pattern -eq '^/newNexus(/|$)' } |
+            Select-Object -First 1
+
+        if (-not $existingCondition) {
+            $condition = $parentConfig.CreateElement('add')
+            $condition.SetAttribute('input', '{REQUEST_URI}')
+            $condition.SetAttribute('pattern', '^/newNexus(/|$)')
+            $condition.SetAttribute('negate', 'true')
+            [void]$rewriteRule.conditions.AppendChild($condition)
+            $parentConfig.Save($parentWebConfig)
+        }
+    }
 }
 
 Write-Host 'Restarting application pool...'

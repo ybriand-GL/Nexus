@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using NewNexus.Data.Postgres;
+using NewNexus.Domain.Administration;
 using NewNexus.Domain.Security;
 using NewNexus.Domain.Transverse;
 
@@ -453,7 +454,9 @@ app.MapGet("/api/admin/integrations/credentials", async (
 app.MapPost("/api/admin/integrations/credentials", async (
     UpsertIntegrationCredentialRequest request,
     NewNexusDbContext dbContext,
-    IDataProtectionProvider dataProtectionProvider) =>
+    IDataProtectionProvider dataProtectionProvider,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
 {
     var providerCode = NormalizeTechnicalCode(request.ProviderCode);
     var keyName = NormalizeTechnicalCode(request.KeyName);
@@ -509,6 +512,17 @@ app.MapPost("/api/admin/integrations/credentials", async (
     }
 
     await dbContext.SaveChangesAsync();
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "ADMIN_ACTIONS",
+        "INTEGRATION_CREDENTIAL_UPSERT",
+        "Info",
+        "Cle API enregistree.",
+        $"Fournisseur={existing.ProviderCode}; cle={existing.KeyName}; actif={existing.IsActive}.",
+        $"{existing.ProviderCode}/{existing.KeyName}",
+        saveImmediately: true);
 
     return Results.Ok(BuildCredentialResponse(existing, dataProtectionProvider, definition));
 }).RequireAuthorization("RequireInformatique");
@@ -517,6 +531,7 @@ app.MapPost("/api/admin/integrations/credentials/import-nexus", async (
     NewNexusDbContext dbContext,
     IConfiguration configuration,
     IDataProtectionProvider dataProtectionProvider,
+    ClaimsPrincipal principal,
     HttpContext httpContext) =>
 {
     var importResult = await ImportLegacyNexusCredentialsAsync(
@@ -530,6 +545,18 @@ app.MapPost("/api/admin/integrations/credentials/import-nexus", async (
         .OrderBy(credential => credential.ProviderLabel)
         .ThenBy(credential => credential.DisplayName)
         .ToListAsync(httpContext.RequestAborted);
+
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "INTEGRATION_RUNS",
+        "LEGACY_CREDENTIALS_IMPORT",
+        importResult.FailedCount > 0 ? "Warning" : "Info",
+        "Import des cles Nexus legacy execute.",
+        $"Importees={importResult.ImportedCount}; ignorees={importResult.SkippedCount}; erreurs={importResult.FailedCount}.",
+        "LEGACY_NEXUS",
+        saveImmediately: true);
 
     return Results.Ok(new
     {
@@ -561,6 +588,17 @@ app.MapPost("/api/auth/login", async (LoginRequest request, NewNexusDbContext db
 
     if (account is null || !account.IsActive || !PasswordHasher.VerifyPassword(request.Password, account.PasswordHash))
     {
+        await AddApplicationTraceAsync(
+            dbContext,
+            httpContext,
+            null,
+            "AUTH_EVENTS",
+            "LOGIN_FAILED",
+            "Warning",
+            "Tentative de connexion refusee.",
+            "Login inconnu, compte inactif ou mot de passe invalide.",
+            MaskTraceSubject(normalizedLogin),
+            saveImmediately: true);
         return Results.Unauthorized();
     }
 
@@ -579,6 +617,18 @@ app.MapPost("/api/auth/login", async (LoginRequest request, NewNexusDbContext db
 
     account.LastLoginAtUtc = now;
     dbContext.UserSessions.Add(session);
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        null,
+        "AUTH_EVENTS",
+        "LOGIN_SUCCESS",
+        "Info",
+        "Connexion utilisateur reussie.",
+        $"Session expire a {session.ExpiresAtUtc:o}.",
+        account.Login,
+        actorUserAccountId: account.Id,
+        actorLogin: account.Login);
     await dbContext.SaveChangesAsync();
 
     var claims = new List<Claim>
@@ -612,6 +662,8 @@ app.MapPost("/api/auth/login", async (LoginRequest request, NewNexusDbContext db
 
 app.MapPost("/api/auth/logout", async (HttpContext httpContext, NewNexusDbContext dbContext) =>
 {
+    var userId = GetUserId(httpContext.User);
+    var userLogin = httpContext.User.FindFirstValue("login");
     var sessionId = GetSessionId(httpContext.User);
     if (sessionId is not null)
     {
@@ -620,6 +672,18 @@ app.MapPost("/api/auth/logout", async (HttpContext httpContext, NewNexusDbContex
         {
             session.LogoutAtUtc = DateTime.UtcNow;
             session.LastSeenAtUtc = DateTime.UtcNow;
+            await AddApplicationTraceAsync(
+                dbContext,
+                httpContext,
+                httpContext.User,
+                "AUTH_EVENTS",
+                "LOGOUT",
+                "Info",
+                "Deconnexion utilisateur.",
+                $"Session={session.Id}.",
+                userLogin,
+                actorUserAccountId: userId,
+                actorLogin: userLogin);
             await dbContext.SaveChangesAsync();
         }
     }
@@ -631,7 +695,8 @@ app.MapPost("/api/auth/logout", async (HttpContext httpContext, NewNexusDbContex
 app.MapPost("/api/auth/forgot-password", async (
     ForgotPasswordRequest request,
     NewNexusDbContext dbContext,
-    ILoggerFactory loggerFactory) =>
+    ILoggerFactory loggerFactory,
+    HttpContext httpContext) =>
 {
     var identifier = request.LoginOrEmail.Trim();
     if (string.IsNullOrWhiteSpace(identifier))
@@ -657,10 +722,37 @@ app.MapPost("/api/auth/forgot-password", async (
         account.PasswordResetRequestedAtUtc = DateTime.UtcNow;
         account.PasswordResetExpiresAtUtc = DateTime.UtcNow.AddMinutes(30);
         account.PasswordResetConsumedAtUtc = null;
+        await AddApplicationTraceAsync(
+            dbContext,
+            httpContext,
+            null,
+            "AUTH_EVENTS",
+            "PASSWORD_RESET_REQUESTED",
+            "Info",
+            "Demande de reinitialisation de mot de passe.",
+            $"Expiration={account.PasswordResetExpiresAtUtc:o}.",
+            account.Login,
+            actorUserAccountId: account.Id,
+            actorLogin: account.Login);
         await dbContext.SaveChangesAsync();
 
         loggerFactory.CreateLogger("NewNexus.PasswordReset")
             .LogInformation("Password reset requested for account {AccountId}.", account.Id);
+    }
+
+    if (account is null)
+    {
+        await AddApplicationTraceAsync(
+            dbContext,
+            httpContext,
+            null,
+            "AUTH_EVENTS",
+            "PASSWORD_RESET_REQUESTED_UNKNOWN",
+            "Warning",
+            "Demande de reinitialisation sans compte actif.",
+            "Aucun identifiant sensible conserve.",
+            null,
+            saveImmediately: true);
     }
 
     return Results.Ok(new
@@ -671,7 +763,7 @@ app.MapPost("/api/auth/forgot-password", async (
     });
 });
 
-app.MapPost("/api/auth/reset-password", async (ResetPasswordRequest request, NewNexusDbContext dbContext) =>
+app.MapPost("/api/auth/reset-password", async (ResetPasswordRequest request, NewNexusDbContext dbContext, HttpContext httpContext) =>
 {
     var errors = ValidateResetPasswordRequest(request);
     if (errors.Count > 0)
@@ -703,6 +795,18 @@ app.MapPost("/api/auth/reset-password", async (ResetPasswordRequest request, New
     account.PasswordResetTokenHash = null;
     account.PasswordResetConsumedAtUtc = DateTime.UtcNow;
     account.PasswordResetExpiresAtUtc = null;
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        null,
+        "AUTH_EVENTS",
+        "PASSWORD_RESET_CONSUMED",
+        "Info",
+        "Mot de passe reinitialise depuis un jeton.",
+        null,
+        account.Login,
+        actorUserAccountId: account.Id,
+        actorLogin: account.Login);
 
     await dbContext.SaveChangesAsync();
 
@@ -1206,6 +1310,95 @@ app.MapPost("/api/admin/sessions/{sessionId:guid}/disconnect", async (
     await dbContext.SaveChangesAsync();
 
     return Results.NoContent();
+}).RequireAuthorization("RequireInformatique");
+
+app.MapGet("/api/admin/sql-queries", () => Results.Ok(GetControlledSqlQueryCatalog()))
+    .RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/admin/sql-queries/{queryCode}/run", async (
+    string queryCode,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    ILoggerFactory loggerFactory,
+    HttpContext httpContext) =>
+{
+    var query = GetControlledSqlQueryCatalog()
+        .SingleOrDefault(item => string.Equals(item.Code, queryCode, StringComparison.OrdinalIgnoreCase));
+    if (query is null)
+    {
+        return Results.NotFound();
+    }
+
+    var rows = await ExecuteControlledSqlQueryAsync(query.Code, dbContext, httpContext.RequestAborted);
+    loggerFactory.CreateLogger("NewNexus.ControlledSql")
+        .LogInformation(
+            "Controlled SQL query {QueryCode} executed by {UserId} with {RowCount} row(s).",
+            query.Code,
+            GetUserId(principal),
+            rows.Count);
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "ADMIN_ACTIONS",
+        "CONTROLLED_SQL_RUN",
+        "Info",
+        "Requete SQL controlee executee.",
+        $"Code={query.Code}; lignes={rows.Count}.",
+        query.Code,
+        saveImmediately: true);
+
+    return Results.Ok(new
+    {
+        Query = query,
+        Rows = rows,
+        RowCount = rows.Count,
+        ExecutedAtUtc = DateTime.UtcNow
+    });
+}).RequireAuthorization("RequireInformatique");
+
+app.MapGet("/api/admin/traces", async (
+    string? streamCode,
+    int? limit,
+    NewNexusDbContext dbContext) =>
+{
+    var normalizedStreamCode = NormalizeOptionalText(streamCode)?.ToUpperInvariant();
+    var safeLimit = Math.Clamp(limit.GetValueOrDefault(100), 20, 300);
+    var query = dbContext.ApplicationTraces
+        .AsNoTracking()
+        .AsQueryable();
+
+    if (!string.IsNullOrWhiteSpace(normalizedStreamCode))
+    {
+        query = query.Where(trace => trace.StreamCode == normalizedStreamCode);
+    }
+
+    var traces = await query
+        .OrderByDescending(trace => trace.CreatedAtUtc)
+        .Take(safeLimit)
+        .Select(trace => new
+        {
+            trace.Id,
+            trace.StreamCode,
+            trace.StreamLabel,
+            trace.EventCode,
+            trace.Level,
+            trace.Message,
+            trace.Detail,
+            trace.Subject,
+            trace.ActorUserAccountId,
+            trace.ActorLogin,
+            trace.IpAddress,
+            trace.CreatedAtUtc
+        })
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        Streams = GetTraceStreams(),
+        Traces = traces,
+        Limit = safeLimit
+    });
 }).RequireAuthorization("RequireInformatique");
 
 app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
@@ -2883,6 +3076,290 @@ static object BuildUserSessionResponse(UserSession session, DateTime now)
     };
 }
 
+static IReadOnlyList<ControlledSqlQueryDefinition> GetControlledSqlQueryCatalog()
+{
+    return
+    [
+        new(
+            "SECURITY_ACCOUNTS_OVERVIEW",
+            "Securite",
+            "Synthese des comptes utilisateurs",
+            "Comptes actifs, inactifs, profils rattaches et derniere connexion.",
+            ["login", "displayName", "profile", "status", "mustChangePassword", "sessionTimeoutMinutes", "lastLoginAtUtc"]),
+        new(
+            "MODULE_RIGHTS_MATRIX",
+            "Droits",
+            "Matrice profils et modules",
+            "Lecture des droits par profil, module et niveau d'acces.",
+            ["profile", "profileStatus", "module", "navigationGroup", "accessLevel"]),
+        new(
+            "COMMON_DATA_REFERENTIALS",
+            "Donnees Communes",
+            "Referentiels transverses",
+            "Societes, analytiques, exploitations, salaries, tiers et materiels avec etat actif.",
+            ["referential", "code", "label", "status", "parent", "lastSyncedAtUtc"]),
+        new(
+            "INTEGRATION_CREDENTIALS_AUDIT",
+            "Outils",
+            "Audit des acces externes",
+            "Fournisseurs, cles renseignees, secrets masques et activation.",
+            ["provider", "keyName", "displayName", "hasValue", "isSecret", "status", "updatedAtUtc"])
+    ];
+}
+
+static async Task<List<Dictionary<string, object?>>> ExecuteControlledSqlQueryAsync(
+    string queryCode,
+    NewNexusDbContext dbContext,
+    CancellationToken cancellationToken)
+{
+    return queryCode.ToUpperInvariant() switch
+    {
+        "SECURITY_ACCOUNTS_OVERVIEW" => await BuildSecurityAccountsOverviewRowsAsync(dbContext, cancellationToken),
+        "MODULE_RIGHTS_MATRIX" => await BuildModuleRightsMatrixRowsAsync(dbContext, cancellationToken),
+        "COMMON_DATA_REFERENTIALS" => await BuildCommonDataReferentialRowsAsync(dbContext, cancellationToken),
+        "INTEGRATION_CREDENTIALS_AUDIT" => await BuildIntegrationCredentialsAuditRowsAsync(dbContext, cancellationToken),
+        _ => []
+    };
+}
+
+static async Task<List<Dictionary<string, object?>>> BuildSecurityAccountsOverviewRowsAsync(
+    NewNexusDbContext dbContext,
+    CancellationToken cancellationToken)
+{
+    var accounts = await dbContext.UserAccounts
+        .AsNoTracking()
+        .Include(account => account.SecurityProfile)
+        .OrderBy(account => account.Login)
+        .Take(250)
+        .ToListAsync(cancellationToken);
+
+    return accounts
+        .Select(account => Row(
+            ("login", account.Login),
+            ("displayName", account.DisplayName),
+            ("profile", account.SecurityProfile?.Label ?? "Aucun"),
+            ("status", account.IsActive ? "Actif" : "Inactif"),
+            ("mustChangePassword", account.MustChangePassword ? "Oui" : "Non"),
+            ("sessionTimeoutMinutes", account.SessionTimeoutMinutes),
+            ("lastLoginAtUtc", account.LastLoginAtUtc)))
+        .ToList();
+}
+
+static async Task<List<Dictionary<string, object?>>> BuildModuleRightsMatrixRowsAsync(
+    NewNexusDbContext dbContext,
+    CancellationToken cancellationToken)
+{
+    var rights = await dbContext.SecurityProfileModuleRights
+        .AsNoTracking()
+        .Include(right => right.SecurityProfile)
+        .Include(right => right.SecurityModule)
+        .OrderBy(right => right.SecurityProfile!.Label)
+        .ThenBy(right => right.SecurityModule!.NavigationGroup)
+        .ThenBy(right => right.SecurityModule!.DisplayOrder)
+        .ToListAsync(cancellationToken);
+
+    return rights
+        .Select(right => Row(
+            ("profile", right.SecurityProfile?.Label),
+            ("profileStatus", right.SecurityProfile?.IsActive == true ? "Actif" : "Inactif"),
+            ("module", right.SecurityModule?.Label),
+            ("navigationGroup", right.SecurityModule?.NavigationGroup),
+            ("accessLevel", right.AccessLevel.ToString())))
+        .ToList();
+}
+
+static async Task<List<Dictionary<string, object?>>> BuildCommonDataReferentialRowsAsync(
+    NewNexusDbContext dbContext,
+    CancellationToken cancellationToken)
+{
+    var rows = new List<Dictionary<string, object?>>();
+
+    rows.AddRange((await dbContext.Companies
+            .AsNoTracking()
+            .OrderBy(item => item.DisplayName)
+            .Take(250)
+            .ToListAsync(cancellationToken))
+        .Select(item => Row(
+            ("referential", "Societes"),
+            ("code", item.Siren),
+            ("label", item.DisplayName),
+            ("status", item.IsActive ? "Actif" : "Inactif"),
+            ("parent", item.LegalName),
+            ("lastSyncedAtUtc", null))));
+
+    rows.AddRange((await dbContext.Analytics
+            .AsNoTracking()
+            .Include(item => item.Company)
+            .OrderBy(item => item.Code)
+            .Take(250)
+            .ToListAsync(cancellationToken))
+        .Select(item => Row(
+            ("referential", "Analytiques"),
+            ("code", item.Code),
+            ("label", item.Label),
+            ("status", item.IsActive ? "Actif" : "Inactif"),
+            ("parent", item.Company?.DisplayName),
+            ("lastSyncedAtUtc", null))));
+
+    rows.AddRange((await dbContext.Exploitations
+            .AsNoTracking()
+            .Include(item => item.Company)
+            .OrderBy(item => item.Code)
+            .Take(250)
+            .ToListAsync(cancellationToken))
+        .Select(item => Row(
+            ("referential", "Exploitations"),
+            ("code", item.Code),
+            ("label", item.Label),
+            ("status", item.IsActive ? "Actif" : "Inactif"),
+            ("parent", item.Company?.DisplayName),
+            ("lastSyncedAtUtc", null))));
+
+    rows.AddRange((await dbContext.Employees
+            .AsNoTracking()
+            .OrderBy(item => item.DisplayName)
+            .Take(250)
+            .ToListAsync(cancellationToken))
+        .Select(item => Row(
+            ("referential", "Salaries"),
+            ("code", item.EmployeeNumber),
+            ("label", item.DisplayName),
+            ("status", item.IsActive ? "Actif" : "Inactif"),
+            ("parent", item.Email),
+            ("lastSyncedAtUtc", item.LastSyncedAtUtc))));
+
+    rows.AddRange((await dbContext.ThirdParties
+            .AsNoTracking()
+            .OrderBy(item => item.DisplayName)
+            .Take(250)
+            .ToListAsync(cancellationToken))
+        .Select(item => Row(
+            ("referential", "Tiers"),
+            ("code", item.Siren ?? item.ExternalReference ?? item.TypeCode),
+            ("label", item.DisplayName),
+            ("status", item.IsActive ? "Actif" : "Inactif"),
+            ("parent", item.TypeCode),
+            ("lastSyncedAtUtc", null))));
+
+    rows.AddRange((await dbContext.Materials
+            .AsNoTracking()
+            .Include(item => item.Exploitation)
+            .OrderBy(item => item.FleetNumber)
+            .Take(250)
+            .ToListAsync(cancellationToken))
+        .Select(item => Row(
+            ("referential", "Materiels"),
+            ("code", item.FleetNumber),
+            ("label", item.Label),
+            ("status", item.IsActive ? "Actif" : "Inactif"),
+            ("parent", item.Exploitation?.Label),
+            ("lastSyncedAtUtc", item.LastSyncedAtUtc))));
+
+    return rows;
+}
+
+static async Task<List<Dictionary<string, object?>>> BuildIntegrationCredentialsAuditRowsAsync(
+    NewNexusDbContext dbContext,
+    CancellationToken cancellationToken)
+{
+    var credentials = await dbContext.IntegrationCredentials
+        .AsNoTracking()
+        .OrderBy(item => item.ProviderLabel)
+        .ThenBy(item => item.KeyName)
+        .Take(250)
+        .ToListAsync(cancellationToken);
+
+    return credentials
+        .Select(item => Row(
+            ("provider", item.ProviderLabel),
+            ("keyName", item.KeyName),
+            ("displayName", item.DisplayName),
+            ("hasValue", string.IsNullOrWhiteSpace(item.ProtectedValue) ? "Non" : "Oui"),
+            ("isSecret", item.IsSecret ? "Oui" : "Non"),
+            ("status", item.IsActive ? "Actif" : "Inactif"),
+            ("updatedAtUtc", item.UpdatedAtUtc)))
+        .ToList();
+}
+
+static Dictionary<string, object?> Row(params (string Key, object? Value)[] values)
+{
+    return values.ToDictionary(item => item.Key, item => item.Value);
+}
+
+static IReadOnlyList<TraceStreamDefinition> GetTraceStreams()
+{
+    return
+    [
+        new("AUTH_EVENTS", "Authentification", "Connexions, deconnexions, echecs et resets de mot de passe.", "90 jours cible"),
+        new("ADMIN_ACTIONS", "Actions administrateur", "Actions sensibles realisees depuis les outils d'administration.", "180 jours cible"),
+        new("INTEGRATION_RUNS", "Traitements d'integration", "Imports et traitements raccordes aux logiciels externes.", "180 jours cible"),
+        new("SYSTEM_ERRORS", "Erreurs applicatives", "Indisponibilites et erreurs critiques journalisees cote serveur.", "365 jours cible")
+    ];
+}
+
+static async Task AddApplicationTraceAsync(
+    NewNexusDbContext dbContext,
+    HttpContext httpContext,
+    ClaimsPrincipal? principal,
+    string streamCode,
+    string eventCode,
+    string level,
+    string message,
+    string? detail = null,
+    string? subject = null,
+    bool saveImmediately = false,
+    Guid? actorUserAccountId = null,
+    string? actorLogin = null)
+{
+    var normalizedStreamCode = NormalizeTechnicalCode(streamCode);
+    var stream = GetTraceStreams().SingleOrDefault(item => item.Code == normalizedStreamCode);
+    var userId = actorUserAccountId ?? (principal is null ? null : GetUserId(principal));
+    var login = actorLogin ?? principal?.FindFirstValue("login");
+
+    dbContext.ApplicationTraces.Add(new ApplicationTrace
+    {
+        Id = Guid.NewGuid(),
+        StreamCode = normalizedStreamCode,
+        StreamLabel = stream?.Label ?? normalizedStreamCode,
+        EventCode = NormalizeTechnicalCode(eventCode),
+        Level = FirstNonEmpty(level, "Info")!,
+        Message = message.Trim(),
+        Detail = NormalizeTraceText(detail, 2000),
+        Subject = NormalizeTraceText(subject, 240),
+        ActorUserAccountId = userId,
+        ActorLogin = NormalizeTraceText(login, 160),
+        IpAddress = NormalizeTraceText(httpContext.Connection.RemoteIpAddress?.ToString(), 80),
+        CreatedAtUtc = DateTime.UtcNow
+    });
+
+    if (saveImmediately)
+    {
+        await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    }
+}
+
+static string? NormalizeTraceText(string? value, int maxLength)
+{
+    var normalized = NormalizeOptionalText(value);
+    if (normalized is null)
+    {
+        return null;
+    }
+
+    return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+}
+
+static string MaskTraceSubject(string value)
+{
+    var normalized = value.Trim();
+    if (normalized.Length <= 2)
+    {
+        return "**";
+    }
+
+    return $"{normalized[0]}***{normalized[^1]}";
+}
+
 static object BuildProfileResponse(SecurityProfile profile)
 {
     return new
@@ -3555,5 +4032,16 @@ internal sealed record CredentialProviderStatus(
     int TotalCount,
     int ConfiguredCount,
     int ActiveConfiguredCount);
+internal sealed record ControlledSqlQueryDefinition(
+    string Code,
+    string Scope,
+    string Label,
+    string Description,
+    string[] Columns);
+internal sealed record TraceStreamDefinition(
+    string Code,
+    string Label,
+    string Description,
+    string Retention);
 internal sealed record LegacyAdminApiKeyRow(int ApiKeyId, string KeyValue, string ProviderName, string CreatedOn);
 internal sealed record LegacyImportResult(int ImportedCount, int SkippedCount, int FailedCount, List<string> Messages);

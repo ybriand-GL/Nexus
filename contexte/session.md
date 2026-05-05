@@ -1798,3 +1798,64 @@ Ordre cible de construction:
   - item `Navigation alphabetique absolue` precise avec sous-menus visibles dans la navigation laterale
 - validation technique:
   - `npm run build` OK
+
+## 2026-05-05 - Requeteur SQL controle testable
+
+- demande:
+  - continuer le backlog apres la passe navigation laterale
+  - prochain item traite: `Donnees Communes | Requeteur SQL controle`
+- choix de securite:
+  - aucun SQL libre accepte depuis l'interface
+  - execution limitee a un catalogue serveur de requetes nommees
+  - requetes implementees en lecture seule via EF Core / DbContext
+  - journalisation serveur de chaque lancement avec code requete, utilisateur et nombre de lignes
+- corrections API:
+  - ajout de `GET /api/admin/sql-queries`
+  - ajout de `POST /api/admin/sql-queries/{queryCode}/run`
+  - requetes disponibles:
+    - `SECURITY_ACCOUNTS_OVERVIEW`
+    - `MODULE_RIGHTS_MATRIX`
+    - `COMMON_DATA_REFERENTIALS`
+    - `INTEGRATION_CREDENTIALS_AUDIT`
+- corrections UI:
+  - branchement du catalogue SQL depuis l'API dans `Administration > Outils > Requeteur SQL`
+  - bouton d'execution par requete nommee
+  - affichage tabulaire generique des resultats avec libelles de colonnes et dates lisibles
+- backlog:
+  - `Requeteur SQL controle` passe de `SCAFFOLDE` a `A_TESTER`
+- validation technique:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+
+## 2026-05-05 - Publication systematique et consultation des traces
+
+- demande:
+  - publier IIS systematiquement apres les passes backlog
+  - continuer le backlog
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` execute apres la passe Requeteur SQL
+  - anomalie detectee: `/newNexus/api/...` etait repris par la regle SPA du site parent et retournait `403.18`
+  - correction du `web.config` parent: exclusion `^/newNexus(/|$)` retablie dans la regle `SPA Routes`
+  - script de publication enrichi pour verifier et retablir cette exclusion a chaque publication
+- traces applicatives:
+  - ajout de l'entite `ApplicationTrace`
+  - ajout de la configuration EF Core et du `DbSet`
+  - generation et application locale de la migration `ApplicationTraces`
+  - ajout de `GET /api/admin/traces` avec filtre par flux
+  - flux exposes: Authentification, Actions administrateur, Traitements d'integration, Erreurs applicatives
+  - premiers evenements collectes: login reussi/refuse, logout, demandes et consommation de reset mot de passe, modification cles API, import cles legacy, execution requeteur SQL controle
+  - les mots de passe, jetons et valeurs de cles API ne sont pas stockes dans les traces
+- UI:
+  - `Administration > Outils > Traces` charge les flux depuis l'API
+  - filtre par flux, liste des traces recentes, niveau, acteur, sujet, IP et detail disponibles
+- backlog:
+  - `Consultation des traces` passe de `SCAFFOLDE` a `A_TESTER`
+  - migration technique `ApplicationTraces` ajoutee en `TERMINE`
+- validation technique:
+  - `dotnet ef migrations add ApplicationTraces --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api/system/info` retourne `200 application/json`

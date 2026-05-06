@@ -1,0 +1,22 @@
+:root {
+  --nexa-bg: #0B0B0F;
+  --nexa-surface: #151821;
+  --nexa-surface-alt: #1D202A;
+  --nexa-gold: #D7A449;
+  --nexa-gold-light: #F2D28A;
+  --nexa-gold-pale: #FFF0C9;
+  --nexa-blue: #2EA8FF;
+  --nexa-blue-light: #4CC2FF;
+  --nexa-blue-glow: rgba(46, 168, 255, 0.35);
+  --nexa-text: #F5F7FA;
+  --nexa-text-muted: #A7AAB4;
+  --nexa-border: #2A2D36;
+  --nexa-radius-sm: 10px;
+  --nexa-radius-md: 16px;
+  --nexa-radius-lg: 22px;
+  --nexa-radius-full: 999px;
+  --nexa-shadow-soft: 0 22px 58px rgba(0, 0, 0, .36);
+  --nexa-shadow-blue: 0 0 0 1px rgba(46, 168, 255, .18), 0 0 28px rgba(46, 168, 255, .24);
+  --nexa-shadow-gold: 0 14px 32px rgba(215, 164, 73, .16);
+  --nexa-focus: 0 0 0 3px rgba(46, 168, 255, .32), 0 0 0 1px rgba(242, 210, 138, .56);
+}

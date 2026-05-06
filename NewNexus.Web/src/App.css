@@ -1196,6 +1196,327 @@
   gap: 12px;
 }
 
+.nexa-floating-button {
+  border-color: rgba(46, 168, 255, .34);
+  background:
+    radial-gradient(circle at 26% 20%, rgba(46, 168, 255, .22), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05)),
+    var(--nexa-bg);
+  box-shadow: var(--nexa-shadow-soft);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.nexa-floating-button:hover,
+.nexa-floating-button:focus-visible,
+.nexa-floating-button-active {
+  border-color: rgba(76, 194, 255, .68);
+  box-shadow: var(--nexa-shadow-soft), var(--nexa-shadow-blue);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.nexa-floating-button span {
+  width: 38px;
+  height: 38px;
+  padding: 2px;
+  background: transparent;
+  box-shadow: 0 0 24px rgba(46, 168, 255, .2);
+}
+
+.nexa-floating-button span img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.nexa-floating-button strong {
+  color: var(--nexa-text);
+}
+
+.nexa-assistant-panel {
+  border-color: rgba(46, 168, 255, .24);
+  background:
+    radial-gradient(circle at 92% 0, rgba(46, 168, 255, .18), transparent 34%),
+    radial-gradient(circle at 0 100%, rgba(215, 164, 73, .13), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.035)),
+    var(--nexa-bg);
+  box-shadow: var(--nexa-shadow-soft), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+
+.nexa-assistant-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.nexa-assistant-logo {
+  width: 158px;
+  max-width: 42vw;
+  height: auto;
+  object-fit: contain;
+}
+
+.nexa-assistant-brand p,
+.nexa-ticket-box-header p {
+  margin: 5px 0 0;
+  color: var(--nexa-text-muted);
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+.nexa-assistant-close {
+  color: var(--nexa-text);
+  border-color: rgba(46, 168, 255, .32);
+  background: rgba(46, 168, 255, .1);
+}
+
+.nexa-assistant-close:hover,
+.nexa-assistant-close:focus-visible,
+.nexa-chip-button:hover,
+.nexa-chip-button:focus-visible,
+.nexa-primary-action:focus-visible {
+  outline: none;
+  box-shadow: var(--nexa-focus);
+}
+
+.nexa-scope-grid span,
+.nexa-message span {
+  color: var(--nexa-gold-light);
+  letter-spacing: 0;
+}
+
+.nexa-scope-grid select,
+.nexa-scope-grid input,
+.nexa-chat-form textarea {
+  border-color: rgba(42, 45, 54, .9);
+  background: rgba(11, 11, 15, .82);
+}
+
+.nexa-scope-grid select:focus,
+.nexa-scope-grid input:focus,
+.nexa-chat-form textarea:focus {
+  outline: none;
+  border-color: rgba(76, 194, 255, .55);
+  box-shadow: var(--nexa-focus);
+}
+
+.nexa-message {
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: start;
+  border-color: rgba(46, 168, 255, .18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .065), rgba(255, 255, 255, .035)),
+    var(--nexa-surface);
+}
+
+.nexa-message-user {
+  grid-template-columns: minmax(0, 1fr);
+  border-color: rgba(242, 210, 138, .28);
+  background: rgba(242, 210, 138, .12);
+}
+
+.nexa-message-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--nexa-radius-sm);
+  box-shadow: 0 0 18px rgba(46, 168, 255, .2);
+}
+
+.nexa-message-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nexa-message-meta,
+.nexa-feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nexa-message-warning {
+  color: #fecaca;
+}
+
+.nexa-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: var(--nexa-radius-full);
+  font-size: .68rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.nexa-badge-ai {
+  color: #c9ecff;
+  border: 1px solid rgba(46, 168, 255, .42);
+  background: rgba(46, 168, 255, .14);
+}
+
+.nexa-badge-validated {
+  color: #fff4cf;
+  border: 1px solid rgba(242, 210, 138, .44);
+  background: rgba(215, 164, 73, .16);
+}
+
+.nexa-badge-source {
+  color: #d6f2ff;
+  border: 1px solid rgba(76, 194, 255, .3);
+  background: rgba(76, 194, 255, .1);
+}
+
+.nexa-badge-waiting {
+  color: #fed7aa;
+  border: 1px solid rgba(251, 146, 60, .34);
+  background: rgba(251, 146, 60, .12);
+}
+
+.nexa-source-list {
+  gap: 6px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.nexa-source-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.nexa-chip-button,
+.nexa-primary-action {
+  min-height: 34px;
+  border-radius: var(--nexa-radius-full);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.nexa-chip-button {
+  color: var(--nexa-text);
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .06);
+  padding: 0 10px;
+}
+
+.nexa-primary-action {
+  color: #061018;
+  border: 1px solid rgba(76, 194, 255, .64);
+  background: linear-gradient(180deg, var(--nexa-blue-light), var(--nexa-blue));
+  padding: 0 14px;
+  box-shadow: 0 10px 24px rgba(46, 168, 255, .2);
+}
+
+.nexa-primary-action:disabled,
+.nexa-chip-button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.nexa-thinking-message {
+  border-color: rgba(76, 194, 255, .32);
+}
+
+.nexa-thinking-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.nexa-thinking-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--nexa-radius-full);
+  background: var(--nexa-blue-light);
+  animation: nexaThinkingPulse 1.1s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(46, 168, 255, .45);
+}
+
+.nexa-thinking-dots i:nth-child(2) {
+  animation-delay: .14s;
+}
+
+.nexa-thinking-dots i:nth-child(3) {
+  animation-delay: .28s;
+}
+
+.nexa-ticket-box {
+  border-color: rgba(46, 168, 255, .2);
+  background:
+    radial-gradient(circle at 100% 0, rgba(46, 168, 255, .12), transparent 40%),
+    rgba(21, 24, 33, .72);
+}
+
+.nexa-ticket-box-header {
+  display: grid;
+  gap: 4px;
+}
+
+.nexa-ticket-box-header strong {
+  color: var(--nexa-text);
+}
+
+.nexa-attachment-placeholder {
+  display: grid;
+  gap: 6px;
+  color: var(--nexa-text-muted);
+  font-size: .78rem;
+}
+
+.nexa-attachment-placeholder input {
+  max-width: 100%;
+}
+
+.nexa-admin-card {
+  border-color: rgba(46, 168, 255, .16);
+}
+
+.nexa-admin-brand-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.nexa-admin-brand-strip img {
+  width: min(230px, 42vw);
+  height: auto;
+}
+
+.nexa-admin-brand-strip h2 {
+  margin: 5px 0 0;
+}
+
+.nexa-ticket-card-selected {
+  border-color: rgba(46, 168, 255, .42);
+  box-shadow: var(--nexa-shadow-blue);
+}
+
+.nexa-ticket-answer {
+  border-color: rgba(46, 168, 255, .18);
+  background: rgba(46, 168, 255, .07);
+}
+
+@keyframes nexaThinkingPulse {
+  0%, 100% {
+    opacity: .35;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
 .nexus-top-meta {
   display: flex;
   align-items: center;

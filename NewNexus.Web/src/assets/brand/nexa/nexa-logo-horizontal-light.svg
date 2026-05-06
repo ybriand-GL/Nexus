@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 220" role="img" aria-labelledby="nexaLogoLightTitle">
+  <title id="nexaLogoLightTitle">Nexa</title>
+  <rect x="14" y="14" width="192" height="192" rx="48" fill="#FFFFFF" stroke="#D7A449" stroke-width="3"/>
+  <path d="M60 124c0-36 27-63 66-63h5c36 0 63 25 63 59 0 36-27 59-66 59H98l-39 24 5-38c-3-11-4-24-4-41Z" fill="#FFFFFF" stroke="#2EA8FF" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M82 140V86c0-6 7-9 12-5l47 43V82c0-5 4-8 8-8 5 0 8 3 8 8v60c0 7-8 11-13 6l-46-41v33c0 5-3 8-8 8-4 0-8-3-8-8Z" fill="#D7A449"/>
+  <path d="M153 55c4 16 8 20 24 24-16 4-20 8-24 24-4-16-8-20-24-24 16-4 20-8 24-24Z" fill="#2EA8FF"/>
+  <g fill="none" stroke="#D7A449" stroke-linecap="round" stroke-linejoin="round" stroke-width="22">
+    <path d="M274 158V62l92 96V62"/>
+    <path d="M432 66h98M432 110h86M432 154h98"/>
+    <path d="M590 65c23 42 55 74 104 92M693 65c-23 42-55 74-104 92"/>
+    <path d="M736 158 787 62l51 96"/>
+  </g>
+  <circle cx="799" cy="133" r="9" fill="#2EA8FF"/>
+</svg>

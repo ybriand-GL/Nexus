@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
+import nexaIcon from './assets/brand/nexa/nexa-icon-dark.svg'
+import nexaLogo from './assets/brand/nexa/nexa-logo-horizontal-dark.svg'
 import nexusIcon from './assets/brand/nexus_icon_figma_clean.svg'
 import nexusWordmark from './assets/brand/nexus_wordmark_figma_clean.svg'
 
@@ -4747,12 +4749,15 @@ function App() {
         {isNexaAssistantOpen ? (
           <section className="nexa-assistant-panel" aria-label="Assistant Nexa">
             <div className="nexa-assistant-header">
-              <div>
-                <span className="eyebrow">Assistant interne</span>
-                <h2>Nexa</h2>
+              <div className="nexa-assistant-brand">
+                <img className="nexa-assistant-logo" src={nexaLogo} alt="Nexa" />
+                <div>
+                  <span className="nexa-badge nexa-badge-ai">Assistant IA Nexus</span>
+                  <p>Réponses internes, tickets et base de connaissance validée.</p>
+                </div>
               </div>
               <button aria-label="Fermer Nexa" className="nexa-assistant-close" onClick={() => setIsNexaAssistantOpen(false)} type="button">
-                X
+                ×
               </button>
             </div>
             <div className="nexa-scope-grid">
@@ -4771,9 +4776,9 @@ function App() {
                 </select>
               </label>
               <label>
-                <span>Categorie</span>
+                <span>Catégorie</span>
                 <select value={nexaSelectedCategoryId} onChange={(event) => setNexaSelectedCategoryId(event.target.value)}>
-                  <option value="">Non precisee</option>
+                  <option value="">Non précisée</option>
                   {nexaCategories
                     .filter((category) => !category.nexaModuleId || category.nexaModuleId === nexaSelectedModuleId)
                     .map((category) => (
@@ -4785,35 +4790,62 @@ function App() {
             <div className="nexa-assistant-messages" aria-live="polite">
               {nexaChatMessages.map((message, index) => (
                 <article className={`nexa-message nexa-message-${message.role}`} key={`${message.role}-${index}`}>
-                  <span>{message.role === 'user' ? 'Vous' : 'Nexa'}</span>
-                  <p>{message.content}</p>
-                  {typeof message.confidenceScore === 'number' ? (
-                    <small>Fiabilite: {Math.round(message.confidenceScore * 100)}%</small>
-                  ) : null}
-                  {message.sources?.length ? (
-                    <ul className="nexa-source-list">
-                      {message.sources.map((source) => (
-                        <li key={source.id}>{source.label}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {message.warning ? <small>{message.warning}</small> : null}
-                  {message.mode ? <small>{message.mode === 'knowledge-base' ? 'Base de connaissance' : message.mode === 'ticket-proposed' ? 'Ticket recommande' : message.mode}</small> : null}
+                  {message.role === 'assistant' ? <img className="nexa-message-avatar" src={nexaIcon} alt="" aria-hidden="true" /> : null}
+                  <div className="nexa-message-body">
+                    <span>{message.role === 'user' ? 'Vous' : 'Nexa'}</span>
+                    <p>{message.content}</p>
+                    <div className="nexa-message-meta">
+                      {typeof message.confidenceScore === 'number' ? (
+                        <span className={`nexa-badge ${message.confidenceScore >= .75 ? 'nexa-badge-validated' : 'nexa-badge-waiting'}`}>
+                          Fiabilité {Math.round(message.confidenceScore * 100)}%
+                        </span>
+                      ) : null}
+                      {message.mode ? (
+                        <span className="nexa-badge nexa-badge-source">
+                          {message.mode === 'knowledge-base' ? 'Réponse issue de la base' : message.mode === 'ticket-proposed' ? 'Ticket recommandé' : message.mode}
+                        </span>
+                      ) : null}
+                    </div>
+                    {message.sources?.length ? (
+                      <ul className="nexa-source-list">
+                        {message.sources.map((source) => (
+                          <li key={source.id}><span className="nexa-badge nexa-badge-source">Source interne</span>{source.label}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {message.warning ? <small className="nexa-message-warning">{message.warning}</small> : null}
+                    {message.role === 'assistant' && index > 0 ? (
+                      <div className="nexa-feedback-actions">
+                        <button className="nexa-chip-button" type="button">Réponse utile</button>
+                        <button className="nexa-chip-button" type="button">Réponse incorrecte</button>
+                        <button className="nexa-chip-button" onClick={() => void navigator.clipboard?.writeText(message.content)} type="button">Copier</button>
+                      </div>
+                    ) : null}
+                  </div>
                 </article>
               ))}
               {isNexaThinking ? (
-                <article className="nexa-message nexa-message-assistant">
-                  <span>Nexa</span>
-                  <p>Analyse locale en cours...</p>
+                <article className="nexa-message nexa-message-assistant nexa-thinking-message">
+                  <img className="nexa-message-avatar" src={nexaIcon} alt="" aria-hidden="true" />
+                  <div className="nexa-message-body">
+                    <span>Nexa réfléchit</span>
+                    <p>Recherche dans la base de connaissance interne...</p>
+                    <div className="nexa-thinking-dots" aria-hidden="true"><i /><i /><i /></div>
+                  </div>
                 </article>
               ) : null}
             </div>
             {nexaChatError ? <p className="nexa-chat-error">{nexaChatError}</p> : null}
             {nexaLastAsk?.canCreateTicket ? (
               <div className="nexa-ticket-box">
+                <div className="nexa-ticket-box-header">
+                  <span className="nexa-badge nexa-badge-waiting">Réponse insuffisante</span>
+                  <strong>Créer un ticket Nexa</strong>
+                  <p>La question sera transmise à un référent selon les règles de routage.</p>
+                </div>
                 <div className="nexa-scope-grid">
                   <label>
-                    <span>Priorite</span>
+                    <span>Priorité</span>
                     <select value={nexaTicketPriority} onChange={(event) => setNexaTicketPriority(event.target.value)}>
                       <option value="BASSE">Basse</option>
                       <option value="NORMAL">Normale</option>
@@ -4822,12 +4854,17 @@ function App() {
                     </select>
                   </label>
                   <label>
-                    <span>Complement</span>
-                    <input value={nexaTicketComment} onChange={(event) => setNexaTicketComment(event.target.value)} placeholder="Precision facultative" />
+                    <span>Complément</span>
+                    <input value={nexaTicketComment} onChange={(event) => setNexaTicketComment(event.target.value)} placeholder="Précision facultative" />
                   </label>
                 </div>
-                <button className="secondary-button" disabled={isCreatingNexaTicket || !nexaSelectedModuleId} onClick={() => void createNexaTicketFromLastAsk()} type="button">
-                  {isCreatingNexaTicket ? 'Creation...' : 'Ouvrir un ticket'}
+                <label className="nexa-attachment-placeholder">
+                  <span>Pièce jointe</span>
+                  <input disabled type="file" />
+                  <small>Prévu pour la prochaine itération ticketing.</small>
+                </label>
+                <button className="nexa-primary-action" disabled={isCreatingNexaTicket || !nexaSelectedModuleId} onClick={() => void createNexaTicketFromLastAsk()} type="button">
+                  {isCreatingNexaTicket ? 'Création...' : 'Ouvrir un ticket'}
                 </button>
               </div>
             ) : null}
@@ -4852,7 +4889,13 @@ function App() {
                 <button className="ghost-button" onClick={() => setNexaChatPrompt('Quel tableau de bord dois-je consulter en priorité ?')} type="button">
                   Dashboard
                 </button>
-                <button className="primary-button" disabled={isNexaThinking || !nexaChatPrompt.trim()} type="submit">
+                <button className="nexa-chip-button" onClick={() => setNexaChatPrompt('Voir les sources disponibles pour ma question.')} type="button">
+                  Voir les sources
+                </button>
+                <button className="nexa-chip-button" onClick={() => setNexaChatPrompt('Rechercher dans la base de connaissance Nexa.')} type="button">
+                  Rechercher dans la base
+                </button>
+                <button className="nexa-primary-action" disabled={isNexaThinking || !nexaChatPrompt.trim()} type="submit">
                   Envoyer
                 </button>
               </div>
@@ -5057,9 +5100,12 @@ function App() {
         {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Nexa' ? (
           <section className="workspace-grid">
             <article className="panel-card panel-card-wide nexa-admin-card">
-              <div className="panel-heading">
-                <span className="eyebrow">Nexa</span>
-                <h2>Assistant, tickets et connaissances</h2>
+              <div className="nexa-admin-brand-strip">
+                <img src={nexaLogo} alt="Nexa" />
+                <div>
+                  <span className="nexa-badge nexa-badge-ai">Administration IA</span>
+                  <h2>Assistant, tickets et connaissances</h2>
+                </div>
               </div>
               <p className="profiles-toolbar-copy">
                 Nexa reste interne à Nexus: le navigateur appelle uniquement le backend, les droits filtrent les données et seules les réponses validées alimentent la connaissance.
@@ -8246,14 +8292,14 @@ function App() {
         ) : null}
       </main>
       <button
-        aria-label="Interroger Nexa"
-        className="nexa-floating-button"
+        aria-label="Demander à Nexa"
+        className={`nexa-floating-button ${isNexaAssistantOpen ? 'nexa-floating-button-active' : ''}`}
         onClick={() => setIsNexaAssistantOpen((isOpen) => !isOpen)}
-        title="Interroger Nexa"
+        title="Demander à Nexa"
         type="button"
       >
-        <span aria-hidden="true">N</span>
-        <strong>Nexa</strong>
+        <span aria-hidden="true"><img src={nexaIcon} alt="" /></span>
+        <strong>Demander à Nexa</strong>
       </button>
     </div>
   )

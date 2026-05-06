@@ -2360,3 +2360,26 @@ Ordre cible de construction:
   - pieces jointes effectives
   - workflow complet depuis la fiche ticket UI pour reponse/validation sans passer par API
   - embeddings locaux et RAG Ollama controle en phase suivante
+
+## 2026-05-06 - Identite visuelle Nexa
+
+- prealable:
+  - commit/push precedent confirme sur `main`: `f6f4f0e feat: enhance nexa administration`
+  - image de reference analysee: `identite visuelle/Nexus/Nexa/Nexa_logo.png`
+- livrables graphiques:
+  - creation des variantes SVG source dans `NewNexus.Web/src/assets/brand/nexa`
+  - exports publics dans `NewNexus.Web/public/nexa`: `nexa-logo-horizontal-dark.svg/png`, `nexa-logo-horizontal-light.svg/png`, `nexa-icon-dark.svg/png`, `nexa-icon-light.svg/png`, `nexa-icon-mono.svg`, `favicon.ico`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `manifest.webmanifest`
+  - mini-charte ajoutee dans `docs/nexa/mini-charte-nexa.md`
+  - tokens dedies ajoutes dans `NewNexus.Web/src/styles/nexa-theme.css` et export `NewNexus.Web/public/nexa/nexa-tokens.css`
+- integration UI:
+  - bouton flottant `Demander a Nexa` avec icone Nexa et halo bleu discret
+  - panneau conversationnel avec logo Nexa, avatar assistant, badges IA/source/fiabilite, etat de recherche et actions de feedback/copie
+  - creation de ticket depuis Nexa restylee avec message d'incertitude, priorite, complement et emplacement piece jointe prepare
+  - `Administration > Nexa` habille avec la marque Nexa et accents visuels dedies
+- validations:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+  - publication IIS `/newNexus` OK
+  - assets publics Nexa accessibles en HTTP 200 sous `/newNexus/nexa/`
+- suites:
+  - reprendre le backlog fonctionnel Nexa: actions UI completes sur fiche ticket, pieces jointes effectives, feedback persistant depuis les bulles, puis RAG local avance

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="nexaIconMonoTitle">
+  <title id="nexaIconMonoTitle">Nexa monochrome</title>
+  <rect x="12" y="12" width="232" height="232" rx="50" fill="none" stroke="currentColor" stroke-width="6"/>
+  <path d="M67 145c0-42 31-73 76-73h5c42 0 73 29 73 68 0 42-31 69-76 69H111l-46 28 6-45c-3-12-4-27-4-47Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M92 164V99c0-6 7-10 12-5l56 51V94c0-5 4-9 9-9s9 4 9 9v71c0 8-9 12-15 7l-54-49v41c0 5-4 9-9 9s-8-4-8-9Z" fill="currentColor"/>
+  <path d="M178 66c5 18 9 22 27 27-18 5-22 9-27 27-5-18-9-22-27-27 18-5 22-9 27-27Z" fill="currentColor"/>
+</svg>

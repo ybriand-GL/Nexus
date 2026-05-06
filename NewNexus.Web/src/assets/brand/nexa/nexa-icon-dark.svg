@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="nexaIconTitle">
+  <title id="nexaIconTitle">Nexa</title>
+  <defs>
+    <linearGradient id="nexaIconShell" x1="36" x2="220" y1="24" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D202A"/>
+      <stop offset=".48" stop-color="#0B0B0F"/>
+      <stop offset="1" stop-color="#151821"/>
+    </linearGradient>
+    <linearGradient id="nexaIconGold" x1="78" x2="174" y1="88" y2="166" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF0C9"/>
+      <stop offset=".42" stop-color="#F2D28A"/>
+      <stop offset="1" stop-color="#D7A449"/>
+    </linearGradient>
+    <linearGradient id="nexaIconBlue" x1="56" x2="204" y1="62" y2="190" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4CC2FF"/>
+      <stop offset="1" stop-color="#2EA8FF"/>
+    </linearGradient>
+    <filter id="nexaIconBlueGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.18 0 0 0 0 0.66 0 0 0 0 1 0 0 0 .65 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="nexaIconGoldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#D7A449" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="58" fill="url(#nexaIconShell)"/>
+  <rect x="12" y="12" width="232" height="232" rx="50" fill="none" stroke="#F2D28A" stroke-opacity=".86" stroke-width="3"/>
+  <rect x="27" y="27" width="202" height="202" rx="42" fill="none" stroke="#FFF0C9" stroke-opacity=".08"/>
+  <path d="M67 145c0-42 31-73 76-73h5c42 0 73 29 73 68 0 42-31 69-76 69H111l-46 28 6-45c-3-12-4-27-4-47Z" fill="#0B0B0F" stroke="url(#nexaIconBlue)" stroke-width="8" stroke-linejoin="round" filter="url(#nexaIconBlueGlow)"/>
+  <path d="M92 164V99c0-6 7-10 12-5l56 51V94c0-5 4-9 9-9s9 4 9 9v71c0 8-9 12-15 7l-54-49v41c0 5-4 9-9 9s-8-4-8-9Z" fill="url(#nexaIconGold)" filter="url(#nexaIconGoldGlow)"/>
+  <path d="M178 66c5 18 9 22 27 27-18 5-22 9-27 27-5-18-9-22-27-27 18-5 22-9 27-27Z" fill="#4CC2FF" stroke="#B9E7FF" stroke-width="2" filter="url(#nexaIconBlueGlow)"/>
+</svg>

@@ -94,6 +94,7 @@ Derniere mise a jour: 2026-05-06
 | IA | Chat Nexa local | A_TESTER | Endpoints `/api/nexa/chat` et `/api/nexa/local-ai/status` raccordes a Ollama local (`Nexa:LocalAi`); modele actif `qwen2.5:1.5b`; fallback local deterministe si le modele n'est pas joignable; panneau flottant hors bandeau haut |
 | IA | Nexa ticketing MVP | A_TESTER | Schema `nexa`, `/api/nexa/ask`, tickets, affectation simple par regle/referent/module, reponse referent, validation demandeur, creation automatique de connaissance validee et reutilisation sur question similaire |
 | IA | Administration Nexa | A_TESTER | Filtres tickets par vue/statut/module, fiche ticket de consultation, administration simple des referents par module et des regles de routage depuis `Administration > Nexa` |
+| IA | Identite visuelle Nexa | A_TESTER | Logo conversationnel, variantes SVG/PNG/ICO, tokens dedies, mini-charte et integration UI du bouton, panneau, bulles, badges, ticketing et administration Nexa |
 | IA | Nexa RAG local avance | A_FAIRE | Embeddings locaux, base vectorielle exploitee, reformulation par Ollama et seuils de confiance avances apres stabilisation du ticketing MVP |
 
 ## 4. Donnees Communes

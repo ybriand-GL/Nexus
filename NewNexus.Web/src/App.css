@@ -875,6 +875,138 @@
   line-height: 1.2;
 }
 
+.nexa-top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.nexa-chat-open-button,
+.nexa-chat-quick-button,
+.nexa-assistant-close {
+  color: var(--nexus-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  border-radius: 999px;
+  border: 1px solid rgba(247, 217, 138, .34);
+  background: rgba(247, 217, 138, .13);
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.nexa-chat-quick-button {
+  color: rgba(255, 255, 255, .82);
+  background: rgba(255, 255, 255, .07);
+  border-color: rgba(255, 255, 255, .12);
+}
+
+.nexa-assistant-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(247, 217, 138, .22);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04)),
+    radial-gradient(circle at 100% 0, rgba(247,217,138,.14), transparent 42%);
+  box-shadow: 0 20px 54px rgba(0, 0, 0, .24);
+}
+
+.nexa-assistant-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.nexa-assistant-header h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 2vw, 1.8rem);
+}
+
+.nexa-assistant-close {
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+}
+
+.nexa-assistant-messages {
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.nexa-message {
+  display: grid;
+  gap: 5px;
+  max-width: min(760px, 100%);
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .06);
+}
+
+.nexa-message-user {
+  justify-self: end;
+  background: rgba(247, 217, 138, .14);
+  border-color: rgba(247, 217, 138, .28);
+}
+
+.nexa-message span {
+  color: var(--nexus-gold-soft);
+  font-size: .72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.nexa-message p,
+.nexa-chat-error {
+  margin: 0;
+}
+
+.nexa-message small {
+  color: rgba(255, 255, 255, .6);
+  font-size: .74rem;
+}
+
+.nexa-chat-error {
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+.nexa-chat-form {
+  display: grid;
+  gap: 10px;
+}
+
+.nexa-chat-form textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 86px;
+  color: var(--nexus-text);
+  font: inherit;
+  background: rgba(0, 0, 0, .26);
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+.nexa-chat-form textarea:focus {
+  outline: 2px solid rgba(247, 217, 138, .32);
+  border-color: rgba(247, 217, 138, .52);
+}
+
+.nexa-chat-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .nexus-top-meta {
   display: flex;
   align-items: center;

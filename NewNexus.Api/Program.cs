@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -135,6 +136,11 @@ builder.Services.AddHttpClient("Integrations", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(20);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("NewNexus/0.1");
+});
+builder.Services.AddHttpClient("NexaLocalAi", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(12);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("NewNexus-Nexa/0.1");
 });
 
 var app = builder.Build();
@@ -939,6 +945,115 @@ app.MapPost("/api/nexa/usage-signal", async (
         Status = "captured",
         Companion = "Nexa",
         SignalType = signalType
+    });
+}).RequireAuthorization();
+
+app.MapGet("/api/nexa/local-ai/status", async (
+    IConfiguration configuration,
+    IHttpClientFactory httpClientFactory,
+    HttpContext httpContext) =>
+{
+    var options = GetNexaLocalAiOptions(configuration);
+    var status = await GetNexaLocalAiStatusAsync(httpClientFactory, options, httpContext.RequestAborted);
+    return Results.Ok(status);
+}).RequireAuthorization();
+
+app.MapPost("/api/nexa/chat", async (
+    NexaChatRequest request,
+    NewNexusDbContext dbContext,
+    IConfiguration configuration,
+    IHttpClientFactory httpClientFactory,
+    HttpContext httpContext,
+    ClaimsPrincipal principal) =>
+{
+    var userId = GetUserId(principal);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var normalizedMessage = NormalizeTraceText(request.Message, 1200);
+    if (string.IsNullOrWhiteSpace(normalizedMessage))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["message"] = ["La question Nexa est obligatoire."]
+        });
+    }
+
+    var account = await dbContext.UserAccounts
+        .AsNoTracking()
+        .Include(userAccount => userAccount.SecurityProfile!)
+            .ThenInclude(profile => profile.ModuleRights)
+                .ThenInclude(right => right.SecurityModule)
+        .SingleOrDefaultAsync(userAccount => userAccount.Id == userId.Value && userAccount.IsActive);
+
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var now = DateTime.UtcNow;
+    var traces = await dbContext.ApplicationTraces
+        .AsNoTracking()
+        .Where(trace => trace.CreatedAtUtc >= now.AddDays(-30) &&
+            (trace.ActorUserAccountId == account.Id || trace.ActorLogin == account.Login))
+        .OrderByDescending(trace => trace.CreatedAtUtc)
+        .Take(80)
+        .Select(trace => new NexaTraceSignal(
+            trace.StreamCode,
+            trace.EventCode,
+            trace.Level,
+            trace.Subject,
+            trace.CreatedAtUtc))
+        .ToListAsync(httpContext.RequestAborted);
+    var localAiOptions = GetNexaLocalAiOptions(configuration);
+    var systemPrompt = BuildNexaChatSystemPrompt(account, traces, now);
+    var chatHistory = NormalizeNexaChatHistory(request.History);
+    var localAiResult = await TryCallNexaLocalAiAsync(
+        httpClientFactory,
+        localAiOptions,
+        systemPrompt,
+        chatHistory,
+        normalizedMessage,
+        httpContext.RequestAborted);
+    var answer = localAiResult.Content ?? BuildNexaChatFallback(account, traces, normalizedMessage);
+    var mode = localAiResult.Content is null ? "local-fallback" : "local-llm";
+
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "NEXA_USAGE",
+        "CHAT_MESSAGE",
+        localAiResult.Content is null ? "Warning" : "Info",
+        localAiResult.Content is null
+            ? "Nexa a repondu avec le fallback local."
+            : "Nexa a repondu via le moteur IA local.",
+        JsonSerializer.Serialize(new
+        {
+            mode,
+            localAiResult.Provider,
+            localAiResult.Model,
+            localAiResult.Error,
+            questionLength = normalizedMessage.Length
+        }),
+        "Chat Nexa");
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    return Results.Ok(new
+    {
+        Companion = "Nexa",
+        Mode = mode,
+        Provider = localAiResult.Provider,
+        Model = localAiResult.Model,
+        IsLocalAiAvailable = localAiResult.Content is not null,
+        Answer = answer,
+        GeneratedAtUtc = now,
+        Sources = BuildNexaChatSources(account, traces),
+        Warning = localAiResult.Content is null
+            ? "Moteur IA local indisponible ou non configure; reponse fallback locale."
+            : null
     });
 }).RequireAuthorization();
 
@@ -4003,6 +4118,252 @@ static IReadOnlyList<string> BuildNexaSuggestions(string profileCode, string? do
     return suggestions;
 }
 
+static NexaLocalAiOptions GetNexaLocalAiOptions(IConfiguration configuration)
+{
+    var section = configuration.GetSection("Nexa:LocalAi");
+    return new NexaLocalAiOptions(
+        section.GetValue("Enabled", true),
+        FirstNonEmpty(section["Provider"], "Ollama")!,
+        FirstNonEmpty(section["BaseUrl"], "http://127.0.0.1:11434")!,
+        FirstNonEmpty(section["Model"], "llama3.1:8b")!,
+        Math.Clamp(section.GetValue("TimeoutSeconds", 12), 2, 90),
+        Math.Clamp(section.GetValue("MaxResponseTokens", 480), 80, 2048));
+}
+
+static IReadOnlyList<NexaChatMessageRequest> NormalizeNexaChatHistory(IReadOnlyCollection<NexaChatMessageRequest>? history)
+{
+    if (history is null || history.Count == 0)
+    {
+        return [];
+    }
+
+    return history
+        .Where(message => string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase))
+        .Select(message => new NexaChatMessageRequest(
+            message.Role.Trim().ToLowerInvariant(),
+            NormalizeTraceText(message.Content, 900) ?? string.Empty))
+        .Where(message => !string.IsNullOrWhiteSpace(message.Content))
+        .TakeLast(8)
+        .ToList();
+}
+
+static async Task<NexaLocalAiResult> TryCallNexaLocalAiAsync(
+    IHttpClientFactory httpClientFactory,
+    NexaLocalAiOptions options,
+    string systemPrompt,
+    IReadOnlyCollection<NexaChatMessageRequest> history,
+    string userMessage,
+    CancellationToken cancellationToken)
+{
+    if (!options.Enabled)
+    {
+        return new NexaLocalAiResult(false, null, options.Provider, options.Model, "Local AI disabled by configuration.");
+    }
+
+    if (!Uri.TryCreate(options.BaseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri))
+    {
+        return new NexaLocalAiResult(false, null, options.Provider, options.Model, "Invalid local AI base URL.");
+    }
+
+    try
+    {
+        var client = httpClientFactory.CreateClient("NexaLocalAi");
+        client.BaseAddress = baseUri;
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
+
+        var messages = new List<object>
+        {
+            new { role = "system", content = systemPrompt }
+        };
+        messages.AddRange(history.Select(message => new { role = message.Role, content = message.Content }));
+        messages.Add(new { role = "user", content = userMessage });
+
+        var response = await client.PostAsJsonAsync(
+            "api/chat",
+            new
+            {
+                model = options.Model,
+                stream = false,
+                messages,
+                options = new
+                {
+                    temperature = 0.25,
+                    num_predict = options.MaxResponseTokens
+                }
+            },
+            timeout.Token);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return new NexaLocalAiResult(false, null, options.Provider, options.Model, $"Local AI returned {(int)response.StatusCode}.");
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<NexaOllamaChatResponse>(cancellationToken: timeout.Token);
+        var content = NormalizeTraceText(payload?.Message?.Content, 4000);
+        return string.IsNullOrWhiteSpace(content)
+            ? new NexaLocalAiResult(false, null, options.Provider, options.Model, "Local AI returned an empty response.")
+            : new NexaLocalAiResult(true, content, options.Provider, options.Model, null);
+    }
+    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or OperationCanceledException)
+    {
+        return new NexaLocalAiResult(false, null, options.Provider, options.Model, exception.Message);
+    }
+}
+
+static async Task<object> GetNexaLocalAiStatusAsync(
+    IHttpClientFactory httpClientFactory,
+    NexaLocalAiOptions options,
+    CancellationToken cancellationToken)
+{
+    if (!options.Enabled)
+    {
+        return new
+        {
+            Provider = options.Provider,
+            Model = options.Model,
+            BaseUrl = options.BaseUrl,
+            IsConfigured = false,
+            IsAvailable = false,
+            Models = Array.Empty<string>(),
+            Error = "Local AI disabled by configuration."
+        };
+    }
+
+    if (!Uri.TryCreate(options.BaseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri))
+    {
+        return new
+        {
+            Provider = options.Provider,
+            Model = options.Model,
+            BaseUrl = options.BaseUrl,
+            IsConfigured = false,
+            IsAvailable = false,
+            Models = Array.Empty<string>(),
+            Error = "Invalid local AI base URL."
+        };
+    }
+
+    try
+    {
+        var client = httpClientFactory.CreateClient("NexaLocalAi");
+        client.BaseAddress = baseUri;
+        client.Timeout = TimeSpan.FromSeconds(Math.Min(options.TimeoutSeconds, 4));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Min(options.TimeoutSeconds, 4)));
+        var tags = await client.GetFromJsonAsync<NexaOllamaTagsResponse>("api/tags", timeout.Token);
+        var models = tags?.Models?
+            .Select(model => model.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Cast<string>()
+            .ToArray() ?? [];
+
+        return new
+        {
+            Provider = options.Provider,
+            Model = options.Model,
+            BaseUrl = options.BaseUrl,
+            IsConfigured = true,
+            IsAvailable = true,
+            Models = models,
+            Error = (string?)null
+        };
+    }
+    catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or OperationCanceledException)
+    {
+        return new
+        {
+            Provider = options.Provider,
+            Model = options.Model,
+            BaseUrl = options.BaseUrl,
+            IsConfigured = true,
+            IsAvailable = false,
+            Models = Array.Empty<string>(),
+            Error = exception.Message
+        };
+    }
+}
+
+static string BuildNexaChatSystemPrompt(UserAccount account, IReadOnlyCollection<NexaTraceSignal> traces, DateTime now)
+{
+    var profile = account.SecurityProfile;
+    var moduleRights = profile?.ModuleRights
+        .Where(right => right.AccessLevel != ModuleAccessLevel.None)
+        .OrderBy(right => right.SecurityModule!.NavigationGroup)
+        .ThenBy(right => right.SecurityModule!.DisplayOrder)
+        .Select(right => $"{right.SecurityModule!.NavigationGroup}/{right.SecurityModule.Label}: {right.AccessLevel}")
+        .Take(18)
+        .ToList() ?? [];
+    var dominantUsage = traces
+        .Where(trace => string.Equals(trace.StreamCode, "NEXA_USAGE", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(trace.Subject))
+        .GroupBy(trace => trace.Subject!)
+        .OrderByDescending(group => group.Count())
+        .Select(group => group.Key)
+        .Take(5)
+        .ToList();
+    var warnings = traces
+        .Where(trace => string.Equals(trace.Level, "Warning", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trace.Level, "Error", StringComparison.OrdinalIgnoreCase))
+        .Select(trace => $"{trace.StreamCode}/{trace.EventCode}")
+        .Distinct()
+        .Take(6)
+        .ToList();
+
+    return string.Join("\n", [
+        "Tu es Nexa, l'assistant IA local de NewNexus.",
+        "Tu réponds en français, de manière courte, concrète et orientée action.",
+        "Tu ne prétends jamais avoir accès à des données qui ne sont pas dans le contexte fourni.",
+        "Tu respectes les droits de l'utilisateur et tu ne suggères pas d'actions hors périmètre.",
+        "Si une demande nécessite un développement, tu proposes les prochaines étapes au lieu d'inventer un état terminé.",
+        $"Date UTC: {now:O}",
+        $"Utilisateur: {account.DisplayName} ({account.Login})",
+        $"Profil: {profile?.Code ?? "SANS_PROFIL"} - {profile?.Label ?? "Sans profil"}",
+        $"Modules autorisés: {(moduleRights.Count == 0 ? "aucun" : string.Join("; ", moduleRights))}",
+        $"Parcours fréquents: {(dominantUsage.Count == 0 ? "aucun signal suffisant" : string.Join("; ", dominantUsage))}",
+        $"Alertes récentes: {(warnings.Count == 0 ? "aucune" : string.Join("; ", warnings))}"
+    ]);
+}
+
+static string BuildNexaChatFallback(UserAccount account, IReadOnlyCollection<NexaTraceSignal> traces, string userMessage)
+{
+    var profileCode = account.SecurityProfile?.Code ?? "SANS_PROFIL";
+    var dominantUsage = traces
+        .Where(trace => string.Equals(trace.StreamCode, "NEXA_USAGE", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(trace.Subject))
+        .GroupBy(trace => trace.Subject!)
+        .OrderByDescending(group => group.Count())
+        .Select(group => group.Key)
+        .FirstOrDefault();
+    var lowerMessage = userMessage.ToLowerInvariant();
+
+    if (lowerMessage.Contains("ia locale") || lowerMessage.Contains("moteur") || lowerMessage.Contains("ollama"))
+    {
+        return "Le connecteur IA locale de Nexa est en place côté serveur. Le moteur configuré est appelé en local quand il répond; sinon Nexa bascule sur ce fallback déterministe. Prochaine étape: installer ou démarrer le modèle Ollama configuré, puis relancer la question.";
+    }
+
+    if (lowerMessage.Contains("dashboard") || lowerMessage.Contains("tableau de bord"))
+    {
+        return dominantUsage is null
+            ? "Je peux t'aider à prioriser les tableaux de bord, mais je n'ai pas encore assez de parcours dominants. Ouvre les dashboards utiles quelques fois, puis je proposerai automatiquement le plus pertinent."
+            : $"Ton parcours dominant actuel est {dominantUsage}. Je te conseille de l'utiliser comme point d'entrée, puis d'affiner les droits dashboard par profil.";
+    }
+
+    return $"Je suis Nexa en mode fallback local pour le profil {profileCode}. Je peux déjà exploiter les droits, sessions, traces et parcours enregistrés. Pour une réponse IA libre, il faut que le moteur local configuré réponde sur le serveur.";
+}
+
+static IReadOnlyList<string> BuildNexaChatSources(UserAccount account, IReadOnlyCollection<NexaTraceSignal> traces)
+{
+    return [
+        $"Profil: {account.SecurityProfile?.Code ?? "SANS_PROFIL"}",
+        $"Droits modules: {account.SecurityProfile?.ModuleRights.Count ?? 0}",
+        $"Traces utilisateur 30 jours: {traces.Count}",
+        $"Signaux Nexa: {traces.Count(trace => string.Equals(trace.StreamCode, "NEXA_USAGE", StringComparison.OrdinalIgnoreCase))}"
+    ];
+}
+
 static object BuildUserSessionResponse(UserSession session, DateTime now)
 {
     var endAtUtc = session.LogoutAtUtc ?? session.RevokedAtUtc ?? (session.ExpiresAtUtc <= now ? session.ExpiresAtUtc : null);
@@ -5922,6 +6283,20 @@ internal sealed record NexaUsageSignalRequest(
     string? Section,
     string? Detail,
     string? DashboardProfileCode);
+internal sealed record NexaChatRequest(string Message, List<NexaChatMessageRequest>? History);
+internal sealed record NexaChatMessageRequest(string Role, string Content);
+internal sealed record NexaLocalAiOptions(
+    bool Enabled,
+    string Provider,
+    string BaseUrl,
+    string Model,
+    int TimeoutSeconds,
+    int MaxResponseTokens);
+internal sealed record NexaLocalAiResult(bool IsAvailable, string? Content, string Provider, string Model, string? Error);
+internal sealed record NexaOllamaChatResponse(NexaOllamaMessage? Message);
+internal sealed record NexaOllamaMessage(string? Role, string? Content);
+internal sealed record NexaOllamaTagsResponse(List<NexaOllamaModel>? Models);
+internal sealed record NexaOllamaModel(string? Name);
 internal sealed record UpdateAccountProfileRequest(Guid? SecurityProfileId);
 internal sealed record UpdateAccountStatusRequest(bool IsActive);
 internal sealed record CreateUserAccountRequest(

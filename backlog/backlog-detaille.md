@@ -91,6 +91,7 @@ Derniere mise a jour: 2026-05-06
 | UX | Sidebar reduite | A_TESTER | Icônes SVG premium dans les raccourcis, infobulles au survol/focus en mode reduit avec z-index/overflow corriges et deconnexion par icone basse |
 | IA | Assistant Nexa | CADRE | Assistant IA local a cadrer: moteur heberge sur le serveur NewNexus, apprentissage des usages par traces/intentions, personnalisation des accroches puis guidage utilisateur dans l'outil |
 | IA | Moteur de personnalisation Nexa | A_TESTER | Endpoint `/api/nexa/session-insight` base sur compte, profil, sessions, traces et signaux d'usage; collecte `/api/nexa/usage-signal` depuis la navigation; recommandations affichees dans le bandeau |
+| IA | Chat Nexa local | A_TESTER | Endpoints `/api/nexa/chat` et `/api/nexa/local-ai/status` raccordes a un moteur local compatible Ollama (`Nexa:LocalAi`); fallback local deterministe si le modele n'est pas joignable; panneau de chat integre dans le bandeau applicatif |
 
 ## 4. Donnees Communes
 

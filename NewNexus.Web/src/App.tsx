@@ -62,6 +62,25 @@ type NexaUsageSignal = {
   dashboardProfileCode: string | null
 }
 
+type NexaChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+  mode?: string
+  warning?: string | null
+}
+
+type NexaChatResponse = {
+  companion: string
+  mode: string
+  provider: string
+  model: string
+  isLocalAiAvailable: boolean
+  answer: string
+  generatedAtUtc: string
+  sources: string[]
+  warning: string | null
+}
+
 type SecurityModuleItem = {
   id: string
   code: string
@@ -956,6 +975,17 @@ function App() {
   })
   const [sessionInsight, setSessionInsight] = useState('')
   const [nexaInsight, setNexaInsight] = useState<NexaSessionInsight | null>(null)
+  const [isNexaAssistantOpen, setIsNexaAssistantOpen] = useState(false)
+  const [nexaChatMessages, setNexaChatMessages] = useState<NexaChatMessage[]>([
+    {
+      role: 'assistant',
+      content: 'Je suis Nexa. Posez-moi une question sur vos droits, vos tableaux de bord, les interfaces ou les prochaines actions.',
+      mode: 'local-fallback',
+    },
+  ])
+  const [nexaChatPrompt, setNexaChatPrompt] = useState('')
+  const [isNexaThinking, setIsNexaThinking] = useState(false)
+  const [nexaChatError, setNexaChatError] = useState<string | null>(null)
   const lastNexaUsageSignalRef = useRef('')
   const nexaUsageSignalTimerRef = useRef<number | null>(null)
   const [credentials, setCredentials] = useState({
@@ -1819,6 +1849,61 @@ function App() {
       }
     } catch {
       // Nexa usage learning is opportunistic: navigation must stay uninterrupted.
+    }
+  }
+
+  async function sendNexaChatMessage(messageOverride?: string) {
+    const message = (messageOverride ?? nexaChatPrompt).trim()
+    if (!message || isNexaThinking) {
+      return
+    }
+
+    const history = nexaChatMessages.slice(-8)
+    setNexaChatPrompt('')
+    setNexaChatError(null)
+    setIsNexaThinking(true)
+    setNexaChatMessages((current) => [...current, { role: 'user', content: message }])
+
+    try {
+      const response = await fetch(apiPath('api/nexa/chat'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          history: history.map((item) => ({ role: item.role, content: item.content })),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Nexa n\u2019a pas pu r\u00e9pondre.'))
+      }
+
+      const payload = (await response.json()) as NexaChatResponse
+      setNexaChatMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          content: payload.answer,
+          mode: payload.mode,
+          warning: payload.warning,
+        },
+      ])
+    } catch (chatError) {
+      const message = chatError instanceof Error ? chatError.message : 'Nexa n\u2019a pas pu r\u00e9pondre.'
+      setNexaChatError(message)
+      setNexaChatMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          content: message,
+          mode: 'local-fallback',
+          warning: message,
+        },
+      ])
+    } finally {
+      setIsNexaThinking(false)
     }
   }
 
@@ -4228,6 +4313,21 @@ function App() {
                 ))}
               </div>
             ) : null}
+            <div className="nexa-top-actions">
+              <button className="nexa-chat-open-button" onClick={() => setIsNexaAssistantOpen(true)} type="button">
+                Interroger Nexa
+              </button>
+              <button
+                className="nexa-chat-quick-button"
+                onClick={() => {
+                  setIsNexaAssistantOpen(true)
+                  void sendNexaChatMessage('Que me conseilles-tu de traiter maintenant ?')
+                }}
+                type="button"
+              >
+                Conseil rapide
+              </button>
+            </div>
           </div>
           <div className="nexus-top-meta">
             <img
@@ -4241,6 +4341,62 @@ function App() {
             </div>
           </div>
         </section>
+        {isNexaAssistantOpen ? (
+          <section className="nexa-assistant-panel" aria-label="Assistant Nexa">
+            <div className="nexa-assistant-header">
+              <div>
+                <span className="eyebrow">Assistant IA local</span>
+                <h2>Nexa</h2>
+              </div>
+              <button aria-label="Fermer Nexa" className="nexa-assistant-close" onClick={() => setIsNexaAssistantOpen(false)} type="button">
+                X
+              </button>
+            </div>
+            <div className="nexa-assistant-messages" aria-live="polite">
+              {nexaChatMessages.map((message, index) => (
+                <article className={`nexa-message nexa-message-${message.role}`} key={`${message.role}-${index}`}>
+                  <span>{message.role === 'user' ? 'Vous' : 'Nexa'}</span>
+                  <p>{message.content}</p>
+                  {message.warning ? <small>{message.warning}</small> : null}
+                  {message.mode ? <small>{message.mode === 'local-llm' ? 'IA locale' : 'Fallback local'}</small> : null}
+                </article>
+              ))}
+              {isNexaThinking ? (
+                <article className="nexa-message nexa-message-assistant">
+                  <span>Nexa</span>
+                  <p>Analyse locale en cours...</p>
+                </article>
+              ) : null}
+            </div>
+            {nexaChatError ? <p className="nexa-chat-error">{nexaChatError}</p> : null}
+            <form
+              className="nexa-chat-form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void sendNexaChatMessage()
+              }}
+            >
+              <textarea
+                aria-label="Question pour Nexa"
+                onChange={(event) => setNexaChatPrompt(event.target.value)}
+                placeholder="Demandez à Nexa quoi traiter, où aller, ou pourquoi un module n'apparaît pas."
+                rows={3}
+                value={nexaChatPrompt}
+              />
+              <div className="nexa-chat-form-actions">
+                <button className="ghost-button" onClick={() => setNexaChatPrompt('Explique-moi mes droits et mes prochains points de contrôle.')} type="button">
+                  Droits
+                </button>
+                <button className="ghost-button" onClick={() => setNexaChatPrompt('Quel tableau de bord dois-je consulter en priorité ?')} type="button">
+                  Dashboard
+                </button>
+                <button className="primary-button" disabled={isNexaThinking || !nexaChatPrompt.trim()} type="submit">
+                  Envoyer
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : null}
         {selectedNavigation !== 'Accueil' ? (
           <section className="hero-card">
             <div className="hero-copy">

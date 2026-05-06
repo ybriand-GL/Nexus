@@ -2266,3 +2266,31 @@ Ordre cible de construction:
 - validation:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+
+## 2026-05-06 - Nexa tranche 3 chat IA locale
+
+- objectif:
+  - rendre Nexa interrogeable depuis l'application
+  - brancher un moteur IA local heberge sur le serveur, sans appel externe
+- configuration:
+  - section `Nexa:LocalAi` dans `appsettings.json` et `appsettings.Development.json`
+  - provider cible: `Ollama`
+  - URL par defaut: `http://127.0.0.1:11434`
+  - modele par defaut: `llama3.1:8b`
+- backend:
+  - endpoint authentifie `POST /api/nexa/chat`
+  - endpoint authentifie `GET /api/nexa/local-ai/status`
+  - contexte envoye au moteur: profil, droits modules, parcours frequents, alertes recentes
+  - si le moteur local repond: mode `local-llm`
+  - si le moteur local est indisponible: mode `local-fallback` avec reponse deterministe locale
+  - chaque message chat est trace dans `NEXA_USAGE` avec l'etat du moteur local
+- frontend:
+  - bouton `Interroger Nexa` dans le bandeau haut
+  - panneau de chat integre dans l'application
+  - prompts rapides `Droits` et `Dashboard`
+  - bouton `Conseil rapide` dans le bandeau
+- validations:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+- point restant:
+  - installer/demarrer le runtime local Ollama et telecharger le modele configure pour obtenir le mode `local-llm`; sans cela Nexa reste volontairement en fallback local

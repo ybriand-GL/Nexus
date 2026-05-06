@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
@@ -52,6 +52,14 @@ type NexaSessionInsight = {
   profileCode: string
   signals: string[]
   suggestions: string[]
+}
+
+type NexaUsageSignal = {
+  signalType: string
+  navigation: string
+  section: string | null
+  detail: string | null
+  dashboardProfileCode: string | null
 }
 
 type SecurityModuleItem = {
@@ -947,6 +955,9 @@ function App() {
     status: 'loading',
   })
   const [sessionInsight, setSessionInsight] = useState('')
+  const [nexaInsight, setNexaInsight] = useState<NexaSessionInsight | null>(null)
+  const lastNexaUsageSignalRef = useRef('')
+  const nexaUsageSignalTimerRef = useRef<number | null>(null)
   const [credentials, setCredentials] = useState({
     login: '',
     password: '',
@@ -1607,6 +1618,58 @@ function App() {
     }
   }, [isInformatique, selectedAdministrationSection, selectedNavigation])
 
+  useEffect(() => {
+    if (!currentUser) {
+      return
+    }
+
+    const section = getNexaCurrentSection(
+      selectedNavigation,
+      selectedAdministrationSection,
+      selectedSettingsSection,
+      selectedToolsSection,
+      selectedWorkspaceSection,
+    )
+    const signalKey = [
+      selectedNavigation,
+      section,
+      selectedDashboardProfileCode ?? '',
+    ].join('|')
+
+    if (signalKey === lastNexaUsageSignalRef.current) {
+      return
+    }
+
+    if (nexaUsageSignalTimerRef.current !== null) {
+      window.clearTimeout(nexaUsageSignalTimerRef.current)
+    }
+
+    nexaUsageSignalTimerRef.current = window.setTimeout(() => {
+      lastNexaUsageSignalRef.current = signalKey
+      void sendNexaUsageSignal({
+        signalType: selectedNavigation === 'Accueil' ? 'DASHBOARD_VIEW' : 'NAVIGATION_VIEW',
+        navigation: selectedNavigation,
+        section,
+        detail: selectedNavigation === 'Accueil' ? 'Accueil tableau de bord' : 'Navigation applicative',
+        dashboardProfileCode: selectedNavigation === 'Accueil' ? selectedDashboardProfileCode ?? '' : '',
+      })
+    }, 900)
+
+    return () => {
+      if (nexaUsageSignalTimerRef.current !== null) {
+        window.clearTimeout(nexaUsageSignalTimerRef.current)
+      }
+    }
+  }, [
+    currentUser?.id,
+    selectedAdministrationSection,
+    selectedDashboardProfileCode,
+    selectedNavigation,
+    selectedSettingsSection,
+    selectedToolsSection,
+    selectedWorkspaceSection,
+  ])
+
   async function initialize() {
     setIsLoading(true)
     setError(null)
@@ -1733,9 +1796,29 @@ function App() {
       }
 
       const insight = (await response.json()) as NexaSessionInsight
+      setNexaInsight(insight)
       setSessionInsight(insight.message || buildSessionInsight(user))
     } catch {
+      setNexaInsight(null)
       setSessionInsight(buildSessionInsight(user))
+    }
+  }
+
+  async function sendNexaUsageSignal(signal: NexaUsageSignal) {
+    try {
+      const response = await fetch(apiPath('api/nexa/usage-signal'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(signal),
+      })
+
+      if (response.ok && currentUser) {
+        void loadNexaSessionInsight(currentUser)
+      }
+    } catch {
+      // Nexa usage learning is opportunistic: navigation must stay uninterrupted.
     }
   }
 
@@ -4136,8 +4219,15 @@ function App() {
       <main className={`nexus-main ${selectedNavigation === 'Accueil' ? 'nexus-main-home' : ''}`}>
         <section className="nexus-top-banner" aria-label="Informations de session">
           <div className="nexus-top-hello">
-            <strong>Bonjour {getFirstName(currentUser.displayName)}</strong>
+            <strong><span className="nexa-companion-badge">Nexa</span> Bonjour {getFirstName(currentUser.displayName)}</strong>
             <span>{sessionInsight}</span>
+            {nexaInsight?.suggestions?.length ? (
+              <div className="nexa-suggestion-row" aria-label="Suggestions Nexa">
+                {nexaInsight.suggestions.slice(0, 2).map((suggestion) => (
+                  <span className="nexa-suggestion-chip" key={suggestion}>{suggestion}</span>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div className="nexus-top-meta">
             <img
@@ -7761,6 +7851,30 @@ function getNavigationIconPaths(entry: string) {
 
 function getFirstName(displayName: string) {
   return displayName.trim().split(/\s+/)[0] || displayName
+}
+
+function getNexaCurrentSection(
+  selectedNavigation: string,
+  selectedAdministrationSection: string,
+  selectedSettingsSection: string,
+  selectedToolsSection: string,
+  selectedWorkspaceSection: string,
+) {
+  if (selectedNavigation === 'Administration') {
+    return selectedAdministrationSection === 'Outils'
+      ? `${selectedAdministrationSection} / ${selectedToolsSection}`
+      : selectedAdministrationSection
+  }
+
+  if (selectedNavigation === commonDataNavigationLabel) {
+    return selectedSettingsSection
+  }
+
+  if (selectedNavigation === 'Exploitation' || selectedNavigation === 'Gestion administrative') {
+    return selectedWorkspaceSection
+  }
+
+  return selectedNavigation
 }
 
 function formatSidebarDateTime(value: Date) {

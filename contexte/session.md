@@ -2249,3 +2249,20 @@ Ordre cible de construction:
   - tracer les consultations de modules pour enrichir l'apprentissage
   - ajouter un stockage dedie des signaux Nexa si les traces applicatives ne suffisent plus
   - brancher plus tard un moteur LLM local heberge sur le meme serveur, avec RAG sur contexte/backlog/modules
+
+## 2026-05-06 - Nexa tranche 2 apprentissage des parcours
+
+- objectif:
+  - rendre Nexa plus present et plus apprenant, sans dependance externe
+- backend:
+  - ajout de `POST /api/nexa/usage-signal`
+  - les signaux sont stockes dans `ApplicationTrace` avec le flux `NEXA_USAGE`
+  - les traces Nexa sont visibles dans les outils de traces via le nouveau flux
+  - `GET /api/nexa/session-insight` tient compte des parcours dominants en plus des sessions et traces existantes
+- frontend:
+  - envoi temporise d'un signal lors des changements de navigation, sous-section et dashboard
+  - rafraichissement opportuniste de l'accroche Nexa apres capture d'un usage
+  - affichage des suggestions Nexa directement dans le bandeau haut sous forme de pastilles
+- validation:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK

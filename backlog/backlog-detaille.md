@@ -86,8 +86,11 @@ Derniere mise a jour: 2026-05-06
 | Securite | Ecran administration des parametres | A_TESTER | Mini-accueil Parametres limite aux Societes, Analytiques et Exploitations; Societes en liste + modale avec creation verrouillee par SIRENE |
 | Securite | Ecran administration des outils | A_TESTER | Diagnostics application, PostgreSQL, securite, parametres, readiness backlog, SIRENE, cles API, Taches planifiees, Requeteur SQL et Traces en place |
 | UX | Sortie du mode tout-dashboard | A_TESTER | Navigation laterale reliee a des vues de travail distinctes; Administration, Parametres et Outils disposent d'accueils de choix |
-| UX | Accueil par profil | A_TESTER | Entree `Accueil` retablie comme page d'arrivee; personnalisation fine par profil a approfondir apres recette |
+| UX | Accueil par profil | A_TESTER | Entree `Accueil` retiree de la navigation principale; retour accueil via logo/nom Nexus, bandeau haut global avec Bonjour, ville, date/heure, meteo image et phrase de session personnalisee; meteo forcee temporairement sur Saint-Etienne-de-Montluc 44360 |
 | UX | Responsive tablette / smartphone / PC | A_TESTER | Passe CSS responsive initiale appliquee sur shell, menus, grilles, formulaires et modales; recette multi-format a effectuer |
+| UX | Sidebar reduite | A_TESTER | Icônes SVG premium dans les raccourcis, infobulles au survol/focus en mode reduit avec z-index/overflow corriges et deconnexion par icone basse |
+| IA | Assistant Nexa | CADRE | Assistant IA local a cadrer: moteur heberge sur le serveur NewNexus, apprentissage des usages par traces/intentions, personnalisation des accroches puis guidage utilisateur dans l'outil |
+| IA | Moteur de personnalisation Nexa | A_FAIRE | Capitaliser connexions, modules consultes, actions frequentes, erreurs et profil pour generer des recommandations explicables sans exposer les donnees hors serveur |
 
 ## 4. Donnees Communes
 

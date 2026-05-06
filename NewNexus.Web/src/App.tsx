@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
@@ -35,6 +35,13 @@ type AuthenticatedUser = {
     label: string
   } | null
   rights: ProfileRight[]
+}
+
+type ClientWeather = {
+  code: number | null
+  isDay: boolean
+  city: string | null
+  status: 'loading' | 'ready' | 'unavailable'
 }
 
 type SecurityModuleItem = {
@@ -623,7 +630,7 @@ type IntegrationCredentialFormState = {
 }
 
 const commonDataNavigationLabel = 'Donn\u00e9es Communes'
-const navigationEntries = ['Accueil', 'Administration', commonDataNavigationLabel, 'Exploitation', 'Gestion administrative']
+const navigationEntries = ['Administration', commonDataNavigationLabel, 'Exploitation', 'Gestion administrative']
 const administrationSettingsSection = 'Param\u00e8tres'
 const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Outils', administrationSettingsSection, 'Profils'] as const
 const settingsCompaniesSection = 'Soci\u00e9t\u00e9s'
@@ -680,6 +687,12 @@ const toolsSubmenuEntries = [
   toolsTracesSection,
 ] as const
 const postAuthLoaderStorageKey = 'newnexus:post-auth-loader'
+const knownSessionStorageKey = 'newnexus:known-session'
+const defaultWeatherLocation = {
+  city: 'Saint-\u00c9tienne-de-Montluc (44360)',
+  latitude: 47.278,
+  longitude: -1.779,
+}
 const accessLevels = ['None', 'Read', 'Write'] as const
 const apiBasePath = import.meta.env.BASE_URL || '/'
 
@@ -915,6 +928,15 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
+  const [hasKnownSession, setHasKnownSession] = useState(() => localStorage.getItem(knownSessionStorageKey) === 'true')
+  const [loadingStepIndex, setLoadingStepIndex] = useState(0)
+  const [clientWeather, setClientWeather] = useState<ClientWeather>({
+    code: null,
+    isDay: true,
+    city: defaultWeatherLocation.city,
+    status: 'loading',
+  })
+  const [sessionInsight, setSessionInsight] = useState('')
   const [credentials, setCredentials] = useState({
     login: '',
     password: '',
@@ -927,9 +949,71 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const stepTimer = window.setInterval(() => setLoadingStepIndex((current) => current + 1), 780)
+    return () => window.clearInterval(stepTimer)
+  }, [])
+
+  useEffect(() => {
     const timer = window.setInterval(() => setCurrentDateTime(new Date()), 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (!currentUser) {
+      return
+    }
+
+    let isCancelled = false
+
+    async function loadWeatherFromCoordinates(latitude: number, longitude: number, cityHint: string | null = null) {
+      const response = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}&current=weather_code,is_day&timezone=auto`,
+      )
+
+      if (!response.ok) {
+        throw new Error('weather unavailable')
+      }
+
+      const payload = (await response.json()) as {
+        current?: {
+          weather_code?: number
+          is_day?: number
+        }
+      }
+
+      if (!isCancelled) {
+        setClientWeather({
+          code: payload.current?.weather_code ?? null,
+          isDay: payload.current?.is_day !== 0,
+          city: cityHint ?? defaultWeatherLocation.city,
+          status: 'ready',
+        })
+      }
+    }
+
+    async function refreshClientWeather() {
+      try {
+        await loadWeatherFromCoordinates(defaultWeatherLocation.latitude, defaultWeatherLocation.longitude, defaultWeatherLocation.city)
+      } catch {
+        if (!isCancelled) {
+          setClientWeather({
+            code: null,
+            isDay: true,
+            city: defaultWeatherLocation.city,
+            status: 'unavailable',
+          })
+        }
+      }
+    }
+
+    void refreshClientWeather()
+    const timer = window.setInterval(() => void refreshClientWeather(), 15 * 60 * 1000)
+
+    return () => {
+      isCancelled = true
+      window.clearInterval(timer)
+    }
+  }, [currentUser?.id])
 
   useEffect(() => {
     normalizeVisibleTextNodes(document.getElementById('root'))
@@ -943,7 +1027,7 @@ function App() {
     const timer = window.setTimeout(() => {
       sessionStorage.removeItem(postAuthLoaderStorageKey)
       setShowPostAuthLoader(false)
-    }, 4300)
+    }, 2800)
 
     return () => window.clearTimeout(timer)
   }, [showPostAuthLoader])
@@ -1390,7 +1474,7 @@ function App() {
     }
 
     setSelectedNavigation((current) =>
-      visibleNavigationEntries.includes(current) ? current : visibleNavigationEntries[0],
+      current === 'Accueil' || visibleNavigationEntries.includes(current) ? current : visibleNavigationEntries[0],
     )
   }, [visibleNavigationEntries])
 
@@ -1548,7 +1632,10 @@ function App() {
 
   async function hydrateAuthenticatedState(user: AuthenticatedUser) {
     setCurrentUser(user)
+    setHasKnownSession(true)
+    localStorage.setItem(knownSessionStorageKey, 'true')
     setIsSidebarCollapsed(user.isSidebarCollapsed)
+    setSessionInsight(buildSessionInsight(user))
     const hasContraventionsAccess = user.rights.some(
       (right) => right.moduleCode === contraventionsModuleCode && canAccessModule(right.accessLevel),
     )
@@ -2048,6 +2135,15 @@ function App() {
     }
   }
 
+  function activateHomeNavigation() {
+    setExpandedSidebarMenu(null)
+    setSelectedNavigation('Accueil')
+    setSelectedAdministrationSection('Accueil')
+    setSelectedSettingsSection('Accueil')
+    setSelectedToolsSection('Accueil')
+    setSelectedWorkspaceSection('Accueil')
+  }
+
   function activateSidebarSubmenu(parentEntry: string, submenuEntry: string) {
     setExpandedSidebarMenu(parentEntry)
     setSelectedNavigation(parentEntry)
@@ -2215,6 +2311,8 @@ function App() {
 
   function resetSessionState() {
     setCurrentUser(null)
+    setHasKnownSession(false)
+    localStorage.removeItem(knownSessionStorageKey)
     setModules([])
     setProfiles([])
     setAccounts([])
@@ -3639,13 +3737,34 @@ function App() {
   const editingAccount = accounts.find((account) => account.id === editingAccountId) ?? null
   const editingEditableAccount = editingAccount ? editableAccounts[editingAccount.id] ?? null : null
 
+  if (isLoading && hasKnownSession) {
+    return <div className="auth-shell app-loading-shell app-loading-shell-silent" aria-hidden="true" />
+  }
+
   if (isLoading) {
+    const loadingSteps = ['Initialisation du socle', 'Validation de la session', 'Synchronisation des droits']
+    const activeLoadingStep = loadingSteps[loadingStepIndex % loadingSteps.length]
+
     return (
-      <div className="auth-shell">
-        <section className="auth-card">
-          <span className="eyebrow">Chargement</span>
-          <h1>Préparation du socle NewNexus</h1>
-          <p>Vérification de l’application publiée, du compte courant et de la base sécurisée.</p>
+      <div className="auth-shell app-loading-shell">
+        <section className="app-loading-card" aria-live="polite">
+          <div className="app-loading-brand">
+            <img className="app-loading-icon" src={nexusIcon} alt="" aria-hidden="true" />
+            <img className="app-loading-wordmark" src={nexusWordmark} alt="Nexus" />
+          </div>
+          <div className="app-loading-orbit" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="app-loading-copy">
+            <span className="eyebrow">Espace s\u00e9curis\u00e9</span>
+            <h1>Ouverture de votre environnement Nexus</h1>
+            <p>{activeLoadingStep}</p>
+          </div>
+          <div className="app-loading-progress" aria-hidden="true">
+            <span />
+          </div>
         </section>
       </div>
     )
@@ -3914,11 +4033,10 @@ function App() {
     <div className={`nexus-app-shell ${isSidebarCollapsed ? 'nexus-app-shell-sidebar-collapsed' : ''}`}>
       <aside className="nexus-sidebar">
         <div className="brand-panel">
-          <img className="brand-icon" src={nexusIcon} alt="NewNexus" />
-          <img className="brand-wordmark" src={nexusWordmark} alt="Nexus" />
-          <time className="brand-copy brand-clock" dateTime={currentDateTime.toISOString()}>
-            {currentDateTime.toLocaleDateString()} - {currentDateTime.toLocaleTimeString()}
-          </time>
+          <button className="brand-home-button" onClick={activateHomeNavigation} type="button">
+            <img className="brand-icon" src={nexusIcon} alt="" aria-hidden="true" />
+            <img className="brand-wordmark" src={nexusWordmark} alt="Nexus" />
+          </button>
           <button
             aria-label={isSidebarCollapsed ? 'Déplier le menu de navigation' : 'Replier le menu de navigation'}
             className="sidebar-collapse-button"
@@ -3942,10 +4060,18 @@ function App() {
                   aria-expanded={submenuEntries.length > 0 ? isExpanded : undefined}
                   className={`sidebar-link ${selectedNavigation === entry ? 'sidebar-link-active' : ''} ${isExpanded ? 'sidebar-link-expanded' : ''}`}
                   onClick={() => activateMainNavigation(entry)}
+                  title={entry}
                   type="button"
                 >
-                  <span className="sidebar-link-initial" aria-hidden="true">{getNavigationInitial(entry)}</span>
+                  <span className="sidebar-link-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      {getNavigationIconPaths(entry).map((path) => (
+                        <path d={path} key={path} />
+                      ))}
+                    </svg>
+                  </span>
                   <span className="sidebar-link-label">{entry}</span>
+                  <span className="sidebar-link-tooltip" role="tooltip">{entry}</span>
                   {submenuEntries.length > 0 ? <span className="sidebar-link-chevron" aria-hidden="true">{isExpanded ? '\u2303' : '\u2304'}</span> : null}
                 </button>
                 {submenuEntries.length > 0 ? (
@@ -3973,17 +4099,33 @@ function App() {
           })}
         </nav>
 
-        <div className="sidebar-status">
-          <span className="sidebar-kicker">Utilisateur connecté</span>
-          <strong>{currentUser.displayName}</strong>
-          <span>{currentUser.profile?.label ?? 'Sans profil'}</span>
-          <button className="ghost-button" onClick={handleLogout} type="button">
-            Se déconnecter
-          </button>
-        </div>
+        <button aria-label="Se déconnecter" className="sidebar-logout-button" onClick={handleLogout} title="Se déconnecter" type="button">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M10 4.5H6.75A2.75 2.75 0 0 0 4 7.25v9.5a2.75 2.75 0 0 0 2.75 2.75H10" />
+            <path d="M15.5 8.5 19 12l-3.5 3.5" />
+            <path d="M19 12H9" />
+          </svg>
+        </button>
       </aside>
 
       <main className={`nexus-main ${selectedNavigation === 'Accueil' ? 'nexus-main-home' : ''}`}>
+        <section className="nexus-top-banner" aria-label="Informations de session">
+          <div className="nexus-top-hello">
+            <strong>Bonjour {getFirstName(currentUser.displayName)}</strong>
+            <span>{sessionInsight}</span>
+          </div>
+          <div className="nexus-top-meta">
+            <img
+              className="nexus-top-weather"
+              src={getWeatherIconDataUri(clientWeather.code, clientWeather.isDay, clientWeather.status)}
+              alt={clientWeather.status === 'ready' ? 'Météo locale' : 'Météo locale indisponible'}
+            />
+            <div>
+              <strong>{clientWeather.city ?? (clientWeather.status === 'loading' ? 'Localisation en cours' : 'Ville non disponible')}</strong>
+              <time dateTime={currentDateTime.toISOString()}>{formatSidebarDateTime(currentDateTime)}</time>
+            </div>
+          </div>
+        </section>
         {selectedNavigation !== 'Accueil' ? (
           <section className="hero-card">
             <div className="hero-copy">
@@ -7560,16 +7702,170 @@ function getWorkspaceTitle(selectedNavigation: string) {
   return 'Exploitation'
 }
 
-function getNavigationInitial(entry: string) {
+function getNavigationIconPaths(entry: string) {
+  if (entry === 'Administration') {
+    return [
+      'M12 3.5 5.5 6.25v4.9c0 4.15 2.58 7.85 6.5 9.35 3.92-1.5 6.5-5.2 6.5-9.35v-4.9L12 3.5Z',
+      'M9.2 12.2h5.6M12 9.4V15',
+    ]
+  }
+
   if (entry === commonDataNavigationLabel) {
-    return 'DC'
+    return [
+      'M5.5 7.2c0-1.5 2.9-2.7 6.5-2.7s6.5 1.2 6.5 2.7-2.9 2.7-6.5 2.7-6.5-1.2-6.5-2.7Z',
+      'M5.5 7.2v5.1c0 1.5 2.9 2.7 6.5 2.7s6.5-1.2 6.5-2.7V7.2',
+      'M5.5 12.3v4.5c0 1.5 2.9 2.7 6.5 2.7s6.5-1.2 6.5-2.7v-4.5',
+    ]
   }
 
-  if (entry === 'Gestion administrative') {
-    return 'GA'
+  if (entry === 'Exploitation') {
+    return [
+      'M6 18.5c2.8-5.4 4.2-7.8 6-7.8s3.2 2.4 6 7.8',
+      'M12 10.7a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Z',
+      'M4.5 18.5h15',
+    ]
   }
 
-  return entry.slice(0, 1).toUpperCase()
+  return [
+    'M7 4.5h7.2L18 8.3v11.2H7V4.5Z',
+    'M14 4.8v4h4',
+    'M9.5 13h5',
+    'M9.5 16h5',
+  ]
+}
+
+function getFirstName(displayName: string) {
+  return displayName.trim().split(/\s+/)[0] || displayName
+}
+
+function formatSidebarDateTime(value: Date) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(value)
+}
+
+function buildSessionInsight(user: AuthenticatedUser) {
+  const profileCode = user.profile?.code ?? 'SANS_PROFIL'
+  const lastLoginAt = user.lastLoginAtUtc ? new Date(user.lastLoginAtUtc) : null
+  const writableModules = user.rights.filter((right) => right.accessLevel === 'Write' && !isDashboardModuleCode(right.moduleCode)).length
+  const readableModules = user.rights.filter((right) => canAccessModule(right.accessLevel) && !isDashboardModuleCode(right.moduleCode)).length
+  const dashboardCount = user.rights.filter((right) => canAccessModule(right.accessLevel) && isDashboardModuleCode(right.moduleCode)).length
+  const hour = new Date().getHours()
+  const dayMoment = hour < 11 ? 'ce matin' : hour < 18 ? 'cet apr\u00e8s-midi' : 'ce soir'
+  const lastLoginHint = lastLoginAt && !Number.isNaN(lastLoginAt.getTime())
+    ? `depuis votre derni\u00e8re connexion du ${lastLoginAt.toLocaleDateString('fr-FR')}`
+    : 'pour cette premi\u00e8re session suivie'
+
+  const profileOpenings: Record<string, string[]> = {
+    INFORMATIQUE: ['Nexa pr\u00e9pare votre poste de pilotage technique', 'Votre espace de supervision est ouvert', 'Le socle est align\u00e9 pour vos contr\u00f4les'],
+    DIRECTION: ['Votre synth\u00e8se de pilotage est pr\u00eate', 'Nexa met en avant les signaux de d\u00e9cision', 'Votre lecture ex\u00e9cutive est assembl\u00e9e'],
+    EXPLOITATION: ['Votre cockpit op\u00e9rationnel est pr\u00eat', 'Nexa recentre les priorit\u00e9s terrain', 'Les vues exploitation sont organis\u00e9es'],
+    ADMINISTRATIF: ['Votre suivi administratif est disponible', 'Nexa pr\u00e9pare les dossiers utiles', 'Votre espace de traitement est pr\u00eat'],
+  }
+
+  const profileFocus: Record<string, string[]> = {
+    INFORMATIQUE: ['droits, interfaces et qualit\u00e9 applicative', 'readiness, traces et raccords sensibles', 's\u00e9curit\u00e9, modules et coh\u00e9rence du socle'],
+    DIRECTION: ['arbitrages, tendances et points de vigilance', 'vision globale, priorit\u00e9s et trajectoire', 'indicateurs consolid\u00e9s et alertes utiles'],
+    EXPLOITATION: ['points, conducteurs, tracteurs et op\u00e9rations', 'parc, terrain et actions \u00e0 suivre', 'flux exploitation et donn\u00e9es \u00e0 fiabiliser'],
+    ADMINISTRATIF: ['contraventions, rattachements et traitements', 'dossiers ouverts et contr\u00f4les administratifs', 'suivi documentaire et prochaines actions'],
+  }
+
+  const openings = profileOpenings[profileCode] ?? ['Votre environnement Nexus est pr\u00eat', 'Nexa charge votre espace', 'Votre session est personnalis\u00e9e']
+  const focuses = profileFocus[profileCode] ?? ['vos espaces accessibles', 'les informations disponibles', 'les actions autoris\u00e9es']
+  const rhythms = [
+    `${dayMoment}`,
+    lastLoginHint,
+    `avec ${readableModules} module(s) accessible(s)`,
+    dashboardCount > 1 ? `avec ${dashboardCount} tableaux de bord consultables` : 'avec votre tableau de bord principal',
+  ]
+  const endings = [
+    writableModules > 0 ? `${writableModules} zone(s) modifiable(s) sont pr\u00eates.` : 'les vues sont ouvertes en consultation.',
+    'les raccourcis essentiels sont d\u00e9j\u00e0 charg\u00e9s.',
+    'le bandeau restera votre point de rep\u00e8re pendant la navigation.',
+    'les donn\u00e9es visibles suivent vos droits actifs.',
+  ]
+
+  return `${pickGeneratedPhrasePart(openings)} pour ${pickGeneratedPhrasePart(focuses)}, ${pickGeneratedPhrasePart(rhythms)}: ${pickGeneratedPhrasePart(endings)}`
+}
+
+function pickGeneratedPhrasePart(values: string[]) {
+  if (values.length === 0) {
+    return ''
+  }
+
+  const randomBuffer = new Uint32Array(1)
+  crypto.getRandomValues(randomBuffer)
+  return values[randomBuffer[0] % values.length]
+}
+function getWeatherIconDataUri(code: number | null, isDay: boolean, status: ClientWeather['status']) {
+  const icon = getWeatherIconKind(code, status)
+  const sky = isDay ? '#171b24' : '#05070c'
+  const horizon = isDay ? '#080b12' : '#020306'
+  const sun = isDay ? '#f7d98a' : '#fff0c9'
+  const cloud = '#d8c188'
+  const rain = '#9ba8b8'
+  const snow = '#fff0c9'
+  const stroke = '#04060a'
+
+  const precipitation =
+    icon === 'rain'
+      ? `<path d="M52 67 47 78M70 67 65 78M88 67 83 78" stroke="${rain}" stroke-width="5" stroke-linecap="round"/>`
+      : icon === 'snow'
+        ? `<g fill="${snow}"><circle cx="52" cy="74" r="3"/><circle cx="70" cy="78" r="3"/><circle cx="88" cy="74" r="3"/></g>`
+        : ''
+
+  const lightning =
+    icon === 'storm'
+      ? `<path d="M72 63 62 84h12l-7 18 23-28H77l9-11Z" fill="${sun}" stroke="${stroke}" stroke-width="2" stroke-linejoin="round"/>`
+      : ''
+
+  const fog =
+    icon === 'fog'
+      ? `<g stroke="${cloud}" stroke-width="5" stroke-linecap="round" opacity=".86"><path d="M34 72h78"/><path d="M26 86h72"/><path d="M45 100h65"/></g>`
+      : ''
+
+  const celestial =
+    icon === 'clear'
+      ? `<circle cx="64" cy="54" r="24" fill="${sun}"/><g stroke="${sun}" stroke-width="5" stroke-linecap="round"><path d="M64 14v12"/><path d="M64 82v12"/><path d="M24 54h12"/><path d="M92 54h12"/><path d="m36 26 8 8"/><path d="m84 74 8 8"/><path d="m92 26-8 8"/><path d="m44 74-8 8"/></g>`
+      : `<circle cx="53" cy="49" r="20" fill="${sun}" opacity=".95"/>`
+
+  const clouds =
+    icon === 'clear'
+      ? ''
+      : `<path d="M42 75c-10 0-18-7-18-16 0-8 6-15 15-16 4-12 15-20 29-20 16 0 29 11 32 26 11 2 19 11 19 22 0 13-11 23-25 23H42Z" fill="${cloud}" opacity=".96"/>`
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop stop-color="${sky}"/><stop offset="1" stop-color="${horizon}"/></linearGradient><radialGradient id="a" cx=".25" cy=".2" r=".9"><stop stop-color="#f7d98a" stop-opacity=".22"/><stop offset=".68" stop-color="#f7d98a" stop-opacity="0"/></radialGradient></defs><rect width="128" height="128" rx="28" fill="url(#g)"/><rect width="128" height="128" rx="28" fill="url(#a)"/><rect x="1" y="1" width="126" height="126" rx="27" fill="none" stroke="#f7d98a" stroke-opacity=".24" stroke-width="2"/>${celestial}${clouds}${precipitation}${lightning}${fog}</svg>`
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
+function getWeatherIconKind(code: number | null, status: ClientWeather['status']) {
+  if (status !== 'ready' || code === null) {
+    return 'fog'
+  }
+
+  if (code === 0) {
+    return 'clear'
+  }
+
+  if ([1, 2, 3].includes(code)) {
+    return 'cloud'
+  }
+
+  if ([45, 48].includes(code)) {
+    return 'fog'
+  }
+
+  if ([71, 73, 75, 77, 85, 86].includes(code)) {
+    return 'snow'
+  }
+
+  if ([95, 96, 99].includes(code)) {
+    return 'storm'
+  }
+
+  return 'rain'
 }
 
 function normalizeMojibakeText(value: string) {

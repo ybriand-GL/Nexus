@@ -10,12 +10,12 @@ type PostLoginBrandTransitionProps = {
 
 export function PostLoginBrandTransition({
   onComplete,
-  label = 'Connexion reussie, chargement de Groupe Laure et Nexus',
+  label = 'Connexion valid\u00e9e, ouverture de Nexus',
 }: PostLoginBrandTransitionProps) {
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       onComplete?.()
-    }, 3400)
+    }, 2600)
 
     return () => window.clearTimeout(timeout)
   }, [onComplete])
@@ -38,7 +38,12 @@ export function PostLoginBrandTransition({
         <section className="post-auth-final">
           <img className="post-auth-icon" src={nexusIcon} alt="" aria-hidden="true" />
           <img className="post-auth-wordmark" src={nexusWordmark} alt="Nexus" />
-          <p>GROUPE LAURE • NEXUS</p>
+          <p>ESPACE GROUPE LAURE</p>
+          <div className="post-auth-readiness" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
         </section>
       </main>
     </div>

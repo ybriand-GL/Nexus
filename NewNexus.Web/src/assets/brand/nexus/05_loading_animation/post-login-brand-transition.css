@@ -407,7 +407,7 @@
 .brand-transition-screen {
   background:
     radial-gradient(circle at 26% 28%, rgba(215, 164, 73, .12), transparent 22%),
-    radial-gradient(circle at 70% 56%, rgba(108, 61, 255, .08), transparent 24%),
+    radial-gradient(circle at 70% 56%, rgba(255, 240, 201, .07), transparent 24%),
     radial-gradient(circle at 48% 48%, rgba(255, 255, 255, .04), transparent 20%),
     linear-gradient(135deg, #020306 0%, #060a12 45%, #020204 100%);
 }
@@ -450,7 +450,7 @@
   display: grid;
   place-items: center;
   opacity: 0;
-  animation: postAuthWavesReveal 3.4s ease-in-out forwards;
+  animation: postAuthWavesReveal 2.6s ease-in-out forwards;
 }
 
 .post-auth-waves svg {
@@ -465,14 +465,14 @@
   stroke-dasharray: 1120;
   stroke-dashoffset: 1120;
   filter: drop-shadow(0 0 14px rgba(247, 217, 138, .16));
-  animation: postAuthThread 2.4s cubic-bezier(.22, .9, .28, 1) forwards;
+  animation: postAuthThread 1.9s cubic-bezier(.22, .9, .28, 1) forwards;
 }
 
 .post-auth-waves .t1 { stroke: rgba(247, 217, 138, .84); stroke-width: 4.8; animation-delay: .1s; }
 .post-auth-waves .t2 { stroke: rgba(255, 255, 255, .78); stroke-width: 3.4; animation-delay: .18s; }
-.post-auth-waves .t3 { stroke: rgba(108, 61, 255, .58); stroke-width: 3.2; animation-delay: .24s; }
-.post-auth-waves .t4 { stroke: rgba(233, 20, 20, .38); stroke-width: 2.8; animation-delay: .3s; }
-.post-auth-waves .t5 { stroke: rgba(25, 188, 235, .36); stroke-width: 2.8; animation-delay: .36s; }
+.post-auth-waves .t3 { stroke: rgba(216, 193, 136, .54); stroke-width: 3.2; animation-delay: .24s; }
+.post-auth-waves .t4 { stroke: rgba(155, 168, 184, .34); stroke-width: 2.8; animation-delay: .3s; }
+.post-auth-waves .t5 { stroke: rgba(255, 240, 201, .30); stroke-width: 2.8; animation-delay: .36s; }
 
 .post-auth-fusion {
   z-index: 3;
@@ -481,10 +481,10 @@
   height: min(520px, 52vw);
   border-radius: 999px;
   background:
-    radial-gradient(circle, rgba(255, 255, 255, .92) 0 2%, rgba(247, 217, 138, .38) 3% 13%, rgba(108, 61, 255, .16) 14% 34%, transparent 64%);
+    radial-gradient(circle, rgba(255, 255, 255, .92) 0 2%, rgba(247, 217, 138, .38) 3% 13%, rgba(255, 240, 201, .14) 14% 34%, transparent 64%);
   filter: blur(18px);
   opacity: 0;
-  animation: postAuthFusion 3.4s ease-in-out forwards;
+  animation: postAuthFusion 2.6s ease-in-out forwards;
 }
 
 .post-auth-final {
@@ -495,7 +495,7 @@
   gap: 18px;
   opacity: 0;
   transform: translateY(36px) scale(.97);
-  animation: postAuthFinal 3.4s cubic-bezier(.2, .8, .2, 1) forwards;
+  animation: postAuthFinal 2.6s cubic-bezier(.2, .8, .2, 1) forwards;
 }
 
 .post-auth-icon {
@@ -520,6 +520,23 @@
   letter-spacing: .34em;
 }
 
+.post-auth-readiness {
+  display: flex;
+  gap: 8px;
+}
+
+.post-auth-readiness span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(247, 217, 138, .86);
+  box-shadow: 0 0 18px rgba(247, 217, 138, .35);
+  animation: postAuthReadiness 1.1s ease-in-out infinite;
+}
+
+.post-auth-readiness span:nth-child(2) { animation-delay: .16s; }
+.post-auth-readiness span:nth-child(3) { animation-delay: .32s; }
+
 @keyframes postAuthWavesReveal {
   0%, 12% { opacity: 0; transform: scale(.98); }
   34%, 82% { opacity: 1; transform: scale(1); }
@@ -542,4 +559,9 @@
   0%, 58% { opacity: 0; transform: translateY(36px) scale(.97); filter: blur(8px); }
   76% { opacity: 1; transform: translateY(0) scale(1.03); filter: blur(0); }
   100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes postAuthReadiness {
+  0%, 100% { opacity: .32; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
 }

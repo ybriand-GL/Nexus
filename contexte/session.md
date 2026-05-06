@@ -2145,3 +2145,87 @@ Ordre cible de construction:
   - `GET /newNexus/` retourne `200`
   - login `yannick / GroupeLaure` OK, profil `INFORMATIQUE`
   - preference testee: `false -> true`, relue via `GET /api/auth/me`, puis restauree a `false`
+
+## 2026-05-06 - Sidebar accueil par logo et meteo client
+
+- demande:
+  - supprimer l'entree `Accueil` de la navigation principale
+  - permettre l'acces a l'accueil via clic sur le logo ou le nom Nexus
+  - aligner logo et nom Nexus cote a cote
+  - supprimer la pastille `Utilisateur connecte`
+  - ajouter un logo de deconnexion en bas de navigation
+  - ajouter sous le logo une pastille `Bonjour` + prenom, date/heure, puis meteo locale sous forme d'image
+  - mettre a jour la meteo toutes les 15 minutes en fonction du poste client
+- corrections UI:
+  - `Accueil` retire des entrees principales de sidebar
+  - bloc logo Nexus transforme en bouton de retour accueil
+  - logo et wordmark alignes horizontalement
+  - pastille personnelle ajoutee sous la marque
+  - deconnexion deplacee dans un bouton icone en bas de sidebar
+  - meteo chargee cote navigateur via `navigator.geolocation`, avec fallback IP client si la geolocalisation navigateur est indisponible
+  - rendu meteo exclusivement par image SVG generee a partir du code meteo
+- validation technique:
+  - `npm run build` OK
+
+## 2026-05-06 - Sidebar reduite, meteo thematisee et loaders premium
+
+- demande:
+  - en sidebar reduite, afficher une bulle info au survol des raccourcis de menu
+  - remplacer les initiales par de vrais icones premium
+  - rendre l'icone meteo coherente avec le theme global
+  - ameliorer la page de chargement `Preparation du socle`
+  - raccourcir et premiumiser la transition post-authentification
+- corrections UI:
+  - pictogrammes SVG ajoutes pour Administration, Donnees Communes, Exploitation et Gestion administrative
+  - infobulle de libelle affichee au hover/focus lorsque la sidebar est reduite
+  - meteo image recoloree sur palette sombre/champagne Nexus
+  - loader initial remplace par une carte sombre premium avec logo Nexus, anneaux animes, et etapes dynamiques
+  - duree minimale du loader initial fixee a environ 2,2 secondes
+  - transition post-authentification reduite a environ 2,6 secondes et nettoyee visuellement
+- validation technique:
+  - `npm run build` OK
+
+## 2026-05-06 - Bandeau haut global et infobulles sidebar
+
+- demande:
+  - les infobulles de sidebar reduite sont tronquees par le dashboard
+  - ajouter un bandeau haut visible systematiquement
+  - y placer Bonjour, date/heure, meteo, ville geolocalisee
+  - ajouter une phrase personnalisee au profil et a l'historique d'utilisation, differente a chaque connexion
+- corrections UI:
+  - bandeau `nexus-top-banner` ajoute en haut du contenu applicatif connecte
+  - Bonjour, phrase de session, ville, date/heure et image meteo deplaces dans ce bandeau
+  - sidebar recentree sur navigation + deconnexion
+  - infobulles corrigees avec z-index et overflow sidebar visibles
+  - ville chargee cote navigateur via geocodage inverse BigDataCloud, avec fallback IP client
+  - phrase de session generee a l'hydratation du compte selon profil et derniere connexion connue
+- validation technique:
+  - `npm run build` OK
+
+## 2026-05-06 - Nexa et generation enrichie des accroches
+
+- demande:
+  - eviter les 2/3 phrases d'accroche fixes
+  - ne plus afficher le loader a chaque rafraichissement lorsque l'utilisateur est deja connu
+  - cadrer la possibilite d'un compagnon IA local nomme `Nexa`
+- corrections UI:
+  - suppression de la duree minimale obligatoire du loader au rafraichissement connecte
+  - memorisation locale d'une session connue pour eviter la carte loader lors du rechargement d'un utilisateur deja connecte
+  - accroche remplacee par une generation combinatoire selon profil, moment de la journee, derniere connexion, modules accessibles, dashboards et droits en ecriture
+  - libelle ville ajuste: `Localisation en cours` uniquement pendant le chargement, puis fallback `Ville non disponible`
+- cadrage Nexa:
+  - assistant IA local possible en architecture dediee: service interne NewNexus, stockage des signaux d'usage, moteur de recommandations, puis chat assistant
+  - principe retenu: aucune donnee utilisateur envoyee a un service externe pour l'apprentissage sans decision explicite
+- validation technique:
+  - `npm run build` OK
+
+## 2026-05-06 - Localisation meteo par defaut
+
+- demande:
+  - prendre par defaut `Saint-Etienne-de-Montluc 44360` pour geolocalisation et meteo
+  - commit/push avant de demarrer Nexa
+- correction UI:
+  - localisation meteo forcee pour l'instant sur `Saint-Etienne-de-Montluc (44360)`
+  - coordonnees utilisees: latitude `47.278`, longitude `-1.779`
+  - la ville par defaut est affichee dans le bandeau haut
+  - la meteo Open-Meteo utilise cette localisation tant que la geolocalisation client fiable n'est pas recadree

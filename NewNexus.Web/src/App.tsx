@@ -118,11 +118,32 @@ type NexaTicketItem = {
   referentAnswer: string | null
   answeredAtUtc: string | null
   validatedAtUtc: string | null
+  rejectedAtUtc: string | null
+  closedAtUtc: string | null
   requesterValidationComment: string | null
   module: NexaReferenceModule | null
   category: NexaReferenceCategory | null
   requester: { id: string; login: string; displayName: string } | null
   assignedTo: { id: string; login: string; displayName: string } | null
+  history?: NexaTicketHistoryItem[] | null
+  comments?: NexaTicketCommentItem[] | null
+}
+
+type NexaTicketHistoryItem = {
+  id: string
+  actionCode: string
+  fromStatusCode: string | null
+  toStatusCode: string | null
+  detail: string | null
+  actor: { id: string; login: string; displayName: string } | null
+  createdAtUtc: string
+}
+
+type NexaTicketCommentItem = {
+  id: string
+  comment: string
+  author: { id: string; login: string; displayName: string } | null
+  createdAtUtc: string
 }
 
 type NexaKnowledgeItem = {
@@ -1079,10 +1100,14 @@ function App() {
   const [nexaLastAsk, setNexaLastAsk] = useState<NexaAskResponse | null>(null)
   const [isCreatingNexaTicket, setIsCreatingNexaTicket] = useState(false)
   const [nexaTicketAnswers, setNexaTicketAnswers] = useState<Record<string, string>>({})
+  const [nexaTicketValidationComments, setNexaTicketValidationComments] = useState<Record<string, string>>({})
+  const [nexaTicketRejectionComments, setNexaTicketRejectionComments] = useState<Record<string, string>>({})
+  const [nexaTicketActionInProgress, setNexaTicketActionInProgress] = useState<string | null>(null)
   const [nexaTicketView, setNexaTicketView] = useState<'mine' | 'to_process' | 'all'>('all')
   const [nexaTicketStatusFilter, setNexaTicketStatusFilter] = useState('ALL')
   const [nexaTicketModuleFilter, setNexaTicketModuleFilter] = useState('ALL')
   const [nexaSelectedTicketId, setNexaSelectedTicketId] = useState<string | null>(null)
+  const [nexaSelectedTicketAssigneeId, setNexaSelectedTicketAssigneeId] = useState('')
   const [nexaReferentForm, setNexaReferentForm] = useState({ moduleId: '', userAccountId: '', isPrimary: true })
   const [nexaRoutingRuleForm, setNexaRoutingRuleForm] = useState({
     moduleId: '',
@@ -1310,6 +1335,10 @@ function App() {
     })
   }, [currentUser?.id, isInformatique, nexaTicketModuleFilter, nexaTicketStatusFilter, nexaTicketView, nexaTickets])
   const selectedNexaTicket = filteredNexaTickets.find((ticket) => ticket.id === nexaSelectedTicketId) ?? filteredNexaTickets[0] ?? null
+
+  useEffect(() => {
+    setNexaSelectedTicketAssigneeId(selectedNexaTicket?.assignedTo?.id ?? '')
+  }, [selectedNexaTicket?.assignedTo?.id, selectedNexaTicket?.id])
 
   const currentWorkspaceModules = selectedNavigation === 'Exploitation' || selectedNavigation === 'Gestion administrative'
     ? modulesByGroup[selectedNavigation] ?? []
@@ -2020,6 +2049,26 @@ function App() {
     }
   }
 
+  function mergeNexaTicket(ticket: NexaTicketItem) {
+    setNexaTickets((current) => {
+      const exists = current.some((item) => item.id === ticket.id)
+      return exists
+        ? current.map((item) => item.id === ticket.id ? { ...item, ...ticket } : item)
+        : [ticket, ...current]
+    })
+  }
+
+  async function selectNexaTicket(ticketId: string) {
+    setNexaSelectedTicketId(ticketId)
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}`))
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible de charger la fiche ticket Nexa.'))
+      return
+    }
+
+    mergeNexaTicket((await response.json()) as NexaTicketItem)
+  }
+
   async function loadNexaKnowledge() {
     try {
       const response = await fetch(apiPath('api/nexa/knowledge'))
@@ -2212,6 +2261,123 @@ function App() {
 
     const ticket = (await response.json()) as NexaTicketItem
     setNexaTickets((current) => current.map((item) => item.id === ticket.id ? ticket : item))
+  }
+
+  async function answerNexaTicketFromDetail(ticketId: string) {
+    const answer = (nexaTicketAnswers[ticketId] ?? '').trim()
+    if (!answer) {
+      return
+    }
+
+    setNexaTicketActionInProgress(`answer-${ticketId}`)
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}/answer`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ answer }),
+    })
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible d enregistrer la reponse.'))
+      setNexaTicketActionInProgress(null)
+      return
+    }
+
+    mergeNexaTicket((await response.json()) as NexaTicketItem)
+    setNexaTicketAnswers((current) => ({ ...current, [ticketId]: '' }))
+    setNexaTicketActionInProgress(null)
+    await selectNexaTicket(ticketId)
+  }
+
+  async function validateNexaTicketFromDetail(ticketId: string) {
+    const comment = (nexaTicketValidationComments[ticketId] ?? '').trim() || 'Réponse validée depuis Nexus.'
+    setNexaTicketActionInProgress(`validate-${ticketId}`)
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}/validate`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ comment }),
+    })
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible de valider la reponse.'))
+      setNexaTicketActionInProgress(null)
+      return
+    }
+
+    mergeNexaTicket((await response.json()) as NexaTicketItem)
+    setNexaTicketValidationComments((current) => ({ ...current, [ticketId]: '' }))
+    setNexaTicketActionInProgress(null)
+    await loadNexaKnowledge()
+    await selectNexaTicket(ticketId)
+  }
+
+  async function rejectNexaTicketFromDetail(ticketId: string) {
+    const comment = (nexaTicketRejectionComments[ticketId] ?? '').trim()
+    if (!comment) {
+      setNexaChatError('Indiquez un motif de refus pour renvoyer le ticket au référent.')
+      return
+    }
+
+    setNexaTicketActionInProgress(`reject-${ticketId}`)
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}/reject`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ comment }),
+    })
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible de refuser la reponse.'))
+      setNexaTicketActionInProgress(null)
+      return
+    }
+
+    mergeNexaTicket((await response.json()) as NexaTicketItem)
+    setNexaTicketRejectionComments((current) => ({ ...current, [ticketId]: '' }))
+    setNexaTicketActionInProgress(null)
+    await selectNexaTicket(ticketId)
+  }
+
+  async function assignNexaTicketFromDetail(ticketId: string) {
+    if (!nexaSelectedTicketAssigneeId) {
+      setNexaChatError('Sélectionnez un référent à affecter.')
+      return
+    }
+
+    setNexaTicketActionInProgress(`assign-${ticketId}`)
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}/assign`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ assignedUserAccountId: nexaSelectedTicketAssigneeId }),
+    })
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible d affecter le ticket Nexa.'))
+      setNexaTicketActionInProgress(null)
+      return
+    }
+
+    mergeNexaTicket((await response.json()) as NexaTicketItem)
+    setNexaTicketActionInProgress(null)
+    await selectNexaTicket(ticketId)
+  }
+
+  async function closeNexaTicketFromDetail(ticketId: string) {
+    setNexaTicketActionInProgress(`close-${ticketId}`)
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}/close`), {
+      method: 'PUT',
+    })
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible de clôturer le ticket Nexa.'))
+      setNexaTicketActionInProgress(null)
+      return
+    }
+
+    mergeNexaTicket((await response.json()) as NexaTicketItem)
+    setNexaTicketActionInProgress(null)
+    await selectNexaTicket(ticketId)
   }
 
   async function sendNexaKnowledgeFeedback(knowledgeId: string, isPositive: boolean) {
@@ -5166,7 +5332,7 @@ function App() {
                         </div>
                         <p>{ticket.question}</p>
                         <small>Demandeur: {ticket.requester?.displayName ?? '-'} | Référent: {ticket.assignedTo?.displayName ?? 'Non affecté'}</small>
-                        <button className="secondary-button" onClick={() => setNexaSelectedTicketId(ticket.id)} type="button">
+                        <button className="secondary-button" onClick={() => void selectNexaTicket(ticket.id)} type="button">
                           Voir la fiche
                         </button>
                         {ticket.referentAnswer ? (
@@ -5231,6 +5397,102 @@ function App() {
                         <div className="nexa-ticket-answer">
                           <strong>Réponse transmise</strong>
                           <p>{selectedNexaTicket.referentAnswer}</p>
+                        </div>
+                      ) : null}
+                    </article>
+                  ) : null}
+                  {selectedNexaTicket ? (
+                    <article className="settings-edit-card nexa-ticket-detail nexa-ticket-workflow-card">
+                      <div className="settings-list-header">
+                        <div>
+                          <h3>Traitement du ticket</h3>
+                          <small>Actions disponibles selon le statut et les droits</small>
+                        </div>
+                        <span className="nexa-badge nexa-badge-source">{formatNexaTicketStatus(selectedNexaTicket.statusCode)}</span>
+                      </div>
+                      {isInformatique ? (
+                        <div className="nexa-ticket-detail-actions">
+                          <label>
+                            <span>Affecter à</span>
+                            <select value={nexaSelectedTicketAssigneeId} onChange={(event) => setNexaSelectedTicketAssigneeId(event.target.value)}>
+                              <option value="">Non affecté</option>
+                              {accounts.filter((account) => account.isActive).map((account) => (
+                                <option key={account.id} value={account.id}>{account.displayName}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <button className="secondary-button" disabled={!nexaSelectedTicketAssigneeId || nexaTicketActionInProgress === `assign-${selectedNexaTicket.id}`} onClick={() => void assignNexaTicketFromDetail(selectedNexaTicket.id)} type="button">
+                            Affecter
+                          </button>
+                        </div>
+                      ) : null}
+                      {!['VALIDE', 'CLOTURE', 'ANNULE'].includes(selectedNexaTicket.statusCode) ? (
+                        <div className="nexa-ticket-actions nexa-ticket-detail-actions">
+                          <label>
+                            <span>Réponse du référent</span>
+                            <textarea
+                              placeholder="Saisir la réponse à transmettre au demandeur"
+                              rows={4}
+                              value={nexaTicketAnswers[selectedNexaTicket.id] ?? ''}
+                              onChange={(event) => setNexaTicketAnswers((current) => ({ ...current, [selectedNexaTicket.id]: event.target.value }))}
+                            />
+                          </label>
+                          <button className="nexa-primary-action" disabled={!(nexaTicketAnswers[selectedNexaTicket.id] ?? '').trim() || nexaTicketActionInProgress === `answer-${selectedNexaTicket.id}`} onClick={() => void answerNexaTicketFromDetail(selectedNexaTicket.id)} type="button">
+                            Transmettre la réponse
+                          </button>
+                        </div>
+                      ) : null}
+                      {selectedNexaTicket.statusCode === 'EN_ATTENTE_VALIDATION_DEMANDEUR' ? (
+                        <div className="nexa-ticket-decision-grid">
+                          <label>
+                            <span>Commentaire de validation</span>
+                            <textarea
+                              placeholder="Commentaire facultatif"
+                              rows={3}
+                              value={nexaTicketValidationComments[selectedNexaTicket.id] ?? ''}
+                              onChange={(event) => setNexaTicketValidationComments((current) => ({ ...current, [selectedNexaTicket.id]: event.target.value }))}
+                            />
+                            <button className="nexa-primary-action" disabled={nexaTicketActionInProgress === `validate-${selectedNexaTicket.id}`} onClick={() => void validateNexaTicketFromDetail(selectedNexaTicket.id)} type="button">
+                              Valider et enrichir Nexa
+                            </button>
+                          </label>
+                          <label>
+                            <span>Motif de refus</span>
+                            <textarea
+                              placeholder="Expliquez ce qui manque ou ce qui est incorrect"
+                              rows={3}
+                              value={nexaTicketRejectionComments[selectedNexaTicket.id] ?? ''}
+                              onChange={(event) => setNexaTicketRejectionComments((current) => ({ ...current, [selectedNexaTicket.id]: event.target.value }))}
+                            />
+                            <button className="secondary-button" disabled={!(nexaTicketRejectionComments[selectedNexaTicket.id] ?? '').trim() || nexaTicketActionInProgress === `reject-${selectedNexaTicket.id}`} onClick={() => void rejectNexaTicketFromDetail(selectedNexaTicket.id)} type="button">
+                              Refuser et renvoyer
+                            </button>
+                          </label>
+                        </div>
+                      ) : null}
+                      {isInformatique && !['CLOTURE', 'ANNULE'].includes(selectedNexaTicket.statusCode) ? (
+                        <div className="profile-action-row">
+                          <button className="secondary-button" disabled={nexaTicketActionInProgress === `close-${selectedNexaTicket.id}`} onClick={() => void closeNexaTicketFromDetail(selectedNexaTicket.id)} type="button">
+                            Clôturer le ticket
+                          </button>
+                        </div>
+                      ) : null}
+                      {selectedNexaTicket.requesterValidationComment ? (
+                        <div className="nexa-ticket-answer">
+                          <strong>Commentaire demandeur</strong>
+                          <p>{selectedNexaTicket.requesterValidationComment}</p>
+                        </div>
+                      ) : null}
+                      {selectedNexaTicket.history?.length ? (
+                        <div className="nexa-ticket-history">
+                          <strong>Historique</strong>
+                          {selectedNexaTicket.history.map((history) => (
+                            <div key={history.id}>
+                              <span>{new Date(history.createdAtUtc).toLocaleString('fr-FR')}</span>
+                              <p>{history.detail ?? formatNexaTicketStatus(history.toStatusCode ?? history.actionCode)}</p>
+                              <small>{history.actor?.displayName ?? 'Nexus'} - {history.actionCode}</small>
+                            </div>
+                          ))}
                         </div>
                       ) : null}
                     </article>

@@ -2383,3 +2383,27 @@ Ordre cible de construction:
   - assets publics Nexa accessibles en HTTP 200 sous `/newNexus/nexa/`
 - suites:
   - reprendre le backlog fonctionnel Nexa: actions UI completes sur fiche ticket, pieces jointes effectives, feedback persistant depuis les bulles, puis RAG local avance
+
+## 2026-05-06 - Reprise backlog Nexa workflow ticket UI
+
+- prealable:
+  - contexte/backlog mis a jour apres l'identite visuelle Nexa
+  - commit/push precedent confirme sur `main`: `fec69d8 feat: add nexa visual identity`
+- objectif:
+  - supprimer le trou fonctionnel entre la liste des tickets Nexa et les endpoints de transition deja disponibles
+  - permettre le traitement complet depuis la fiche ticket dans `Administration > Nexa`
+- frontend:
+  - chargement detaille d'une fiche ticket via `GET /api/nexa/tickets/{id}` au clic `Voir la fiche`
+  - ajout des actions fiche: affectation, reponse referent, validation avec commentaire, refus motive, cloture admin
+  - affichage du commentaire demandeur et de l'historique detaille quand la fiche est chargee
+  - styles dedies pour les zones de traitement, decisions et historique Nexa
+- validations:
+  - `npm run build` OK
+  - `dotnet build NewNexus.slnx` OK
+  - publication IIS `/newNexus` OK
+  - test authentifie `yannick / GroupeLaure`: login OK, liste tickets OK, detail ticket OK en HTTP 200
+- suites:
+  - pieces jointes effectives
+  - feedback persistant depuis les bulles de conversation
+  - filtres avances sur base de connaissance
+  - RAG local avance avec embeddings

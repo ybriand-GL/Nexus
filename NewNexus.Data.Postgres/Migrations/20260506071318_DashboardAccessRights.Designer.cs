@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NewNexus.Data.Postgres;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NewNexus.Data.Postgres.Migrations
 {
     [DbContext(typeof(NewNexusDbContext))]
-    partial class NewNexusDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260506071318_DashboardAccessRights")]
+    partial class DashboardAccessRights
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -714,11 +717,6 @@ namespace NewNexus.Data.Postgres.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsSidebarCollapsed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<DateTime?>("LastLoginAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -777,7 +775,6 @@ namespace NewNexus.Data.Postgres.Migrations
                             CreatedAtUtc = new DateTime(2026, 4, 29, 0, 0, 0, 0, DateTimeKind.Utc),
                             DisplayName = "Administrateur système",
                             IsActive = true,
-                            IsSidebarCollapsed = false,
                             Login = "admin",
                             MustChangePassword = true,
                             PasswordHash = "100000.T4PL0v0v1mGm2O8x2M8vMw==.xdyoWj/llsa9F5KoRoeZc8mUL29qNlCKh8LzHxzd8MM=",

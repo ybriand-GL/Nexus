@@ -1,5 +1,5 @@
 # Backlog detaille NewNexus
-Derniere mise a jour: 2026-05-05
+Derniere mise a jour: 2026-05-06
 
 ## Legende des statuts
 
@@ -31,10 +31,10 @@ Derniere mise a jour: 2026-05-05
 |---|---|---|---|
 | UX | Cadrage UX V1 | TERMINE | Document redige |
 | UX | Wireframes V1 | TERMINE | Document redige |
-| UX | Dashboard par profil | A_TESTER | Accueil, vues de travail et readiness diagnostics disponibles; personnalisation fine par profil a poursuivre apres recette |
+| UX | Dashboard par profil | A_TESTER | Accueil personnalise par profil Informatique, Direction, Exploitation et Administratif; consultation par cube pivotant ralenti, rapproche du haut de page et affichage pilote par droits `DASHBOARD_*` |
 | UX | Coque frontend premium initiale | TERMINE | Shell Nexus 4C integre et branche au socle |
 | UX | Integration identite visuelle Nexus | TERMINE | Assets officiels SVG, palette graphite/champagne et tokens centralises appliques depuis le prompt Nexus |
-| UX | Qualite accents et libelles UTF-8 | A_TESTER | Check visible refait sur les ecrans modifies; constantes Outils corrigees proprement, normalisation visible conservee pour les chaines historiques |
+| UX | Qualite accents et libelles UTF-8 | A_TESTER | Check visible relance sur l'application; normalisation visible enrichie pour les accents courants (`taches`, `planifiees`, `pret/prete`, `creation`, `materiels`, `salaries`, `societes`, `cles`, `coordonnees`) |
 | UX | Tokens officiels du handoff | TERMINE | `nexus-theme.css`, `design-tokens.css` et `design-tokens.json` alignes sur l'identite Nexus sombre |
 | UX | Animation post-authentification | TERMINE | Transition `Groupe Laure × Nexus` integree, affichage unique après login |
 | UX | Favicon et identite navigateur | TERMINE | Icônes 16/32/180/192/512 et manifest publies |
@@ -73,6 +73,9 @@ Derniere mise a jour: 2026-05-05
 | Securite | Changement de mot de passe | TERMINE | Endpoint utilisateur et ecran force `mustChangePassword` en place |
 | Securite | Controle d'autorisation backend | A_TESTER | Policy `RequireInformatique` en place sur les endpoints administration/securite; tests automatises 401/403/200 a ajouter |
 | Securite | Protection frontend par droits | TERMINE | Navigation et dashboard filtres selon les droits reels |
+| Securite | Droit module Donnees Communes | A_TESTER | Module `DONNEES_COMMUNES` ajoute aux profils; API `/api/settings/*` protegee en Lecture/Ecriture et navigation branchee sur le droit reel |
+| Securite | Droits tableaux de bord | A_TESTER | Modules `DASHBOARD_INFORMATIQUE`, `DASHBOARD_DIRECTION`, `DASHBOARD_EXPLOITATION`, `DASHBOARD_ADMINISTRATIF` ajoutes pour piloter quels dashboards chaque profil peut consulter |
+| Securite | Preference menu retractable | A_TESTER | `IsSidebarCollapsed` porte par le compte utilisateur, endpoint `PUT /api/auth/preferences`, hydrate via `login/me` et teste avec `yannick` |
 | Securite | Endpoint mise a jour profil compte | TERMINE | `PUT /api/security/accounts/{id}/profile` publie et teste |
 | Securite | Endpoint activation / desactivation compte | TERMINE | `PUT /api/security/accounts/{id}/status` publie et teste |
 | Securite | Ecran administration des comptes | A_TESTER | Vue dediee `Comptes utilisateurs` alignee sur `Profils`: cartes, configuration, creation, modales corrigees, bouton fermer sombre, cycle de vie, timeout session et reset admin temporaire |
@@ -114,10 +117,10 @@ Derniere mise a jour: 2026-05-05
 |---|---|---|---|
 | Interfaces | SIRENE | A_TESTER | Recherche SIRENE mutualisee backend et creation Societes bloquee si le SIREN n'est pas valide par SIRENE; readiness diagnostics ajoutee, enrichissement complet a poursuivre |
 | Interfaces | LUCCA | A_TESTER | Import compatible Lucca legacy `/api/v3/users` et API v5 `/lucca-api/employees`; authentification application-key ou Bearer, mapping champs v3/v5 et message d'erreur detaille disponibles; recette avec cle reelle a faire |
-| Interfaces | Truckonline | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client metier a raccorder apres validation contrat API |
-| Interfaces | YellowBox | A_DEVELOPPER | Parametres et secrets legacy importes, ecran Materiels et readiness disponibles; client telematique a raccorder apres validation contrat API |
-| Interfaces | Geocodage | A_DEVELOPPER | Emplacements Geoapify/Google et readiness disponibles; choix fournisseur et cle active a confirmer |
-| Interfaces | Cartographie | A_DEVELOPPER | OpenStreetMap/Nominatim reference dans Outils et readiness disponible; raccord carte depend du modele des points |
+| Interfaces | Truckonline | A_TESTER | Raccord local disponible: readiness, tache planifiee executable et endpoint d'import materiels provider; appel API externe final a valider avec le contrat TruckOnline |
+| Interfaces | YellowBox | A_TESTER | Raccord local disponible: readiness, tache planifiee executable et endpoint d'import materiels provider; appel API externe final a valider avec le contrat YellowBox |
+| Interfaces | Geocodage | A_TESTER | Geocodage points raccorde avec priorite Geoapify, Google Maps puis OpenStreetMap/Nominatim; action endpoint par point a recetter avec cle ou fallback |
+| Interfaces | Cartographie | A_TESTER | Endpoint carte OpenStreetMap expose centre, bornes et points actifs; affichage local existant et donnees cartographiques pretes pour recette |
 
 ## 6. Modules fonctionnels V1
 
@@ -125,8 +128,8 @@ Derniere mise a jour: 2026-05-05
 |---|---|---|---|
 | Module | Gestion des contraventions | A_TESTER | Module V1 branche: table `administration.Contravention`, endpoints droits `CONTRAVENTIONS`, liste, creation, edition, statuts, rattachements conducteur/materiel et traces metier |
 | Module | Carte des points chargements/dechargements | A_TESTER | Module V1 local branche: table `exploitation.LoadingPoint`, endpoints droits `CARTE_POINTS_CHARGEMENT_DECHARGEMENT`, liste, creation, edition, types chargement/dechargement/mixte, rattachements tiers/exploitation et coordonnees manuelles |
-| Module | Les indicateurs conducteurs | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: donnees Lucca, qualification conducteur et indicateurs a definir |
-| Module | Les indicateurs des tracteurs | SCAFFOLDE | Carte de cadrage visible dans `Exploitation`: donnees materiels, TruckOnline, YellowBox et modele parc a definir |
+| Module | Les indicateurs conducteurs | A_TESTER | Endpoint et UI operationnels: actifs, comptes rattaches, qualite contact, contraventions ouvertes et liste conducteurs |
+| Module | Les indicateurs des tracteurs | A_TESTER | Endpoint et UI operationnels: parc tracteurs, actifs, liens TruckOnline/YellowBox, exploitations, contraventions ouvertes et qualite donnees |
 
 ## 7. Technique
 
@@ -157,6 +160,9 @@ Derniere mise a jour: 2026-05-05
 | Technique | Migration telephone salaries | TERMINE | `EmployeePhoneAndLuccaImport` generee et appliquee localement |
 | Technique | Migration traces applicatives | TERMINE | `ApplicationTraces` generee et appliquee localement |
 | Technique | Migration points chargement/dechargement | TERMINE | `LoadingPointsModule` generee et appliquee localement |
+| Technique | Migration droits dashboards | TERMINE | `DashboardAccessRights` generee et appliquee localement |
+| Technique | Migration preference sidebar utilisateur | TERMINE | `UserSidebarPreference` generee et appliquee localement |
+| Technique | Migration droit Donnees Communes | TERMINE | `CommonDataSecurityModule` generee et appliquee localement; libelle DB verifie `Données Communes` |
 | Technique | Documentation integration branding | TERMINE | `docs/newnexus-brand-handoff-integration.md` ajoute |
 | Technique | Endpoint diagnostics administration | TERMINE | `GET /api/admin/diagnostics` publie pour le profil Informatique |
 | Technique | Import cles Nexus legacy | TERMINE | 22 valeurs importees depuis `LOCATIF_DEV` et rechiffrees avec le trousseau IIS NewNexus |
@@ -167,7 +173,7 @@ Derniere mise a jour: 2026-05-05
 |---|---|---|---|
 | Hebergement | URL cible `http://192.168.60.158/newNexus` | A_TESTER | URL testee en HTTP, retour `200 text/html`; recette navigateur a faire |
 | Hebergement | URL cible `http://192.168.50.102/newNexus` | A_TESTER | URL testee en HTTP, retour `200 text/html`; recette navigateur a faire |
-| Hebergement | Publication sous repertoire virtuel `/newNexus` | SCAFFOLDE | Application configuree pour fonctionner sous ce chemin |
+| Hebergement | Publication sous repertoire virtuel `/newNexus` | A_TESTER | Script de publication maintenu; compatibilite PathBase, assets et exclusion rewrite parent a verifier apres publication |
 | Hebergement | Compatibilite acces HTTP cible | TERMINE | Redirection HTTPS forcee retiree du socle API |
 | Hebergement | Compatibilite URL `/newNexus` sans slash final | TERMINE | Appels API frontend construits avec le base path Vite absolu pour eviter les retours HTML du site parent |
 | Hebergement | Publication IIS effective `Localaure/newNexus` | TERMINE | Application publiee et testee en HTTP |

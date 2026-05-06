@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import PostLoginBrandTransition from './assets/brand/nexus/05_loading_animation/PostLoginBrandTransition'
@@ -27,6 +27,7 @@ type AuthenticatedUser = {
   email: string | null
   employeeNumber: string | null
   mustChangePassword: boolean
+  isSidebarCollapsed: boolean
   lastLoginAtUtc: string | null
   profile: {
     id: string
@@ -442,6 +443,60 @@ type LoadingPointFormState = {
   error: string | null
 }
 
+type DriverIndicatorsPayload = {
+  summary: {
+    totalDrivers: number
+    activeDrivers: number
+    driversWithAccounts: number
+    driversWithoutAccount: number
+    driversWithOpenContraventions: number
+    incompleteContactData: number
+  }
+  drivers: Array<{
+    id: string
+    employeeNumber: string
+    displayName: string
+    email: string | null
+    phoneNumber: string | null
+    isActive: boolean
+    lastSyncedAtUtc: string | null
+    accountLogin: string | null
+    accountProfile: string | null
+    accountIsActive: boolean | null
+    openContraventions: number
+    totalContraventions: number
+    dataQuality: string
+  }>
+}
+
+type TractorIndicatorsPayload = {
+  summary: {
+    totalTractors: number
+    activeTractors: number
+    truckOnlineLinked: number
+    yellowBoxLinked: number
+    withExploitation: number
+    withOpenContraventions: number
+  }
+  tractors: Array<{
+    id: string
+    fleetNumber: string
+    label: string
+    registrationNumber: string | null
+    sourceSystem: string | null
+    isActive: boolean
+    lastSyncedAtUtc: string | null
+    exploitation: {
+      id: string
+      code: string
+      label: string
+    } | null
+    openContraventions: number
+    totalContraventions: number
+    dataQuality: string
+  }>
+}
+
 type EditableAccountState = {
   login: string
   displayName: string
@@ -584,8 +639,24 @@ const employeeSettingsSection = 'Salari\u00e9s'
 const thirdPartySettingsSection = 'Tiers'
 const materialSettingsSection = 'Mat\u00e9riels'
 const settingsNavigationEntries = [...settingsSubmenuEntries] as const
+const dashboardProfileCodes = ['INFORMATIQUE', 'DIRECTION', 'EXPLOITATION', 'ADMINISTRATIF'] as const
+const dashboardModuleByProfileCode: Record<string, string> = {
+  INFORMATIQUE: 'DASHBOARD_INFORMATIQUE',
+  DIRECTION: 'DASHBOARD_DIRECTION',
+  EXPLOITATION: 'DASHBOARD_EXPLOITATION',
+  ADMINISTRATIF: 'DASHBOARD_ADMINISTRATIF',
+}
+const dashboardProfileLabels: Record<string, string> = {
+  INFORMATIQUE: 'Informatique',
+  DIRECTION: 'Direction',
+  EXPLOITATION: 'Exploitation',
+  ADMINISTRATIF: 'Administratif',
+}
+const commonDataModuleCode = 'DONNEES_COMMUNES'
 const contraventionsModuleCode = 'CONTRAVENTIONS'
 const loadingPointsModuleCode = 'CARTE_POINTS_CHARGEMENT_DECHARGEMENT'
+const driverIndicatorsModuleCode = 'INDICATEURS_CONDUCTEURS'
+const tractorIndicatorsModuleCode = 'INDICATEURS_TRACTEURS'
 const contraventionStatuses = [
   { code: 'A_TRAITER', label: 'A traiter' },
   { code: 'EN_CONTESTATION', label: 'En contestation' },
@@ -641,6 +712,91 @@ const mojibakeTextReplacements: Array<[string, string]> = [
   ['\u00e2\u20ac\u0153', '"'],
   ['\u00e2\u20ac\u009d', '"'],
   ['\u00e2\u20ac\u00a2', '\u2022'],
+  ['A tester', '\u00c0 tester'],
+  ['A planifier', '\u00c0 planifier'],
+  ['A raccorder', '\u00c0 raccorder'],
+  ['A cadrer', '\u00c0 cadrer'],
+  ['a completer', '\u00e0 compl\u00e9ter'],
+  ['a confirmer', '\u00e0 confirmer'],
+  ['a enregistrer', '\u00e0 enregistrer'],
+  ['a jour', '\u00e0 jour'],
+  ['a maintenir', '\u00e0 maintenir'],
+  ['a valider', '\u00e0 valider'],
+  ['acces', 'acc\u00e8s'],
+  ['actives', 'activ\u00e9es'],
+  ['activee', 'activ\u00e9e'],
+  ['activite', 'activit\u00e9'],
+  ['cible est valide', 'cible est valid\u00e9'],
+  ['cles', 'cl\u00e9s'],
+  ['controle', 'contr\u00f4le'],
+  ['Controle', 'Contr\u00f4le'],
+  ['coordonnees', 'coordonn\u00e9es'],
+  ['Coordonnees', 'Coordonn\u00e9es'],
+  ['creation', 'cr\u00e9ation'],
+  ['Creation', 'Cr\u00e9ation'],
+  ['cree(s)', 'cr\u00e9\u00e9(s)'],
+  ['Creer', 'Cr\u00e9er'],
+  ['declare', 'd\u00e9clar\u00e9'],
+  ['dechargement', 'd\u00e9chargement'],
+  ['definir', 'd\u00e9finir'],
+  ['definitif', 'd\u00e9finitif'],
+  ['detaillee', 'd\u00e9taill\u00e9e'],
+  ['donnees', 'donn\u00e9es'],
+  ['echeances', '\u00e9ch\u00e9ances'],
+  ['ecriture', '\u00e9criture'],
+  ['edition', '\u00e9dition'],
+  ['equipes', '\u00e9quipes'],
+  ['etat', '\u00e9tat'],
+  ['executions', 'ex\u00e9cutions'],
+  ['execute', 'ex\u00e9cut\u00e9'],
+  ['Geocodage', 'G\u00e9ocodage'],
+  ['ignore(s)', 'ignor\u00e9(s)'],
+  ['libelle', 'libell\u00e9'],
+  ['lie par matricule', 'li\u00e9 par matricule'],
+  ['materiel', 'mat\u00e9riel'],
+  ['Materiel', 'Mat\u00e9riel'],
+  ['materiels', 'mat\u00e9riels'],
+  ['Materiels', 'Mat\u00e9riels'],
+  ['metier', 'm\u00e9tier'],
+  ['modele', 'mod\u00e8le'],
+  ['Numero', 'Num\u00e9ro'],
+  ['numero', 'num\u00e9ro'],
+  ['operationnels', 'op\u00e9rationnels'],
+  ['periodique', 'p\u00e9riodique'],
+  ['perimetre', 'p\u00e9rim\u00e8tre'],
+  ['planifiee', 'planifi\u00e9e'],
+  ['planifiees', 'planifi\u00e9es'],
+  ['priorites', 'priorit\u00e9s'],
+  ['Priorites', 'Priorit\u00e9s'],
+  ['pret', 'pr\u00eat'],
+  ['prete', 'pr\u00eate'],
+  ['Preparer', 'Pr\u00e9parer'],
+  ['Referentiel', 'R\u00e9f\u00e9rentiel'],
+  ['referentiel', 'r\u00e9f\u00e9rentiel'],
+  ['rattache', 'rattach\u00e9'],
+  ['rattachee', 'rattach\u00e9e'],
+  ['rattachees', 'rattach\u00e9es'],
+  ['reelle', 'r\u00e9elle'],
+  ['reel', 'r\u00e9el'],
+  ['renseignee', 'renseign\u00e9e'],
+  ['reservee', 'r\u00e9serv\u00e9e'],
+  ['salarie', 'salari\u00e9'],
+  ['Salarie', 'Salari\u00e9'],
+  ['salaries', 'salari\u00e9s'],
+  ['Salaries', 'Salari\u00e9s'],
+  ['societe', 'soci\u00e9t\u00e9'],
+  ['Societe', 'Soci\u00e9t\u00e9'],
+  ['societes', 'soci\u00e9t\u00e9s'],
+  ['Societes', 'Soci\u00e9t\u00e9s'],
+  ['specification', 'sp\u00e9cification'],
+  ['telematique', 't\u00e9l\u00e9matique'],
+  ['tache', 't\u00e2che'],
+  ['Tache', 'T\u00e2che'],
+  ['taches', 't\u00e2ches'],
+  ['Taches', 'T\u00e2ches'],
+  ['vehicule', 'v\u00e9hicule'],
+  ['vehicules', 'v\u00e9hicules'],
+  ['verrouillee', 'verrouill\u00e9e'],
 ]
 
 function App() {
@@ -656,6 +812,8 @@ function App() {
   const [materials, setMaterials] = useState<MaterialItem[]>([])
   const [contraventions, setContraventions] = useState<ContraventionItem[]>([])
   const [loadingPoints, setLoadingPoints] = useState<LoadingPointItem[]>([])
+  const [driverIndicators, setDriverIndicators] = useState<DriverIndicatorsPayload | null>(null)
+  const [tractorIndicators, setTractorIndicators] = useState<TractorIndicatorsPayload | null>(null)
   const [adminDiagnostics, setAdminDiagnostics] = useState<AdminDiagnostics | null>(null)
   const [integrationCredentials, setIntegrationCredentials] = useState<IntegrationCredentialItem[]>([])
   const [userSessions, setUserSessions] = useState<UserSessionsPayload>({ active: [], history: [] })
@@ -736,7 +894,9 @@ function App() {
   const [selectedToolsSection, setSelectedToolsSection] =
     useState<string>('Accueil')
   const [selectedWorkspaceSection, setSelectedWorkspaceSection] = useState('Accueil')
+  const [selectedDashboardProfileCode, setSelectedDashboardProfileCode] = useState<string | null>(null)
   const [expandedSidebarMenu, setExpandedSidebarMenu] = useState<string | null>(null)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null)
   const [credentialsError, setCredentialsError] = useState<string | null>(null)
@@ -748,6 +908,8 @@ function App() {
   const [runningScheduledTaskCode, setRunningScheduledTaskCode] = useState<string | null>(null)
   const [contraventionsError, setContraventionsError] = useState<string | null>(null)
   const [loadingPointsError, setLoadingPointsError] = useState<string | null>(null)
+  const [driverIndicatorsError, setDriverIndicatorsError] = useState<string | null>(null)
+  const [tractorIndicatorsError, setTractorIndicatorsError] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -796,11 +958,11 @@ function App() {
 
   const visibleModules = useMemo(() => {
     if (isInformatique && modules.length > 0) {
-      return modules.filter((module) => canAccessModule(rightsByModuleCode.get(module.code)))
+      return modules.filter((module) => !isDashboardModuleCode(module.code) && canAccessModule(rightsByModuleCode.get(module.code)))
     }
 
     return (currentUser?.rights ?? [])
-      .filter((right) => canAccessModule(right.accessLevel))
+      .filter((right) => !isDashboardModuleCode(right.moduleCode) && canAccessModule(right.accessLevel))
       .map((right, index) => ({
         id: `${right.moduleCode}-${index}`,
         code: right.moduleCode,
@@ -816,6 +978,9 @@ function App() {
   const canWriteContraventions = contraventionsAccessLevel === 'Write'
   const loadingPointsAccessLevel = rightsByModuleCode.get(loadingPointsModuleCode) ?? 'None'
   const canWriteLoadingPoints = loadingPointsAccessLevel === 'Write'
+  const commonDataAccessLevel = rightsByModuleCode.get(commonDataModuleCode) ?? 'None'
+  const canReadCommonData = canAccessModule(commonDataAccessLevel)
+  const canWriteCommonData = commonDataAccessLevel === 'Write'
 
   const modulesByGroup = useMemo(() => {
     return visibleModules.reduce<Record<string, SecurityModuleItem[]>>((groups, module) => {
@@ -828,9 +993,9 @@ function App() {
   const visibleNavigationEntries = useMemo(
     () =>
       navigationEntries.filter(
-        (entry) => entry === 'Accueil' || (isInformatique && entry === commonDataNavigationLabel) || (modulesByGroup[entry] ?? []).length > 0,
+        (entry) => entry === 'Accueil' || (canReadCommonData && entry === commonDataNavigationLabel) || (modulesByGroup[entry] ?? []).length > 0,
       ),
-    [isInformatique, modulesByGroup],
+    [canReadCommonData, modulesByGroup],
   )
 
   const visibleIntegrationCredentials = useMemo(
@@ -881,6 +1046,7 @@ function App() {
     selectedNavigation === commonDataNavigationLabel
       ? commonDataNavigationEntries
       : settingsNavigationEntries
+  const canEditReferenceData = selectedNavigation === commonDataNavigationLabel ? canWriteCommonData : isInformatique
 
   const currentWorkspaceModules = selectedNavigation === 'Exploitation' || selectedNavigation === 'Gestion administrative'
     ? modulesByGroup[selectedNavigation] ?? []
@@ -898,11 +1064,11 @@ function App() {
 
     return {
       Administration: isInformatique ? administrationSubmenuEntries.filter((entry) => entry !== 'Accueil') : [],
-      [commonDataNavigationLabel]: isInformatique ? commonDataNavigationEntries.filter((entry) => entry !== 'Accueil') : [],
+      [commonDataNavigationLabel]: canReadCommonData ? commonDataNavigationEntries.filter((entry) => entry !== 'Accueil') : [],
       Exploitation: exploitationEntries,
       'Gestion administrative': administrativeEntries,
     } as Record<string, string[]>
-  }, [isInformatique, modulesByGroup])
+  }, [canReadCommonData, isInformatique, modulesByGroup])
 
   const scheduledTasks = useMemo(
     () => [
@@ -973,6 +1139,182 @@ function App() {
         isRunnable: false,
         lastRun: null,
       }))
+
+  const dashboardProfileOptions = useMemo(() => {
+    const allowedProfileCodes = dashboardProfileCodes.filter((profileCode) =>
+      canAccessModule(rightsByModuleCode.get(dashboardModuleByProfileCode[profileCode])),
+    )
+
+    const options = allowedProfileCodes
+      .map((code) => profiles.find((profile) => profile.code === code && profile.isActive))
+      .filter((profile): profile is SecurityProfileItem => Boolean(profile))
+
+    if (options.length > 0) {
+      return options
+    }
+
+    if (allowedProfileCodes.length > 0) {
+      return allowedProfileCodes.map((code) => ({
+        id: dashboardModuleByProfileCode[code],
+        code,
+        label: dashboardProfileLabels[code],
+        isSystemProfile: true,
+        isActive: true,
+        moduleRights: currentUser?.rights.map((right) => ({
+          securityModuleId: right.moduleCode,
+          moduleCode: right.moduleCode,
+          moduleLabel: right.moduleLabel,
+          navigationGroup: right.navigationGroup,
+          accessLevel: right.accessLevel,
+        })) ?? [],
+      }))
+    }
+
+    return currentUser?.profile
+      ? [{
+          id: currentUser.profile.id,
+          code: currentUser.profile.code,
+          label: currentUser.profile.label,
+          isSystemProfile: true,
+          isActive: true,
+          moduleRights: currentUser.rights.map((right) => ({
+            securityModuleId: right.moduleCode,
+            moduleCode: right.moduleCode,
+            moduleLabel: right.moduleLabel,
+            navigationGroup: right.navigationGroup,
+            accessLevel: right.accessLevel,
+          })),
+        }]
+      : []
+  }, [currentUser, profiles, rightsByModuleCode])
+
+  const activeDashboardProfileCode = selectedDashboardProfileCode ?? dashboardProfileOptions[0]?.code ?? currentUser?.profile?.code ?? 'SANS_PROFIL'
+  const activeDashboardProfileIndex = Math.max(
+    0,
+    dashboardProfileOptions.findIndex((profile) => profile.code === activeDashboardProfileCode),
+  )
+
+  useEffect(() => {
+    if (dashboardProfileOptions.length === 0) {
+      return
+    }
+
+    if (!selectedDashboardProfileCode || !dashboardProfileOptions.some((profile) => profile.code === selectedDashboardProfileCode)) {
+      const ownDashboard = dashboardProfileOptions.find((profile) => profile.code === currentUser?.profile?.code)
+      setSelectedDashboardProfileCode(ownDashboard?.code ?? dashboardProfileOptions[0].code)
+    }
+  }, [currentUser?.profile?.code, dashboardProfileOptions, selectedDashboardProfileCode])
+
+  const dashboardVisibleModules = useMemo(() => {
+    if (dashboardProfileOptions.length === 0 || profiles.length === 0) {
+      return visibleModules
+    }
+
+    const selectedProfile = dashboardProfileOptions.find((profile) => profile.code === activeDashboardProfileCode)
+    if (!selectedProfile) {
+      return visibleModules
+    }
+
+    return selectedProfile.moduleRights
+      .filter((right) => !isDashboardModuleCode(right.moduleCode) && canAccessModule(right.accessLevel))
+      .map((right, index) => {
+        const registeredModule = modules.find((module) => module.code === right.moduleCode)
+        return registeredModule ?? {
+          id: `${right.moduleCode}-${index}`,
+          code: right.moduleCode,
+          label: right.moduleLabel,
+          navigationGroup: right.navigationGroup,
+          displayOrder: index,
+          isActive: true,
+        }
+      })
+      .sort(compareModules)
+  }, [activeDashboardProfileCode, dashboardProfileOptions, modules, profiles.length, visibleModules])
+
+  const dashboardCubeItems = useMemo(
+    () =>
+      dashboardProfileOptions.map((profile) => {
+        const profileVisibleModules = profiles.length === 0
+          ? visibleModules
+          : profile.moduleRights
+              .filter((right) => !isDashboardModuleCode(right.moduleCode) && canAccessModule(right.accessLevel))
+              .map((right, index) => {
+                const registeredModule = modules.find((module) => module.code === right.moduleCode)
+                return registeredModule ?? {
+                  id: `${right.moduleCode}-${index}`,
+                  code: right.moduleCode,
+                  label: right.moduleLabel,
+                  navigationGroup: right.navigationGroup,
+                  displayOrder: index,
+                  isActive: true,
+                }
+              })
+              .sort(compareModules)
+
+        return {
+          profile,
+          dashboard: buildProfileDashboard({
+            profileCode: profile.code,
+            visibleModules: profileVisibleModules,
+            accounts,
+            profiles,
+            employees,
+            materials,
+            thirdParties,
+            loadingPoints,
+            contraventions,
+            driverIndicators,
+            tractorIndicators,
+          }),
+        }
+      }),
+    [
+      accounts,
+      contraventions,
+      dashboardProfileOptions,
+      driverIndicators,
+      employees,
+      loadingPoints,
+      materials,
+      modules,
+      profiles,
+      thirdParties,
+      tractorIndicators,
+      visibleModules,
+    ],
+  )
+
+  const profileDashboard = useMemo(
+    () =>
+      dashboardCubeItems.find((item) => item.profile.code === activeDashboardProfileCode)?.dashboard ??
+      buildProfileDashboard({
+        profileCode: activeDashboardProfileCode,
+        visibleModules: dashboardVisibleModules,
+        accounts,
+        profiles,
+        employees,
+        materials,
+        thirdParties,
+        loadingPoints,
+        contraventions,
+        driverIndicators,
+        tractorIndicators,
+      }),
+    [
+      accounts,
+      activeDashboardProfileCode,
+      contraventions,
+      dashboardCubeItems,
+      dashboardVisibleModules,
+      driverIndicators,
+      employees,
+      loadingPoints,
+      materials,
+      profiles,
+      thirdParties,
+      tractorIndicators,
+    ],
+  )
 
   const controlledSqlQueries = useMemo(
     () => [
@@ -1194,8 +1536,9 @@ function App() {
       }
 
       const user = (await meResponse.json()) as AuthenticatedUser
+      const shouldShowPostAuthLoader = sessionStorage.getItem(postAuthLoaderStorageKey) === 'pending'
+      setShowPostAuthLoader(shouldShowPostAuthLoader)
       await hydrateAuthenticatedState(user)
-      setShowPostAuthLoader(sessionStorage.getItem(postAuthLoaderStorageKey) === 'pending')
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Erreur de chargement.')
     } finally {
@@ -1205,11 +1548,21 @@ function App() {
 
   async function hydrateAuthenticatedState(user: AuthenticatedUser) {
     setCurrentUser(user)
+    setIsSidebarCollapsed(user.isSidebarCollapsed)
     const hasContraventionsAccess = user.rights.some(
       (right) => right.moduleCode === contraventionsModuleCode && canAccessModule(right.accessLevel),
     )
     const hasLoadingPointsAccess = user.rights.some(
       (right) => right.moduleCode === loadingPointsModuleCode && canAccessModule(right.accessLevel),
+    )
+    const hasDriverIndicatorsAccess = user.rights.some(
+      (right) => right.moduleCode === driverIndicatorsModuleCode && canAccessModule(right.accessLevel),
+    )
+    const hasTractorIndicatorsAccess = user.rights.some(
+      (right) => right.moduleCode === tractorIndicatorsModuleCode && canAccessModule(right.accessLevel),
+    )
+    const hasCommonDataAccess = user.rights.some(
+      (right) => right.moduleCode === commonDataModuleCode && canAccessModule(right.accessLevel),
     )
 
     if (user.profile?.code === 'INFORMATIQUE') {
@@ -1217,6 +1570,8 @@ function App() {
         loadAdminSecurityData(),
         hasContraventionsAccess ? loadContraventionsData() : Promise.resolve(),
         hasLoadingPointsAccess ? loadLoadingPointsData() : Promise.resolve(),
+        hasDriverIndicatorsAccess ? loadDriverIndicatorsData() : Promise.resolve(),
+        hasTractorIndicatorsAccess ? loadTractorIndicatorsData() : Promise.resolve(),
       ])
       return
     }
@@ -1224,12 +1579,16 @@ function App() {
     setModules([])
     setProfiles([])
     setAccounts([])
-    setCompanies([])
-    setAnalytics([])
-    setExploitations([])
-    setEmployees([])
-    setThirdParties([])
-    setMaterials([])
+    if (hasCommonDataAccess) {
+      await loadSettingsData()
+    } else {
+      setCompanies([])
+      setAnalytics([])
+      setExploitations([])
+      setEmployees([])
+      setThirdParties([])
+      setMaterials([])
+    }
     if (hasContraventionsAccess) {
       await loadContraventionsData()
     } else {
@@ -1241,6 +1600,18 @@ function App() {
     } else {
       setLoadingPoints([])
       setLoadingPointsError(null)
+    }
+    if (hasDriverIndicatorsAccess) {
+      await loadDriverIndicatorsData()
+    } else {
+      setDriverIndicators(null)
+      setDriverIndicatorsError(null)
+    }
+    if (hasTractorIndicatorsAccess) {
+      await loadTractorIndicatorsData()
+    } else {
+      setTractorIndicators(null)
+      setTractorIndicatorsError(null)
     }
     setAdminDiagnostics(null)
     setIntegrationCredentials([])
@@ -1257,43 +1628,61 @@ function App() {
   }
 
   async function loadAdminSecurityData() {
-    const [modulesResponse, profilesResponse, accountsResponse, settingsResponse] = await Promise.all([
+    const [modulesResponse, profilesResponse, accountsResponse] = await Promise.all([
       fetch(apiPath('api/security/modules')),
       fetch(apiPath('api/security/profiles')),
       fetch(apiPath('api/security/accounts')),
-      fetch(apiPath('api/settings/bootstrap')),
     ])
 
-    const failedAdminResponse = [modulesResponse, profilesResponse, accountsResponse, settingsResponse].find(
+    const failedAdminResponse = [modulesResponse, profilesResponse, accountsResponse].find(
       (response) => !response.ok,
     )
     if (failedAdminResponse) {
       throw new Error(await getRequestError(failedAdminResponse, 'Impossible de charger l’administration de sécurité.'))
     }
 
-    const [modulesPayload, profilesPayload, accountsPayload, settingsPayload] = await Promise.all([
+    const [modulesPayload, profilesPayload, accountsPayload] = await Promise.all([
       modulesResponse.json() as Promise<SecurityModuleItem[]>,
       profilesResponse.json() as Promise<SecurityProfileItem[]>,
       accountsResponse.json() as Promise<AccountItem[]>,
-      settingsResponse.json() as Promise<{
-        companies: CompanyItem[]
-        analytics: AnalyticItem[]
-        exploitations: ExploitationItem[]
-        employees: EmployeeItem[]
-        thirdParties: ThirdPartyItem[]
-        materials: MaterialItem[]
-      }>,
     ])
 
     setModules(modulesPayload)
     setProfiles(profilesPayload)
     setAccounts(accountsPayload)
+    await loadSettingsData()
+  }
+
+  async function loadSettingsData() {
+    const settingsResponse = await fetch(apiPath('api/settings/bootstrap'))
+    if (!settingsResponse.ok) {
+      throw new Error(await getRequestError(settingsResponse, 'Impossible de charger les donnÃ©es communes.'))
+    }
+
+    const settingsPayload = (await settingsResponse.json()) as {
+      companies: CompanyItem[]
+      analytics: AnalyticItem[]
+      exploitations: ExploitationItem[]
+      employees: EmployeeItem[]
+      thirdParties: ThirdPartyItem[]
+      materials: MaterialItem[]
+    }
+
     setCompanies(settingsPayload.companies)
     setAnalytics(settingsPayload.analytics)
     setExploitations(settingsPayload.exploitations)
     setEmployees(settingsPayload.employees)
     setThirdParties(settingsPayload.thirdParties)
     setMaterials(settingsPayload.materials)
+  }
+
+  async function reloadReferenceData() {
+    if (isInformatique) {
+      await loadAdminSecurityData()
+      return
+    }
+
+    await loadSettingsData()
   }
 
   async function loadContraventionsData() {
@@ -1356,6 +1745,40 @@ function App() {
     } catch (pointsLoadError) {
       setLoadingPointsError(
         pointsLoadError instanceof Error ? pointsLoadError.message : 'Erreur de chargement des points.',
+      )
+    }
+  }
+
+  async function loadDriverIndicatorsData() {
+    setDriverIndicatorsError(null)
+
+    try {
+      const response = await fetch(apiPath('api/modules/driver-indicators'))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de charger les indicateurs conducteurs.'))
+      }
+
+      setDriverIndicators((await response.json()) as DriverIndicatorsPayload)
+    } catch (indicatorsLoadError) {
+      setDriverIndicatorsError(
+        indicatorsLoadError instanceof Error ? indicatorsLoadError.message : 'Indicateurs conducteurs indisponibles.',
+      )
+    }
+  }
+
+  async function loadTractorIndicatorsData() {
+    setTractorIndicatorsError(null)
+
+    try {
+      const response = await fetch(apiPath('api/modules/tractor-indicators'))
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de charger les indicateurs tracteurs.'))
+      }
+
+      setTractorIndicators((await response.json()) as TractorIndicatorsPayload)
+    } catch (indicatorsLoadError) {
+      setTractorIndicatorsError(
+        indicatorsLoadError instanceof Error ? indicatorsLoadError.message : 'Indicateurs tracteurs indisponibles.',
       )
     }
   }
@@ -1561,9 +1984,9 @@ function App() {
       }
 
       const user = (await response.json()) as AuthenticatedUser
-      await hydrateAuthenticatedState(user)
       sessionStorage.setItem(postAuthLoaderStorageKey, 'pending')
       setShowPostAuthLoader(true)
+      await hydrateAuthenticatedState(user)
     } catch (submitError) {
       setLoginError(submitError instanceof Error ? submitError.message : 'Erreur de connexion.')
     } finally {
@@ -1576,6 +1999,36 @@ function App() {
     sessionStorage.removeItem(postAuthLoaderStorageKey)
     setShowPostAuthLoader(false)
     resetSessionState()
+  }
+
+  async function handleSidebarCollapsedChange() {
+    if (!currentUser) {
+      return
+    }
+
+    const nextValue = !isSidebarCollapsed
+    setIsSidebarCollapsed(nextValue)
+    setCurrentUser((user) => (user ? { ...user, isSidebarCollapsed: nextValue } : user))
+
+    try {
+      const response = await fetch(apiPath('api/auth/preferences'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isSidebarCollapsed: nextValue }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'La préférence du menu n’a pas été enregistrée.'))
+      }
+
+      const user = (await response.json()) as AuthenticatedUser
+      setCurrentUser(user)
+      setIsSidebarCollapsed(user.isSidebarCollapsed)
+    } catch (preferenceError) {
+      setIsSidebarCollapsed(!nextValue)
+      setCurrentUser((user) => (user ? { ...user, isSidebarCollapsed: !nextValue } : user))
+      setError(preferenceError instanceof Error ? preferenceError.message : 'La préférence du menu n’a pas été enregistrée.')
+    }
   }
 
   function activateMainNavigation(entry: string) {
@@ -1618,6 +2071,24 @@ function App() {
 
     if (parentEntry === 'Exploitation' || parentEntry === 'Gestion administrative') {
       setSelectedWorkspaceSection(submenuEntry)
+    }
+  }
+
+  function activateDashboardAction(action: {
+    navigation: string
+    administrationSection?: string
+    settingsSection?: string
+    workspaceSection?: string
+  }) {
+    activateMainNavigation(action.navigation)
+    if (action.administrationSection) {
+      setSelectedAdministrationSection(action.administrationSection as (typeof administrationSubmenuEntries)[number])
+    }
+    if (action.settingsSection) {
+      setSelectedSettingsSection(action.settingsSection)
+    }
+    if (action.workspaceSection) {
+      setSelectedWorkspaceSection(action.workspaceSection)
     }
   }
 
@@ -1753,6 +2224,10 @@ function App() {
     setEmployees([])
     setThirdParties([])
     setMaterials([])
+    setContraventions([])
+    setLoadingPoints([])
+    setDriverIndicators(null)
+    setTractorIndicators(null)
     setIntegrationCredentials([])
     setUserSessions({ active: [], history: [] })
     setEditableAccounts({})
@@ -1785,6 +2260,11 @@ function App() {
     setTracesError(null)
     setScheduledTasksError(null)
     setRunningScheduledTaskCode(null)
+    setContraventionsError(null)
+    setLoadingPointsError(null)
+    setDriverIndicatorsError(null)
+    setTractorIndicatorsError(null)
+    setIsSidebarCollapsed(false)
   }
 
   function handleCredentialSelectionChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -2393,7 +2873,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La création de la société a échoué.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       closeCompanyModal()
     } catch (createError) {
       setCompanyForm((current) => ({
@@ -2423,7 +2903,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La mise a jour de la societe a echoue.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       closeCompanyModal()
     } catch (saveError) {
       setCompanyForm((current) => ({
@@ -2518,7 +2998,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La création de l’analytique a échoué.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       setNewAnalytic(createEmptySettingsReferenceForm(newAnalytic.companyId))
     } catch (createError) {
       setNewAnalytic((current) => ({
@@ -2551,7 +3031,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La mise à jour de l’analytique a échoué.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
     } catch (saveError) {
       setEditableAnalytics((current) => ({
         ...current,
@@ -2624,7 +3104,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La création de l’exploitation a échoué.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       setNewExploitation(createEmptySettingsReferenceForm(newExploitation.companyId))
     } catch (createError) {
       setNewExploitation((current) => ({
@@ -2657,7 +3137,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La mise à jour de l’exploitation a échoué.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
     } catch (saveError) {
       setEditableExploitations((current) => ({
         ...current,
@@ -2671,12 +3151,20 @@ function App() {
   }
 
   function openCreateEmployeeModal() {
+    if (!canEditReferenceData) {
+      return
+    }
+
     setEditingEmployee(null)
     setEmployeeForm(createEmptyEmployeeForm())
     setIsCreateEmployeeModalOpen(true)
   }
 
   function openEditEmployeeModal(employee: EmployeeItem) {
+    if (!canEditReferenceData) {
+      return
+    }
+
     setEditingEmployee(employee)
     setEmployeeForm(buildEmployeeFormFromItem(employee))
   }
@@ -2714,7 +3202,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La creation du salarie a echoue.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       closeEmployeeModal()
     } catch (createError) {
       setEmployeeForm((current) => ({
@@ -2744,7 +3232,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La mise a jour du salarie a echoue.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       closeEmployeeModal()
     } catch (saveError) {
       setEmployeeForm((current) => ({
@@ -2756,6 +3244,10 @@ function App() {
   }
 
   async function handleProvisionEmployeeAccounts() {
+    if (!canEditReferenceData) {
+      return
+    }
+
     setEmployeeProvisioning({ isProvisioning: true, result: null, error: null })
 
     try {
@@ -2768,7 +3260,7 @@ function App() {
       }
 
       const result = (await response.json()) as EmployeeAccountProvisioningResult
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       setEmployeeProvisioning({ isProvisioning: false, result, error: null })
     } catch (provisionError) {
       setEmployeeProvisioning({
@@ -2780,6 +3272,10 @@ function App() {
   }
 
   async function handleImportLuccaEmployees() {
+    if (!canEditReferenceData) {
+      return
+    }
+
     setLuccaEmployeeImport({ isImporting: true, result: null, error: null })
 
     try {
@@ -2792,7 +3288,7 @@ function App() {
       }
 
       const result = (await response.json()) as LuccaEmployeeImportResult
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       setLuccaEmployeeImport({ isImporting: false, result, error: null })
     } catch (importError) {
       setLuccaEmployeeImport({
@@ -2838,7 +3334,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La creation du tiers a echoue.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       closeThirdPartyModal()
     } catch (createError) {
       setNewThirdParty((current) => ({
@@ -2868,7 +3364,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La mise a jour du tiers a echoue.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       closeThirdPartyModal()
     } catch (saveError) {
       setNewThirdParty((current) => ({
@@ -2880,12 +3376,20 @@ function App() {
   }
 
   function openCreateThirdPartyModal() {
+    if (!canEditReferenceData) {
+      return
+    }
+
     setEditingThirdParty(null)
     setNewThirdParty(createEmptyThirdPartyForm())
     setIsThirdPartyModalOpen(true)
   }
 
   function openEditThirdPartyModal(thirdParty: ThirdPartyItem) {
+    if (!canEditReferenceData) {
+      return
+    }
+
     setEditingThirdParty(thirdParty)
     setNewThirdParty(buildThirdPartyFormFromItem(thirdParty))
     setIsThirdPartyModalOpen(true)
@@ -2935,7 +3439,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La creation du materiel a echoue.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       closeMaterialModal()
     } catch (createError) {
       setNewMaterial((current) => ({
@@ -2969,7 +3473,7 @@ function App() {
         throw new Error(await getRequestError(response, 'La mise a jour du materiel a echoue.'))
       }
 
-      await loadAdminSecurityData()
+      await reloadReferenceData()
       closeMaterialModal()
     } catch (saveError) {
       setNewMaterial((current) => ({
@@ -2981,12 +3485,20 @@ function App() {
   }
 
   function openCreateMaterialModal() {
+    if (!canEditReferenceData) {
+      return
+    }
+
     setEditingMaterial(null)
     setNewMaterial(createEmptyMaterialForm())
     setIsMaterialModalOpen(true)
   }
 
   function openEditMaterialModal(material: MaterialItem) {
+    if (!canEditReferenceData) {
+      return
+    }
+
     setEditingMaterial(material)
     setNewMaterial(buildMaterialFormFromItem(material))
     setIsMaterialModalOpen(true)
@@ -3399,7 +3911,7 @@ function App() {
   }
 
   return (
-    <div className="nexus-app-shell">
+    <div className={`nexus-app-shell ${isSidebarCollapsed ? 'nexus-app-shell-sidebar-collapsed' : ''}`}>
       <aside className="nexus-sidebar">
         <div className="brand-panel">
           <img className="brand-icon" src={nexusIcon} alt="NewNexus" />
@@ -3407,6 +3919,15 @@ function App() {
           <time className="brand-copy brand-clock" dateTime={currentDateTime.toISOString()}>
             {currentDateTime.toLocaleDateString()} - {currentDateTime.toLocaleTimeString()}
           </time>
+          <button
+            aria-label={isSidebarCollapsed ? 'Déplier le menu de navigation' : 'Replier le menu de navigation'}
+            className="sidebar-collapse-button"
+            onClick={() => void handleSidebarCollapsedChange()}
+            title={isSidebarCollapsed ? 'Déplier le menu' : 'Replier le menu'}
+            type="button"
+          >
+            <span aria-hidden="true">{isSidebarCollapsed ? '\u203a' : '\u2039'}</span>
+          </button>
         </div>
 
         <nav className="sidebar-nav" aria-label="Navigation principale">
@@ -3423,7 +3944,8 @@ function App() {
                   onClick={() => activateMainNavigation(entry)}
                   type="button"
                 >
-                  <span>{entry}</span>
+                  <span className="sidebar-link-initial" aria-hidden="true">{getNavigationInitial(entry)}</span>
+                  <span className="sidebar-link-label">{entry}</span>
                   {submenuEntries.length > 0 ? <span className="sidebar-link-chevron" aria-hidden="true">{isExpanded ? '\u2303' : '\u2304'}</span> : null}
                 </button>
                 {submenuEntries.length > 0 ? (
@@ -3461,23 +3983,25 @@ function App() {
         </div>
       </aside>
 
-      <main className="nexus-main">
-        <section className="hero-card">
-          <div className="hero-copy">
-            <span className="eyebrow">{selectedNavigation}</span>
-            <h1>{getWorkspaceTitle(selectedNavigation)}</h1>
-            <p>{getWorkspaceDescription(selectedNavigation, isInformatique)}</p>
-            <div className={`hero-actions ${selectedNavigation !== 'Administration' ? 'hero-actions-placeholder' : ''}`}>
-              {selectedNavigation === 'Administration' ? (
-                <span className="primary-chip">Version {systemInfo?.version ?? '0.1.0'}</span>
-              ) : (
-                <span className="primary-chip" aria-hidden="true">
-                  Version
-                </span>
-              )}
+      <main className={`nexus-main ${selectedNavigation === 'Accueil' ? 'nexus-main-home' : ''}`}>
+        {selectedNavigation !== 'Accueil' ? (
+          <section className="hero-card">
+            <div className="hero-copy">
+              <span className="eyebrow">{selectedNavigation}</span>
+              <h1>{getWorkspaceTitle(selectedNavigation)}</h1>
+              <p>{getWorkspaceDescription(selectedNavigation, isInformatique)}</p>
+              <div className={`hero-actions ${selectedNavigation !== 'Administration' ? 'hero-actions-placeholder' : ''}`}>
+                {selectedNavigation === 'Administration' ? (
+                  <span className="primary-chip">Version {systemInfo?.version ?? '0.1.0'}</span>
+                ) : (
+                  <span className="primary-chip" aria-hidden="true">
+                    Version
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         {selectedNavigation === 'Administration' && isInformatique ? (
           <section className="admin-subnav" aria-label="Sous-menu administration">
@@ -3509,7 +4033,7 @@ function App() {
           </section>
         ) : null}
 
-        {!error && visibleModules.length === 0 ? (
+        {!error && visibleModules.length === 0 && dashboardProfileOptions.length === 0 ? (
           <section className="status-banner status-banner-warning">
             <strong>Aucun accès métier disponible.</strong>
             <span>Ce compte existe, mais aucun droit lecture/écriture n’est encore attribué.</span>
@@ -3553,74 +4077,105 @@ function App() {
 
         {selectedNavigation === 'Accueil' ? (
           <section className="dashboard-stack">
-            <section className="metrics-grid">
-              <article className="metric-card metric-card-navy">
-                <span className="metric-label">Modules visibles</span>
-                <strong>{visibleModules.length}</strong>
-              </article>
-              <article className="metric-card metric-card-champagne">
-                <span className="metric-label">Profils actifs</span>
-                <strong>{profiles.filter((profile) => profile.isActive).length}</strong>
-              </article>
-              <article className="metric-card metric-card-gold">
-                <span className="metric-label">Comptes actifs</span>
-                <strong>{accounts.filter((account) => account.isActive).length}</strong>
-              </article>
-              <article className="metric-card metric-card-cyan">
-                <span className="metric-label">Rôle courant</span>
-                <strong>{currentUser.profile?.label ?? 'Sans profil'}</strong>
-              </article>
-            </section>
-
-            <section className="workspace-grid">
-              <article className="panel-card">
-                <div className="panel-heading">
-                  <span className="eyebrow">Accès rapides</span>
-                  <h2>Espaces disponibles</h2>
-                </div>
-                <div className="dashboard-actions">
-                  {visibleNavigationEntries
-                    .filter((entry) => entry !== 'Accueil')
-                    .map((entry) => (
-                      <button
-                        key={entry}
-                        className="dashboard-action-card"
-                        onClick={() => activateMainNavigation(entry)}
-                        type="button"
+            {dashboardCubeItems.length > 1 ? (
+              <section className="profile-dashboard-cube-layout" aria-label="Tableaux de bord profils">
+                <button
+                  aria-label="Tableau de bord precedent"
+                  className="profile-dashboard-side-arrow profile-dashboard-side-arrow-left"
+                  onClick={() => {
+                    const previousIndex = (activeDashboardProfileIndex - 1 + dashboardCubeItems.length) % dashboardCubeItems.length
+                    setSelectedDashboardProfileCode(dashboardCubeItems[previousIndex].profile.code)
+                  }}
+                  type="button"
+                >
+                  <span aria-hidden="true">‹</span>
+                </button>
+                <div className="profile-dashboard-cube-stage">
+                  <div
+                    className="profile-dashboard-cube"
+                    style={{ transform: `translateZ(calc(-1 * var(--dashboard-cube-depth))) rotateY(${-activeDashboardProfileIndex * 90}deg)` }}
+                  >
+                    {dashboardCubeItems.map((item, index) => (
+                      <article
+                        className={`profile-dashboard-panel profile-dashboard-cube-face ${item.dashboard.accentClass}`}
+                        key={`cube-${item.profile.code}`}
+                        style={{ transform: `rotateY(${index * 90}deg) translateZ(var(--dashboard-cube-depth))` }}
                       >
-                        <span className="eyebrow">{entry}</span>
-                        <strong>{getWorkspaceTitle(entry)}</strong>
-                        <p>{getWorkspaceDescription(entry, isInformatique)}</p>
-                      </button>
+                        <div className="panel-heading">
+                          <span className="eyebrow">{item.dashboard.eyebrow}</span>
+                          <h2>{item.dashboard.title}</h2>
+                        </div>
+                        <p>{item.dashboard.description}</p>
+                        <section className="metrics-grid">
+                          {item.dashboard.metrics.map((metric) => (
+                            <article className={`metric-card ${metric.className}`} key={`${item.profile.code}-${metric.label}`}>
+                              <span className="metric-label">{metric.label}</span>
+                              <strong>{metric.value}</strong>
+                            </article>
+                          ))}
+                        </section>
+                        <div className="dashboard-actions profile-dashboard-actions">
+                          {item.dashboard.actions.map((action) => (
+                            <button
+                              key={action.label}
+                              className="dashboard-action-card"
+                              onClick={() => activateDashboardAction(action)}
+                              type="button"
+                            >
+                              <span className="eyebrow">{action.navigation}</span>
+                              <strong>{action.label}</strong>
+                              <p>{action.detail}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </article>
                     ))}
+                  </div>
                 </div>
-              </article>
-
-              <article className="panel-card">
+                <button
+                  aria-label="Tableau de bord suivant"
+                  className="profile-dashboard-side-arrow profile-dashboard-side-arrow-right"
+                  onClick={() => {
+                    const nextIndex = (activeDashboardProfileIndex + 1) % dashboardCubeItems.length
+                    setSelectedDashboardProfileCode(dashboardCubeItems[nextIndex].profile.code)
+                  }}
+                  type="button"
+                >
+                  <span aria-hidden="true">›</span>
+                </button>
+              </section>
+            ) : (
+              <article className={`profile-dashboard-panel ${profileDashboard.accentClass}`}>
                 <div className="panel-heading">
-                  <span className="eyebrow">Synthèse</span>
-                  <h2>Lecture de votre session</h2>
+                  <span className="eyebrow">{profileDashboard.eyebrow}</span>
+                  <h2>{profileDashboard.title}</h2>
                 </div>
-                <ul className="rights-list">
-                  <li>
-                    <span>Utilisateur connecté</span>
-                    <strong>{currentUser.displayName}</strong>
-                  </li>
-                  <li>
-                    <span>Profil actif</span>
-                    <strong>{currentUser.profile?.label ?? 'Sans profil'}</strong>
-                  </li>
-                  <li>
-                    <span>Droits en lecture</span>
-                    <strong>{currentUser.rights.filter((right) => right.accessLevel === 'Read').length}</strong>
-                  </li>
-                  <li>
-                    <span>Droits en écriture</span>
-                    <strong>{currentUser.rights.filter((right) => right.accessLevel === 'Write').length}</strong>
-                  </li>
-                </ul>
+                <p>{profileDashboard.description}</p>
+                <section className="metrics-grid">
+                  {profileDashboard.metrics.map((metric) => (
+                    <article className={`metric-card ${metric.className}`} key={`${activeDashboardProfileCode}-${metric.label}`}>
+                      <span className="metric-label">{metric.label}</span>
+                      <strong>{metric.value}</strong>
+                    </article>
+                  ))}
+                </section>
+                <div className="dashboard-actions profile-dashboard-actions">
+                  {profileDashboard.actions.map((action) => (
+                    <button
+                      key={action.label}
+                      className="dashboard-action-card"
+                      onClick={() => activateDashboardAction(action)}
+                      type="button"
+                    >
+                      <span className="eyebrow">{action.navigation}</span>
+                      <strong>{action.label}</strong>
+                      <p>{action.detail}</p>
+                    </button>
+                  ))}
+                </div>
               </article>
-            </section>
+            )}
+
           </section>
         ) : null}
 
@@ -3751,6 +4306,108 @@ function App() {
                               ))
                             )}
                           </div>
+                        </div>
+                      </article>
+                    )
+                  }
+
+                  if (module.code === driverIndicatorsModuleCode) {
+                    const summary = driverIndicators?.summary
+                    const rows = driverIndicators?.drivers ?? []
+
+                    return (
+                      <article className="functional-module-card indicators-module-card" key={`workspace-${module.code}`}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{module.code}</span>
+                            <h3>{module.label}</h3>
+                          </div>
+                          <span className="profile-status-badge is-active">A tester</span>
+                        </header>
+                        <p>{blueprint.intent}</p>
+                        {driverIndicatorsError ? <p className="form-error">{driverIndicatorsError}</p> : null}
+                        <div className="contraventions-kpis indicators-kpis" aria-label="Synthese conducteurs">
+                          <span><strong>{summary?.totalDrivers ?? 0}</strong> conducteurs</span>
+                          <span><strong>{summary?.driversWithAccounts ?? 0}</strong> comptes</span>
+                          <span><strong>{summary?.driversWithOpenContraventions ?? 0}</strong> avec avis ouverts</span>
+                          <span><strong>{summary?.incompleteContactData ?? 0}</strong> fiches a completer</span>
+                        </div>
+                        <div className="indicator-table">
+                          {rows.length === 0 ? (
+                            <div className="workspace-empty">
+                              <strong>Aucun conducteur qualifie</strong>
+                              <span>Marquez les salaries conducteurs dans Donnees Communes pour alimenter ces indicateurs.</span>
+                            </div>
+                          ) : rows.map((driver) => (
+                            <article className="indicator-row" key={driver.id}>
+                              <div>
+                                <strong>{driver.displayName}</strong>
+                                <span>{driver.employeeNumber}</span>
+                              </div>
+                              <div>
+                                <span>{driver.accountLogin ?? 'Compte non cree'}</span>
+                                <span>{driver.accountProfile ?? 'Sans profil'}</span>
+                              </div>
+                              <div>
+                                <strong>{driver.openContraventions}</strong>
+                                <span>avis ouverts</span>
+                              </div>
+                              <span className={`profile-status-badge ${driver.dataQuality === 'Complet' ? 'is-active' : 'is-inactive'}`}>
+                                {driver.dataQuality}
+                              </span>
+                            </article>
+                          ))}
+                        </div>
+                      </article>
+                    )
+                  }
+
+                  if (module.code === tractorIndicatorsModuleCode) {
+                    const summary = tractorIndicators?.summary
+                    const rows = tractorIndicators?.tractors ?? []
+
+                    return (
+                      <article className="functional-module-card indicators-module-card" key={`workspace-${module.code}`}>
+                        <header>
+                          <div>
+                            <span className="eyebrow">{module.code}</span>
+                            <h3>{module.label}</h3>
+                          </div>
+                          <span className="profile-status-badge is-active">A tester</span>
+                        </header>
+                        <p>{blueprint.intent}</p>
+                        {tractorIndicatorsError ? <p className="form-error">{tractorIndicatorsError}</p> : null}
+                        <div className="contraventions-kpis indicators-kpis" aria-label="Synthese tracteurs">
+                          <span><strong>{summary?.totalTractors ?? 0}</strong> tracteurs</span>
+                          <span><strong>{summary?.truckOnlineLinked ?? 0}</strong> TruckOnline</span>
+                          <span><strong>{summary?.yellowBoxLinked ?? 0}</strong> YellowBox</span>
+                          <span><strong>{summary?.withOpenContraventions ?? 0}</strong> avec avis ouverts</span>
+                        </div>
+                        <div className="indicator-table">
+                          {rows.length === 0 ? (
+                            <div className="workspace-empty">
+                              <strong>Aucun tracteur charge</strong>
+                              <span>Ajoutez ou importez les materiels tracteurs pour alimenter le pilotage exploitation.</span>
+                            </div>
+                          ) : rows.map((tractor) => (
+                            <article className="indicator-row" key={tractor.id}>
+                              <div>
+                                <strong>{tractor.fleetNumber}</strong>
+                                <span>{tractor.label}</span>
+                              </div>
+                              <div>
+                                <span>{tractor.registrationNumber ?? 'Immatriculation non renseignee'}</span>
+                                <span>{tractor.exploitation?.label ?? 'Exploitation non rattachee'}</span>
+                              </div>
+                              <div>
+                                <strong>{tractor.openContraventions}</strong>
+                                <span>avis ouverts</span>
+                              </div>
+                              <span className={`profile-status-badge ${tractor.dataQuality === 'Complet' ? 'is-active' : 'is-inactive'}`}>
+                                {tractor.dataQuality}
+                              </span>
+                            </article>
+                          ))}
                         </div>
                       </article>
                     )
@@ -4197,7 +4854,7 @@ function App() {
         ) : null}
 
         {((selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === administrationSettingsSection) ||
-          (selectedNavigation === commonDataNavigationLabel && isInformatique)) ? (
+          (selectedNavigation === commonDataNavigationLabel && canReadCommonData)) ? (
           <section className="workspace-grid">
             <article className="panel-card panel-card-wide settings-card">
               <div className="panel-heading">
@@ -4563,10 +5220,10 @@ function App() {
                     R&eacute;f&eacute;rentiel local pr&ecirc;t pour l&apos;import Lucca. La qualification conducteur est port&eacute;e par le champ d&eacute;di&eacute; en attendant le mapping d&eacute;finitif.
                   </p>
                   <div className="administration-synthesis-actions">
-                    <button className="secondary-button" disabled={luccaEmployeeImport.isImporting} onClick={() => void handleImportLuccaEmployees()} type="button">
+                    <button className="secondary-button" disabled={!canEditReferenceData || luccaEmployeeImport.isImporting} onClick={() => void handleImportLuccaEmployees()} type="button">
                       {luccaEmployeeImport.isImporting ? 'Import Lucca...' : 'Importer depuis Lucca'}
                     </button>
-                    <button className="primary-button" onClick={openCreateEmployeeModal} type="button">
+                    <button className="primary-button" disabled={!canEditReferenceData} onClick={openCreateEmployeeModal} type="button">
                       Ajouter un salari&eacute;
                     </button>
                   </div>
@@ -4584,7 +5241,7 @@ function App() {
                     <span>Les salaries actifs sans compte lie par matricule peuvent etre provisionnes sans profil NewNexus. Aucun droit n&apos;est affecte automatiquement.</span>
                     <button
                       className="secondary-button"
-                      disabled={employeeProvisioning.isProvisioning || employees.length === 0}
+                      disabled={!canEditReferenceData || employeeProvisioning.isProvisioning || employees.length === 0}
                       onClick={() => void handleProvisionEmployeeAccounts()}
                       type="button"
                     >
@@ -4649,7 +5306,7 @@ function App() {
                           </div>
                         </div>
                         <div className="profile-summary-actions">
-                          <button className="secondary-button" onClick={() => openEditEmployeeModal(employee)} type="button">
+                          <button className="secondary-button" disabled={!canEditReferenceData} onClick={() => openEditEmployeeModal(employee)} type="button">
                             Configurer le salari&eacute;
                           </button>
                         </div>
@@ -4670,7 +5327,7 @@ function App() {
                       <h3>Tiers</h3>
                       <small>{thirdParties.length} tiers - multi-analytiques</small>
                     </div>
-                    <button className="primary-button" onClick={openCreateThirdPartyModal} type="button">
+                    <button className="primary-button" disabled={!canEditReferenceData} onClick={openCreateThirdPartyModal} type="button">
                       Ajouter un tiers
                     </button>
                   </div>
@@ -4702,7 +5359,7 @@ function App() {
                           </div>
                         </div>
                         <div className="profile-summary-actions">
-                          <button className="secondary-button" onClick={() => openEditThirdPartyModal(thirdParty)} type="button">
+                          <button className="secondary-button" disabled={!canEditReferenceData} onClick={() => openEditThirdPartyModal(thirdParty)} type="button">
                             Configurer le tiers
                           </button>
                         </div>
@@ -4719,7 +5376,7 @@ function App() {
                       <h3>Mat&eacute;riels</h3>
                       <small>{materials.length} materiel(s) - parc</small>
                     </div>
-                    <button className="primary-button" onClick={openCreateMaterialModal} type="button">
+                    <button className="primary-button" disabled={!canEditReferenceData} onClick={openCreateMaterialModal} type="button">
                       Ajouter un mat&eacute;riel
                     </button>
                   </div>
@@ -4751,7 +5408,7 @@ function App() {
                           </div>
                         </div>
                         <div className="profile-summary-actions">
-                          <button className="secondary-button" onClick={() => openEditMaterialModal(material)} type="button">
+                          <button className="secondary-button" disabled={!canEditReferenceData} onClick={() => openEditMaterialModal(material)} type="button">
                             Configurer le mat&eacute;riel
                           </button>
                         </div>
@@ -6437,6 +7094,10 @@ function canAccessModule(accessLevel: string | undefined) {
   return accessLevel === 'Read' || accessLevel === 'Write'
 }
 
+function isDashboardModuleCode(moduleCode: string) {
+  return Object.values(dashboardModuleByProfileCode).includes(moduleCode)
+}
+
 function compareModules(left: SecurityModuleItem, right: SecurityModuleItem) {
   const leftGroupIndex = navigationEntries.indexOf(left.navigationGroup)
   const rightGroupIndex = navigationEntries.indexOf(right.navigationGroup)
@@ -6899,6 +7560,18 @@ function getWorkspaceTitle(selectedNavigation: string) {
   return 'Exploitation'
 }
 
+function getNavigationInitial(entry: string) {
+  if (entry === commonDataNavigationLabel) {
+    return 'DC'
+  }
+
+  if (entry === 'Gestion administrative') {
+    return 'GA'
+  }
+
+  return entry.slice(0, 1).toUpperCase()
+}
+
 function normalizeMojibakeText(value: string) {
   return mojibakeTextReplacements.reduce(
     (normalized, [broken, fixed]) => normalized.split(broken).join(fixed),
@@ -7100,6 +7773,116 @@ function getFunctionalModuleBlueprint(moduleCode: string): FunctionalModuleBluep
         primaryData: 'Perimetre fonctionnel a confirmer.',
         nextStep: 'Cadrer les donnees, les actions et les droits fins du module.',
       }
+  }
+}
+
+function buildProfileDashboard(context: {
+  profileCode: string
+  visibleModules: SecurityModuleItem[]
+  accounts: AccountItem[]
+  profiles: SecurityProfileItem[]
+  employees: EmployeeItem[]
+  materials: MaterialItem[]
+  thirdParties: ThirdPartyItem[]
+  loadingPoints: LoadingPointItem[]
+  contraventions: ContraventionItem[]
+  driverIndicators: DriverIndicatorsPayload | null
+  tractorIndicators: TractorIndicatorsPayload | null
+}) {
+  const baseMetrics = [
+    { label: 'Modules visibles', value: String(context.visibleModules.length), className: 'metric-card-navy' },
+    { label: 'Points actifs', value: String(context.loadingPoints.filter((point) => point.isActive).length), className: 'metric-card-champagne' },
+    { label: 'Avis ouverts', value: String(context.contraventions.filter((item) => !['PAYEE', 'CLASSEE'].includes(item.statusCode)).length), className: 'metric-card-gold' },
+    { label: 'Profil courant', value: context.profileCode.replace('_', ' '), className: 'metric-card-cyan' },
+  ]
+  const moduleLabel = (code: string, fallback: string) =>
+    context.visibleModules.find((module) => module.code === code)?.label ?? fallback
+
+  if (context.profileCode === 'INFORMATIQUE') {
+    return {
+      eyebrow: 'Tableau de bord Informatique',
+      title: 'Pilotage socle, droits et readiness',
+      description: 'Priorites: recetter les droits, surveiller les interfaces et verrouiller les outils critiques.',
+      accentClass: 'accent-champagne',
+      metrics: [
+        { label: 'Profils actifs', value: String(context.profiles.filter((profile) => profile.isActive).length), className: 'metric-card-champagne' },
+        { label: 'Comptes actifs', value: String(context.accounts.filter((account) => account.isActive).length), className: 'metric-card-gold' },
+        { label: 'Salaries', value: String(context.employees.length), className: 'metric-card-navy' },
+        { label: 'Materiels', value: String(context.materials.length), className: 'metric-card-cyan' },
+      ],
+      actions: [
+        { navigation: 'Administration', administrationSection: 'Outils', label: 'Outils et diagnostics', detail: 'Readiness, traces, taches planifiees et cles API.' },
+        { navigation: 'Administration', administrationSection: 'Comptes utilisateurs', label: 'Comptes', detail: 'Cycle de vie, profils, sessions et resets temporaires.' },
+        { navigation: commonDataNavigationLabel, settingsSection: materialSettingsSection, label: 'Referentiel materiels', detail: 'Base locale prete pour TruckOnline et YellowBox.' },
+      ],
+    }
+  }
+
+  if (context.profileCode === 'EXPLOITATION') {
+    return {
+      eyebrow: 'Tableau de bord Exploitation',
+      title: 'Points, conducteurs et tracteurs',
+      description: 'Priorites: maintenir les points operationnels, suivre les conducteurs et fiabiliser le parc tracteurs.',
+      accentClass: 'accent-green',
+      metrics: [
+        { label: 'Points actifs', value: String(context.loadingPoints.filter((point) => point.isActive).length), className: 'metric-card-champagne' },
+        { label: 'Conducteurs', value: String(context.driverIndicators?.summary.activeDrivers ?? 0), className: 'metric-card-green' },
+        { label: 'Tracteurs actifs', value: String(context.tractorIndicators?.summary.activeTractors ?? 0), className: 'metric-card-navy' },
+        { label: 'Avis ouverts', value: String(context.contraventions.filter((item) => !['PAYEE', 'CLASSEE'].includes(item.statusCode)).length), className: 'metric-card-gold' },
+      ],
+      actions: [
+        { navigation: 'Exploitation', workspaceSection: moduleLabel(loadingPointsModuleCode, 'Carte des points chargements/dechargements'), label: 'Carte des points', detail: 'Sites, coordonnees et rattachements tiers/exploitations.' },
+        { navigation: 'Exploitation', workspaceSection: moduleLabel(driverIndicatorsModuleCode, 'Les indicateurs conducteurs'), label: 'Conducteurs', detail: 'Comptes, qualite des fiches et contraventions rattachees.' },
+        { navigation: 'Exploitation', workspaceSection: moduleLabel(tractorIndicatorsModuleCode, 'Les indicateurs des tracteurs'), label: 'Tracteurs', detail: 'Parc, sources TruckOnline/YellowBox et rattachements.' },
+      ],
+    }
+  }
+
+  if (context.profileCode === 'ADMINISTRATIF') {
+    return {
+      eyebrow: 'Tableau de bord Administratif',
+      title: 'Suivi des contraventions',
+      description: 'Priorites: traiter les avis ouverts, rattacher conducteurs et materiels, surveiller les echeances.',
+      accentClass: 'accent-orange',
+      metrics: [
+        { label: 'Avis suivis', value: String(context.contraventions.length), className: 'metric-card-gold' },
+        { label: 'Avis ouverts', value: String(context.contraventions.filter((item) => !['PAYEE', 'CLASSEE'].includes(item.statusCode)).length), className: 'metric-card-navy' },
+        { label: 'Conducteurs', value: String(context.driverIndicators?.summary.activeDrivers ?? 0), className: 'metric-card-green' },
+        { label: 'Materiels', value: String(context.materials.length), className: 'metric-card-cyan' },
+      ],
+      actions: [
+        { navigation: 'Gestion administrative', workspaceSection: moduleLabel(contraventionsModuleCode, 'Gestion des contraventions'), label: 'Contraventions', detail: 'Creation, suivi et mise a jour des statuts.' },
+      ],
+    }
+  }
+
+  if (context.profileCode === 'DIRECTION') {
+    return {
+      eyebrow: 'Tableau de bord Direction',
+      title: 'Vue de pilotage transverse',
+      description: 'Priorites: lecture des indicateurs exploitation, suivi des avis et qualite des referentiels.',
+      accentClass: 'accent-cyan',
+      metrics: baseMetrics,
+      actions: [
+        { navigation: 'Exploitation', workspaceSection: moduleLabel(driverIndicatorsModuleCode, 'Les indicateurs conducteurs'), label: 'Indicateurs conducteurs', detail: 'Lecture des effectifs conducteurs et points de vigilance.' },
+        { navigation: 'Exploitation', workspaceSection: moduleLabel(tractorIndicatorsModuleCode, 'Les indicateurs des tracteurs'), label: 'Indicateurs tracteurs', detail: 'Lecture du parc et des raccords TruckOnline/YellowBox.' },
+        { navigation: 'Gestion administrative', workspaceSection: moduleLabel(contraventionsModuleCode, 'Gestion des contraventions'), label: 'Contraventions', detail: 'Lecture des avis et des echeances.' },
+      ],
+    }
+  }
+
+  return {
+    eyebrow: 'Tableau de bord',
+    title: 'Accueil personnalise',
+    description: 'Ce compte dispose d une lecture limitee tant qu un profil complet n est pas affecte.',
+    accentClass: 'accent-navy',
+    metrics: baseMetrics,
+    actions: context.visibleModules.slice(0, 3).map((module) => ({
+      navigation: module.navigationGroup,
+      workspaceSection: module.label,
+      label: module.label,
+      detail: getFunctionalModuleBlueprint(module.code).intent,
+    })),
   }
 }
 

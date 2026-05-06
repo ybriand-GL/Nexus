@@ -35,6 +35,9 @@ internal sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAc
         builder.Property(entity => entity.SessionTimeoutMinutes)
             .HasDefaultValue(60);
 
+        builder.Property(entity => entity.IsSidebarCollapsed)
+            .HasDefaultValue(false);
+
         builder.HasIndex(entity => entity.Login)
             .IsUnique();
 

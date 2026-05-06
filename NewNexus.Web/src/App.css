@@ -267,6 +267,11 @@
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
   color: var(--nexus-text);
+  transition: grid-template-columns 0.28s ease;
+}
+
+.nexus-app-shell-sidebar-collapsed {
+  grid-template-columns: 88px minmax(0, 1fr);
 }
 
 .nexus-sidebar {
@@ -283,9 +288,16 @@
     linear-gradient(180deg, #090d15 0%, var(--nexus-navy) 100%);
   color: white;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  transition: padding 0.28s ease;
+}
+
+.nexus-app-shell-sidebar-collapsed .nexus-sidebar {
+  padding: 22px 12px;
+  gap: 18px;
 }
 
 .brand-panel {
+  position: relative;
   display: grid;
   gap: 14px;
 }
@@ -300,6 +312,34 @@
 .brand-wordmark {
   width: 170px;
   max-width: 100%;
+}
+
+.sidebar-collapse-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(247, 217, 138, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--nexus-gold-soft);
+  font: inherit;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.sidebar-collapse-button:hover {
+  transform: translateX(-2px);
+  border-color: rgba(247, 217, 138, 0.42);
+  background: rgba(247, 217, 138, 0.12);
 }
 
 .auth-wordmark {
@@ -342,6 +382,65 @@
     transform 0.2s ease,
     background-color 0.2s ease,
     border-color 0.2s ease;
+}
+
+.sidebar-link-initial {
+  display: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(247, 217, 138, 0.12);
+  color: var(--nexus-gold-soft);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.sidebar-link-label {
+  flex: 1;
+}
+
+.nexus-app-shell-sidebar-collapsed .brand-wordmark,
+.nexus-app-shell-sidebar-collapsed .brand-clock,
+.nexus-app-shell-sidebar-collapsed .sidebar-link-label,
+.nexus-app-shell-sidebar-collapsed .sidebar-link-chevron,
+.nexus-app-shell-sidebar-collapsed .sidebar-subnav,
+.nexus-app-shell-sidebar-collapsed .sidebar-status {
+  display: none;
+}
+
+.nexus-app-shell-sidebar-collapsed .brand-panel {
+  justify-items: center;
+  padding-top: 42px;
+}
+
+.nexus-app-shell-sidebar-collapsed .brand-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+}
+
+.nexus-app-shell-sidebar-collapsed .sidebar-collapse-button {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+
+.nexus-app-shell-sidebar-collapsed .sidebar-collapse-button:hover {
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.nexus-app-shell-sidebar-collapsed .sidebar-link {
+  justify-content: center;
+  padding: 10px;
+}
+
+.nexus-app-shell-sidebar-collapsed .sidebar-link:hover {
+  transform: translateY(-2px);
+}
+
+.nexus-app-shell-sidebar-collapsed .sidebar-link-initial {
+  display: grid;
 }
 
 .sidebar-link-active {
@@ -447,6 +546,17 @@
   padding: 30px;
   display: grid;
   gap: 22px;
+}
+
+.nexus-main.nexus-main-home {
+  align-content: start;
+  padding: 6px 30px 30px;
+  gap: 10px;
+}
+
+.nexus-main-home .dashboard-stack {
+  align-self: start;
+  margin-top: 0;
 }
 
 .nexus-main *,
@@ -632,6 +742,102 @@
   gap: 18px;
 }
 
+.profile-dashboard-panel {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(247, 217, 138, .18);
+  background:
+    radial-gradient(circle at top left, rgba(247, 217, 138, .14), transparent 24%),
+    linear-gradient(135deg, rgba(10, 14, 22, .96), rgba(20, 24, 34, .92));
+  box-shadow: var(--nexus-shadow-card);
+}
+
+.profile-dashboard-panel p {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--nexus-muted);
+  line-height: 1.65;
+}
+
+.profile-dashboard-actions {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.profile-dashboard-cube-layout {
+  --dashboard-cube-depth: 420px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 58px;
+  gap: 14px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.profile-dashboard-cube-stage {
+  width: 100%;
+  min-height: 560px;
+  perspective: 1500px;
+  justify-self: stretch;
+}
+
+.profile-dashboard-cube {
+  position: relative;
+  width: 100%;
+  min-height: 560px;
+  transform-style: preserve-3d;
+  transition: transform 1.35s cubic-bezier(.2, .8, .2, 1);
+}
+
+.profile-dashboard-cube-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.profile-dashboard-cube-face.profile-dashboard-panel {
+  align-content: start;
+  min-height: 560px;
+}
+
+.profile-dashboard-cube-face .metrics-grid {
+  margin-top: 2px;
+}
+
+.profile-dashboard-side-arrow {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 96px;
+  border: 1px solid rgba(247, 217, 138, .22);
+  border-radius: 18px;
+  color: var(--nexus-gold-soft);
+  background:
+    linear-gradient(180deg, rgba(247, 217, 138, .12), rgba(247, 217, 138, .035)),
+    rgba(0, 0, 0, .22);
+  cursor: pointer;
+  transition:
+    transform .18s ease,
+    border-color .18s ease,
+    background .18s ease;
+}
+
+.profile-dashboard-side-arrow:hover {
+  transform: translateY(-2px);
+  border-color: rgba(247, 217, 138, .45);
+  background:
+    linear-gradient(180deg, rgba(247, 217, 138, .18), rgba(247, 217, 138, .06)),
+    rgba(0, 0, 0, .26);
+}
+
+.profile-dashboard-side-arrow span {
+  font-family: var(--nexus-font-heading);
+  font-size: 3rem;
+  line-height: 1;
+}
+
 .metric-card {
   display: grid;
   gap: 8px;
@@ -656,6 +862,10 @@
 
 .metric-card-cyan {
   border-left: 5px solid var(--nexus-cyan);
+}
+
+.metric-card-green {
+  border-left: 5px solid var(--nexus-green);
 }
 
 .workspace-grid {
@@ -862,6 +1072,37 @@
   color: var(--nexus-muted);
   font-size: .82rem;
   font-weight: 700;
+}
+
+.indicators-module-card {
+  gap: 16px;
+}
+
+.indicator-table {
+  display: grid;
+  gap: 10px;
+}
+
+.indicator-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(180px, 1.2fr) minmax(90px, .45fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(0, 0, 0, .14);
+}
+
+.indicator-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.indicator-row span:not(.profile-status-badge) {
+  color: var(--nexus-muted);
+  font-size: .86rem;
 }
 
 .contraventions-module-card {
@@ -3804,6 +4045,10 @@
     padding: 22px;
   }
 
+  .nexus-main.nexus-main-home {
+    padding: 6px 22px 22px;
+  }
+
   .nexus-main > .workspace-grid,
   .nexus-main .dashboard-stack > .workspace-grid,
   .settings-reference-grid,
@@ -3853,6 +4098,10 @@
   .nexus-main {
     padding: 18px;
     gap: 18px;
+  }
+
+  .nexus-main.nexus-main-home {
+    padding: 8px 18px 18px;
   }
 
   .nexus-main .hero-card,
@@ -3928,13 +4177,29 @@
   .rights-editor-grid,
   .metrics-grid,
   .profiles-overview-grid,
-  .integration-credentials-grid {
+  .integration-credentials-grid,
+  .indicator-row {
     grid-template-columns: 1fr;
   }
 
   .admin-subnav,
-  .tools-subnav {
+  .tools-subnav,
+  .profile-dashboard-cube-layout {
     grid-template-columns: 1fr;
+  }
+
+  .profile-dashboard-cube-stage {
+    width: 100%;
+    min-height: 680px;
+  }
+
+  .profile-dashboard-cube-layout {
+    --dashboard-cube-depth: 260px;
+  }
+
+  .profile-dashboard-side-arrow {
+    width: 100%;
+    height: 54px;
   }
 
   .profiles-toolbar,

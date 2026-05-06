@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NewNexus.Data.Postgres;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NewNexus.Data.Postgres.Migrations
 {
     [DbContext(typeof(NewNexusDbContext))]
-    partial class NewNexusDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260506063109_CommonDataSecurityModule")]
+    partial class CommonDataSecurityModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -319,42 +322,6 @@ namespace NewNexus.Data.Postgres.Migrations
                             IsActive = true,
                             Label = "Données Communes",
                             NavigationGroup = "Données Communes"
-                        },
-                        new
-                        {
-                            Id = new Guid("bcf37d38-6e8a-4b9e-82f9-66ec0e2d0451"),
-                            Code = "DASHBOARD_INFORMATIQUE",
-                            DisplayOrder = 1,
-                            IsActive = true,
-                            Label = "Dashboard Informatique",
-                            NavigationGroup = "Tableaux de bord"
-                        },
-                        new
-                        {
-                            Id = new Guid("a1701377-bdd4-4f0f-9159-76c12d4f9fb6"),
-                            Code = "DASHBOARD_DIRECTION",
-                            DisplayOrder = 2,
-                            IsActive = true,
-                            Label = "Dashboard Direction",
-                            NavigationGroup = "Tableaux de bord"
-                        },
-                        new
-                        {
-                            Id = new Guid("2d0832df-7431-46f7-9935-2c8d27c1d8a4"),
-                            Code = "DASHBOARD_EXPLOITATION",
-                            DisplayOrder = 3,
-                            IsActive = true,
-                            Label = "Dashboard Exploitation",
-                            NavigationGroup = "Tableaux de bord"
-                        },
-                        new
-                        {
-                            Id = new Guid("c3a46e30-7392-4107-b56f-a1bb4f775522"),
-                            Code = "DASHBOARD_ADMINISTRATIF",
-                            DisplayOrder = 4,
-                            IsActive = true,
-                            Label = "Dashboard Administratif",
-                            NavigationGroup = "Tableaux de bord"
                         });
                 });
 
@@ -493,34 +460,6 @@ namespace NewNexus.Data.Postgres.Migrations
                         },
                         new
                         {
-                            Id = new Guid("3b42210a-cd34-05f2-1206-5bce807b1311"),
-                            AccessLevel = "Write",
-                            SecurityModuleId = new Guid("bcf37d38-6e8a-4b9e-82f9-66ec0e2d0451"),
-                            SecurityProfileId = new Guid("87b15c32-a3be-4e6c-90ff-3d228e561740")
-                        },
-                        new
-                        {
-                            Id = new Guid("26c14f45-1e6a-0163-01a6-4be3a31988f6"),
-                            AccessLevel = "Write",
-                            SecurityModuleId = new Guid("a1701377-bdd4-4f0f-9159-76c12d4f9fb6"),
-                            SecurityProfileId = new Guid("87b15c32-a3be-4e6c-90ff-3d228e561740")
-                        },
-                        new
-                        {
-                            Id = new Guid("aab96eed-d78f-089b-09ca-11afa997cfe4"),
-                            AccessLevel = "Write",
-                            SecurityModuleId = new Guid("2d0832df-7431-46f7-9935-2c8d27c1d8a4"),
-                            SecurityProfileId = new Guid("87b15c32-a3be-4e6c-90ff-3d228e561740")
-                        },
-                        new
-                        {
-                            Id = new Guid("44153202-d02c-0f6b-2590-9c99c1214262"),
-                            AccessLevel = "Write",
-                            SecurityModuleId = new Guid("c3a46e30-7392-4107-b56f-a1bb4f775522"),
-                            SecurityProfileId = new Guid("87b15c32-a3be-4e6c-90ff-3d228e561740")
-                        },
-                        new
-                        {
                             Id = new Guid("8ab92df0-2826-0556-0bc4-2237bb7e757c"),
                             AccessLevel = "None",
                             SecurityModuleId = new Guid("3cbcc9c0-20e1-4a71-a6d9-84cbcb4d18d9"),
@@ -563,34 +502,6 @@ namespace NewNexus.Data.Postgres.Migrations
                         },
                         new
                         {
-                            Id = new Guid("0af69908-664d-04b9-2fe4-c0107e1e69f4"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("bcf37d38-6e8a-4b9e-82f9-66ec0e2d0451"),
-                            SecurityProfileId = new Guid("b605e430-08c7-4f27-ad1d-a6fc70336da5")
-                        },
-                        new
-                        {
-                            Id = new Guid("1775f747-b513-0028-3c44-d03d5d7cf213"),
-                            AccessLevel = "Read",
-                            SecurityModuleId = new Guid("a1701377-bdd4-4f0f-9159-76c12d4f9fb6"),
-                            SecurityProfileId = new Guid("b605e430-08c7-4f27-ad1d-a6fc70336da5")
-                        },
-                        new
-                        {
-                            Id = new Guid("9b0dd6ef-7cf6-09d0-3428-8a7157f2b501"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("2d0832df-7431-46f7-9935-2c8d27c1d8a4"),
-                            SecurityProfileId = new Guid("b605e430-08c7-4f27-ad1d-a6fc70336da5")
-                        },
-                        new
-                        {
-                            Id = new Guid("75a18a00-7b55-0e20-1872-07473f443887"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("c3a46e30-7392-4107-b56f-a1bb4f775522"),
-                            SecurityProfileId = new Guid("b605e430-08c7-4f27-ad1d-a6fc70336da5")
-                        },
-                        new
-                        {
                             Id = new Guid("e2eadb86-42e1-098c-000f-c8646047dec2"),
                             AccessLevel = "Read",
                             SecurityModuleId = new Guid("6d56c6e5-0e73-4772-9b0c-6a8d0f68a5d4"),
@@ -619,34 +530,6 @@ namespace NewNexus.Data.Postgres.Migrations
                         },
                         new
                         {
-                            Id = new Guid("334f605b-2218-0560-19fa-c40561027f47"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("bcf37d38-6e8a-4b9e-82f9-66ec0e2d0451"),
-                            SecurityProfileId = new Guid("8fbc1d63-4c92-4efe-9b03-a2e96f2f7b16")
-                        },
-                        new
-                        {
-                            Id = new Guid("2ecc0e14-f146-01f1-0a5a-d4284260e4a0"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("a1701377-bdd4-4f0f-9159-76c12d4f9fb6"),
-                            SecurityProfileId = new Guid("8fbc1d63-4c92-4efe-9b03-a2e96f2f7b16")
-                        },
-                        new
-                        {
-                            Id = new Guid("a2b42fbc-38a3-0809-0236-8e6448eea3b2"),
-                            AccessLevel = "Read",
-                            SecurityModuleId = new Guid("2d0832df-7431-46f7-9935-2c8d27c1d8a4"),
-                            SecurityProfileId = new Guid("8fbc1d63-4c92-4efe-9b03-a2e96f2f7b16")
-                        },
-                        new
-                        {
-                            Id = new Guid("4c187353-3f00-0ff9-2e6c-035220582e34"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("c3a46e30-7392-4107-b56f-a1bb4f775522"),
-                            SecurityProfileId = new Guid("8fbc1d63-4c92-4efe-9b03-a2e96f2f7b16")
-                        },
-                        new
-                        {
                             Id = new Guid("6dc2753b-37e1-0ea2-2ee6-d8347514f8a5"),
                             AccessLevel = "None",
                             SecurityModuleId = new Guid("6d56c6e5-0e73-4772-9b0c-6a8d0f68a5d4"),
@@ -657,34 +540,6 @@ namespace NewNexus.Data.Postgres.Migrations
                             Id = new Guid("e9e85ca1-5e5b-0fd4-3c6d-f2d8291b1faa"),
                             AccessLevel = "Write",
                             SecurityModuleId = new Guid("e97cef7f-67c9-4604-8987-4061536742db"),
-                            SecurityProfileId = new Guid("0094b3de-3992-49d0-b5ea-b2b97a7c5d71")
-                        },
-                        new
-                        {
-                            Id = new Guid("bc67cee6-5718-024e-3713-d45574515920"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("bcf37d38-6e8a-4b9e-82f9-66ec0e2d0451"),
-                            SecurityProfileId = new Guid("0094b3de-3992-49d0-b5ea-b2b97a7c5d71")
-                        },
-                        new
-                        {
-                            Id = new Guid("a1e4a0a9-8446-06df-24b3-c4785733c2c7"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("a1701377-bdd4-4f0f-9159-76c12d4f9fb6"),
-                            SecurityProfileId = new Guid("0094b3de-3992-49d0-b5ea-b2b97a7c5d71")
-                        },
-                        new
-                        {
-                            Id = new Guid("2d9c8101-4da3-0f27-2cdf-9e345dbd85d5"),
-                            AccessLevel = "None",
-                            SecurityModuleId = new Guid("2d0832df-7431-46f7-9935-2c8d27c1d8a4"),
-                            SecurityProfileId = new Guid("0094b3de-3992-49d0-b5ea-b2b97a7c5d71")
-                        },
-                        new
-                        {
-                            Id = new Guid("c330ddee-4a00-08d7-0085-1302350b0853"),
-                            AccessLevel = "Read",
-                            SecurityModuleId = new Guid("c3a46e30-7392-4107-b56f-a1bb4f775522"),
                             SecurityProfileId = new Guid("0094b3de-3992-49d0-b5ea-b2b97a7c5d71")
                         });
                 });
@@ -713,11 +568,6 @@ namespace NewNexus.Data.Postgres.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
-
-                    b.Property<bool>("IsSidebarCollapsed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<DateTime?>("LastLoginAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -777,7 +627,6 @@ namespace NewNexus.Data.Postgres.Migrations
                             CreatedAtUtc = new DateTime(2026, 4, 29, 0, 0, 0, 0, DateTimeKind.Utc),
                             DisplayName = "Administrateur système",
                             IsActive = true,
-                            IsSidebarCollapsed = false,
                             Login = "admin",
                             MustChangePassword = true,
                             PasswordHash = "100000.T4PL0v0v1mGm2O8x2M8vMw==.xdyoWj/llsa9F5KoRoeZc8mUL29qNlCKh8LzHxzd8MM=",

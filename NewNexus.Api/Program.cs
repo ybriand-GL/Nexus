@@ -131,6 +131,11 @@ builder.Services.AddHttpClient("Lucca", client =>
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("NewNexus/0.1");
 });
+builder.Services.AddHttpClient("Integrations", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("NewNexus/0.1");
+});
 
 var app = builder.Build();
 
@@ -835,6 +840,34 @@ app.MapGet("/api/auth/me", async (NewNexusDbContext dbContext, ClaimsPrincipal p
     return account is null ? Results.Unauthorized() : Results.Ok(BuildAuthenticatedUser(account));
 });
 
+app.MapPut("/api/auth/preferences", async (
+    UpdateUserPreferencesRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    var userId = GetUserId(principal);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var account = await dbContext.UserAccounts
+        .Include(userAccount => userAccount.SecurityProfile!)
+            .ThenInclude(profile => profile.ModuleRights)
+                .ThenInclude(right => right.SecurityModule)
+        .SingleOrDefaultAsync(userAccount => userAccount.Id == userId.Value && userAccount.IsActive);
+
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    account.IsSidebarCollapsed = request.IsSidebarCollapsed;
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(BuildAuthenticatedUser(account));
+}).RequireAuthorization();
+
 app.MapPost("/api/auth/change-password", async (
     ChangePasswordRequest request,
     NewNexusDbContext dbContext,
@@ -1477,6 +1510,18 @@ app.MapPost("/api/admin/scheduled-tasks/{taskCode}/run", async (
     {
         result = await ProvisionEmployeeAccountsAsync(dbContext, httpContext.RequestAborted);
     }
+    else if (task.Code == "TRUCKONLINE_FLEET_SYNC")
+    {
+        result = await BuildMaterialIntegrationSnapshotAsync(dbContext, "TRUCKONLINE", httpContext.RequestAborted);
+    }
+    else if (task.Code == "YELLOWBOX_TELEMATICS_SYNC")
+    {
+        result = await BuildMaterialIntegrationSnapshotAsync(dbContext, "YELLOWBOX", httpContext.RequestAborted);
+    }
+    else if (task.Code == "GEOCODING_LOADING_POINTS")
+    {
+        result = await BuildLoadingPointGeocodingSnapshotAsync(dbContext, httpContext.RequestAborted);
+    }
     else
     {
         result = new { Message = "Aucun executeur local n'est defini pour cette tache." };
@@ -1707,6 +1752,27 @@ app.MapGet("/api/modules/loading-points", async (
     return Results.Ok(points.Select(BuildLoadingPointResponse));
 }).RequireAuthorization();
 
+app.MapGet("/api/modules/loading-points/map", async (
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CARTE_POINTS_CHARGEMENT_DECHARGEMENT", ModuleAccessLevel.Read))
+    {
+        return Results.Forbid();
+    }
+
+    var points = await dbContext.LoadingPoints
+        .AsNoTracking()
+        .Include(item => item.ThirdParty)
+        .Include(item => item.Exploitation)
+        .Where(item => item.IsActive)
+        .OrderBy(item => item.City)
+        .ThenBy(item => item.Label)
+        .ToListAsync();
+
+    return Results.Ok(BuildLoadingPointMapResponse(points));
+}).RequireAuthorization();
+
 app.MapGet("/api/modules/loading-points/referentials", async (
     NewNexusDbContext dbContext,
     ClaimsPrincipal principal) =>
@@ -1870,6 +1936,102 @@ app.MapPut("/api/modules/loading-points/{loadingPointId:guid}", async (
     return Results.NoContent();
 }).RequireAuthorization();
 
+app.MapPost("/api/modules/loading-points/{loadingPointId:guid}/geocode", async (
+    Guid loadingPointId,
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider,
+    IHttpClientFactory httpClientFactory,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "CARTE_POINTS_CHARGEMENT_DECHARGEMENT", ModuleAccessLevel.Write))
+    {
+        return Results.Forbid();
+    }
+
+    var loadingPoint = await dbContext.LoadingPoints
+        .Include(item => item.ThirdParty)
+        .Include(item => item.Exploitation)
+        .SingleOrDefaultAsync(item => item.Id == loadingPointId);
+    if (loadingPoint is null)
+    {
+        return Results.NotFound();
+    }
+
+    var geocodeResult = await GeocodeLoadingPointAsync(
+        loadingPoint,
+        dbContext,
+        dataProtectionProvider,
+        httpClientFactory,
+        httpContext.RequestAborted);
+
+    if (!geocodeResult.IsSuccess)
+    {
+        await AddApplicationTraceAsync(
+            dbContext,
+            httpContext,
+            principal,
+            "INTEGRATION_RUNS",
+            "LOADING_POINT_GEOCODE_FAILED",
+            "Warning",
+            "Geocodage du point impossible.",
+            geocodeResult.ErrorDetail,
+            loadingPoint.Code);
+        await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["geocoding"] = [geocodeResult.ErrorDetail ?? "Le geocodage n'a retourne aucune coordonnee."]
+        });
+    }
+
+    loadingPoint.Latitude = geocodeResult.Latitude;
+    loadingPoint.Longitude = geocodeResult.Longitude;
+    loadingPoint.UpdatedAtUtc = DateTime.UtcNow;
+
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "INTEGRATION_RUNS",
+        "LOADING_POINT_GEOCODED",
+        "Info",
+        "Point geocode.",
+        $"Fournisseur={geocodeResult.Provider}; latitude={geocodeResult.Latitude}; longitude={geocodeResult.Longitude}.",
+        loadingPoint.Code);
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    return Results.Ok(new
+    {
+        Point = BuildLoadingPointResponse(loadingPoint),
+        Geocoding = geocodeResult
+    });
+}).RequireAuthorization();
+
+app.MapGet("/api/modules/driver-indicators", async (
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "INDICATEURS_CONDUCTEURS", ModuleAccessLevel.Read))
+    {
+        return Results.Forbid();
+    }
+
+    return Results.Ok(await BuildDriverIndicatorsAsync(dbContext));
+}).RequireAuthorization();
+
+app.MapGet("/api/modules/tractor-indicators", async (
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal) =>
+{
+    if (!await HasModuleAccessAsync(dbContext, principal, "INDICATEURS_TRACTEURS", ModuleAccessLevel.Read))
+    {
+        return Results.Forbid();
+    }
+
+    return Results.Ok(await BuildTractorIndicatorsAsync(dbContext));
+}).RequireAuthorization();
+
 app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
 {
     var companies = await dbContext.Companies
@@ -2013,7 +2175,9 @@ app.MapGet("/api/settings/bootstrap", async (NewNexusDbContext dbContext) =>
         ThirdParties = thirdParties,
         Materials = materials
     });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Read));
 
 app.MapGet("/api/settings/companies/sirene/{siren}", async (string siren, IHttpClientFactory httpClientFactory) =>
 {
@@ -2049,7 +2213,9 @@ app.MapGet("/api/settings/companies/sirene/{siren}", async (string siren, IHttpC
         lookup.Company.Naf,
         Source = "API Recherche d'Entreprises"
     });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Read));
 
 app.MapGet("/api/settings/companies/sirene-search", async (
     string? name,
@@ -2091,7 +2257,9 @@ app.MapGet("/api/settings/companies/sirene-search", async (
         company.City,
         Source = "API Recherche d'Entreprises"
     }));
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Read));
 
 app.MapPost("/api/settings/companies", async (UpsertCompanyRequest request, NewNexusDbContext dbContext, IHttpClientFactory httpClientFactory) =>
 {
@@ -2132,7 +2300,9 @@ app.MapPost("/api/settings/companies", async (UpsertCompanyRequest request, NewN
     await dbContext.SaveChangesAsync();
 
     return Results.Created($"/api/settings/companies/{company.Id}", new { company.Id });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPut("/api/settings/companies/{companyId:guid}", async (
     Guid companyId,
@@ -2158,7 +2328,9 @@ app.MapPut("/api/settings/companies/{companyId:guid}", async (
 
     await dbContext.SaveChangesAsync();
     return Results.NoContent();
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPost("/api/settings/analytics", async (UpsertAnalyticRequest request, NewNexusDbContext dbContext) =>
 {
@@ -2181,7 +2353,9 @@ app.MapPost("/api/settings/analytics", async (UpsertAnalyticRequest request, New
     await dbContext.SaveChangesAsync();
 
     return Results.Created($"/api/settings/analytics/{analytic.Id}", new { analytic.Id });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPut("/api/settings/analytics/{analyticId:guid}", async (
     Guid analyticId,
@@ -2207,7 +2381,9 @@ app.MapPut("/api/settings/analytics/{analyticId:guid}", async (
 
     await dbContext.SaveChangesAsync();
     return Results.NoContent();
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPost("/api/settings/exploitations", async (UpsertExploitationRequest request, NewNexusDbContext dbContext) =>
 {
@@ -2230,7 +2406,9 @@ app.MapPost("/api/settings/exploitations", async (UpsertExploitationRequest requ
     await dbContext.SaveChangesAsync();
 
     return Results.Created($"/api/settings/exploitations/{exploitation.Id}", new { exploitation.Id });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPut("/api/settings/exploitations/{exploitationId:guid}", async (
     Guid exploitationId,
@@ -2256,7 +2434,9 @@ app.MapPut("/api/settings/exploitations/{exploitationId:guid}", async (
 
     await dbContext.SaveChangesAsync();
     return Results.NoContent();
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPost("/api/settings/employees", async (UpsertEmployeeRequest request, NewNexusDbContext dbContext) =>
 {
@@ -2284,7 +2464,9 @@ app.MapPost("/api/settings/employees", async (UpsertEmployeeRequest request, New
     await dbContext.SaveChangesAsync();
 
     return Results.Created($"/api/settings/employees/{employee.Id}", new { employee.Id });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPost("/api/settings/employees/provision-accounts", async (
     NewNexusDbContext dbContext,
@@ -2305,7 +2487,9 @@ app.MapPost("/api/settings/employees/provision-accounts", async (
         saveImmediately: true);
 
     return Results.Ok(result);
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPost("/api/settings/employees/import-lucca", async (
     NewNexusDbContext dbContext,
@@ -2433,7 +2617,9 @@ app.MapPost("/api/settings/employees/import-lucca", async (
         SkippedCount = skipped,
         Messages = messages
     });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPut("/api/settings/employees/{employeeId:guid}", async (
     Guid employeeId,
@@ -2463,7 +2649,9 @@ app.MapPut("/api/settings/employees/{employeeId:guid}", async (
 
     await dbContext.SaveChangesAsync();
     return Results.NoContent();
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPost("/api/settings/third-parties", async (UpsertThirdPartyRequest request, NewNexusDbContext dbContext) =>
 {
@@ -2494,7 +2682,9 @@ app.MapPost("/api/settings/third-parties", async (UpsertThirdPartyRequest reques
     await dbContext.SaveChangesAsync();
 
     return Results.Created($"/api/settings/third-parties/{thirdParty.Id}", new { thirdParty.Id });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPut("/api/settings/third-parties/{thirdPartyId:guid}", async (
     Guid thirdPartyId,
@@ -2532,7 +2722,9 @@ app.MapPut("/api/settings/third-parties/{thirdPartyId:guid}", async (
 
     await dbContext.SaveChangesAsync();
     return Results.NoContent();
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPost("/api/settings/materials", async (UpsertMaterialRequest request, NewNexusDbContext dbContext) =>
 {
@@ -2560,7 +2752,9 @@ app.MapPost("/api/settings/materials", async (UpsertMaterialRequest request, New
     await dbContext.SaveChangesAsync();
 
     return Results.Created($"/api/settings/materials/{material.Id}", new { material.Id });
-}).RequireAuthorization("RequireInformatique");
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
 
 app.MapPut("/api/settings/materials/{materialId:guid}", async (
     Guid materialId,
@@ -2590,6 +2784,52 @@ app.MapPut("/api/settings/materials/{materialId:guid}", async (
 
     await dbContext.SaveChangesAsync();
     return Results.NoContent();
+})
+    .RequireAuthorization()
+    .AddEndpointFilter(RequireModuleAccessFilter("DONNEES_COMMUNES", ModuleAccessLevel.Write));
+
+app.MapGet("/api/admin/integrations/readiness", async (
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider) =>
+{
+    return Results.Ok(await BuildIntegrationReadinessAsync(dbContext, dataProtectionProvider));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/admin/integrations/{providerCode}/materials/import", async (
+    string providerCode,
+    ImportMaterialsRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var normalizedProviderCode = NormalizeTechnicalCode(providerCode);
+    if (normalizedProviderCode is not ("TRUCKONLINE" or "YELLOWBOX"))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["providerCode"] = ["Seuls TruckOnline et YellowBox alimentent le referentiel materiels dans cette passe."]
+        });
+    }
+
+    var result = await ImportMaterialsFromProviderAsync(
+        dbContext,
+        normalizedProviderCode,
+        request.Materials,
+        httpContext.RequestAborted);
+
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "INTEGRATION_RUNS",
+        "MATERIALS_PROVIDER_IMPORT",
+        "Info",
+        "Import materiels execute.",
+        $"Fournisseur={normalizedProviderCode}; crees={result.CreatedCount}; mis a jour={result.UpdatedCount}; ignores={result.SkippedCount}.",
+        normalizedProviderCode,
+        saveImmediately: true);
+
+    return Results.Ok(result);
 }).RequireAuthorization("RequireInformatique");
 
 app.MapPut("/api/security/accounts/{accountId:guid}/profile", async (
@@ -3446,6 +3686,7 @@ static object BuildAuthenticatedUser(UserAccount account)
         account.EmployeeNumber,
         account.MustChangePassword,
         account.SessionTimeoutMinutes,
+        account.IsSidebarCollapsed,
         account.LastLoginAtUtc,
         Profile = profile == null
             ? null
@@ -3712,8 +3953,9 @@ static IReadOnlyList<ScheduledTaskDefinition> GetScheduledTaskDefinitions()
         new("SIRENE_COMPANY_SYNC", "Synchronisation SIRENE", "Societes", "A planifier", "A raccorder", "Mise a jour periodique des informations societes depuis SIRENE.", false),
         new("LUCCA_EMPLOYEES_IMPORT", "Import salaries Lucca", "Ressources humaines", "Quotidienne cible", "A raccorder", "Import des salaries depuis Lucca apres validation du contrat API cible.", false),
         new("LUCCA_ACCOUNT_PROVISIONING", "Provisioning comptes Lucca", "Ressources humaines", "Apres import salaries", "Disponible", "Creation automatique de comptes actifs sans profil depuis les salaries actifs.", true),
-        new("TRUCKONLINE_FLEET_SYNC", "Synchronisation TruckOnline", "Exploitation", "Horaire cible", "A raccorder", "Synchronisation des informations tracteurs et statuts techniques TruckOnline.", false),
-        new("YELLOWBOX_TELEMATICS_SYNC", "Synchronisation YellowBox", "Exploitation", "Horaire cible", "A raccorder", "Recuperation des donnees telematiques YellowBox.", false),
+        new("TRUCKONLINE_FLEET_SYNC", "Synchronisation TruckOnline", "Exploitation", "Horaire cible", "Raccord local", "Controle du parc tracteurs rattache a TruckOnline et pret pour import API.", true),
+        new("YELLOWBOX_TELEMATICS_SYNC", "Synchronisation YellowBox", "Exploitation", "Horaire cible", "Raccord local", "Controle du parc tracteurs rattache a YellowBox et pret pour import telematique.", true),
+        new("GEOCODING_LOADING_POINTS", "Geocodage des points", "Exploitation", "A la demande", "Raccord local", "Controle des points charge/decharge restant sans coordonnees.", true),
         new("MATERIALS_IMPORT", "Import materiels", "Exploitation", "Apres cadrage parc", "A cadrer", "Preparation du referentiel materiels avec numero de parc unique.", false),
         new("AUDIT_LOG_RETENTION", "Purge controlee des traces", "Technique", "Mensuelle cible", "A cadrer", "Politique de conservation des journaux applicatifs et techniques.", false)
     ];
@@ -3800,6 +4042,255 @@ static async Task<EmployeeAccountProvisioningResult> ProvisionEmployeeAccountsAs
         skippedEmployees.Count,
         createdAccounts,
         skippedEmployees);
+}
+
+static async Task<object> BuildMaterialIntegrationSnapshotAsync(
+    NewNexusDbContext dbContext,
+    string providerCode,
+    CancellationToken cancellationToken)
+{
+    var normalizedProviderCode = NormalizeTechnicalCode(providerCode);
+    var materials = await dbContext.Materials
+        .AsNoTracking()
+        .Include(material => material.Exploitation)
+        .Where(material => material.MaterialType == "TRACTEUR")
+        .OrderBy(material => material.FleetNumber)
+        .ToListAsync(cancellationToken);
+    var providerMaterials = materials
+        .Where(material => string.Equals(material.SourceSystem, normalizedProviderCode, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    return new
+    {
+        ProviderCode = normalizedProviderCode,
+        TotalTractors = materials.Count,
+        LinkedTractors = providerMaterials.Count,
+        ActiveLinkedTractors = providerMaterials.Count(material => material.IsActive),
+        MissingProviderLink = materials.Count - providerMaterials.Count,
+        MissingExploitation = providerMaterials.Count(material => material.ExploitationId is null),
+        LastSyncedAtUtc = providerMaterials
+            .Where(material => material.LastSyncedAtUtc is not null)
+            .OrderByDescending(material => material.LastSyncedAtUtc)
+            .Select(material => material.LastSyncedAtUtc)
+            .FirstOrDefault(),
+        Materials = providerMaterials.Select(material => new
+        {
+            material.Id,
+            material.FleetNumber,
+            material.Label,
+            material.RegistrationNumber,
+            material.SourceSystem,
+            material.IsActive,
+            material.LastSyncedAtUtc,
+            Exploitation = material.Exploitation is null
+                ? null
+                : new
+                {
+                    material.Exploitation.Id,
+                    material.Exploitation.Code,
+                    material.Exploitation.Label
+                }
+        })
+    };
+}
+
+static async Task<object> BuildLoadingPointGeocodingSnapshotAsync(
+    NewNexusDbContext dbContext,
+    CancellationToken cancellationToken)
+{
+    var points = await dbContext.LoadingPoints
+        .AsNoTracking()
+        .OrderBy(point => point.City)
+        .ThenBy(point => point.Label)
+        .ToListAsync(cancellationToken);
+
+    return new
+    {
+        TotalPoints = points.Count,
+        ActivePoints = points.Count(point => point.IsActive),
+        GeocodedPoints = points.Count(point => point.Latitude is not null && point.Longitude is not null),
+        MissingCoordinates = points.Count(point => point.IsActive && (point.Latitude is null || point.Longitude is null)),
+        PointsToGeocode = points
+            .Where(point => point.IsActive && (point.Latitude is null || point.Longitude is null))
+            .Select(point => new
+            {
+                point.Id,
+                point.Code,
+                point.Label,
+                point.AddressLine,
+                point.PostalCode,
+                point.City,
+                point.CountryCode
+            })
+            .ToList()
+    };
+}
+
+static async Task<object> BuildDriverIndicatorsAsync(NewNexusDbContext dbContext)
+{
+    var drivers = await dbContext.Employees
+        .AsNoTracking()
+        .Where(employee => employee.IsDriver)
+        .OrderBy(employee => employee.DisplayName)
+        .ToListAsync();
+    var accounts = await dbContext.UserAccounts
+        .AsNoTracking()
+        .Include(account => account.SecurityProfile)
+        .Where(account => account.EmployeeNumber != null)
+        .ToListAsync();
+    var contraventions = await dbContext.Contraventions
+        .AsNoTracking()
+        .Where(item => item.DriverEmployeeId != null)
+        .ToListAsync();
+    var accountsByEmployeeNumber = accounts
+        .Where(account => !string.IsNullOrWhiteSpace(account.EmployeeNumber))
+        .GroupBy(account => account.EmployeeNumber!, StringComparer.OrdinalIgnoreCase)
+        .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+    var contraventionsByDriverId = contraventions
+        .GroupBy(item => item.DriverEmployeeId!.Value)
+        .ToDictionary(group => group.Key, group => group.ToList());
+
+    var rows = drivers.Select(driver =>
+    {
+        accountsByEmployeeNumber.TryGetValue(driver.EmployeeNumber, out var account);
+        contraventionsByDriverId.TryGetValue(driver.Id, out var driverContraventions);
+        driverContraventions ??= [];
+        var openContraventions = driverContraventions.Count(item => !IsClosedContraventionStatus(item.StatusCode));
+
+        return new
+        {
+            driver.Id,
+            driver.EmployeeNumber,
+            driver.DisplayName,
+            driver.Email,
+            driver.PhoneNumber,
+            driver.IsActive,
+            driver.LastSyncedAtUtc,
+            AccountLogin = account?.Login,
+            AccountProfile = account?.SecurityProfile?.Label,
+            AccountIsActive = account?.IsActive,
+            OpenContraventions = openContraventions,
+            TotalContraventions = driverContraventions.Count,
+            DataQuality = BuildDriverDataQuality(driver, account)
+        };
+    }).ToList();
+
+    return new
+    {
+        Summary = new
+        {
+            TotalDrivers = rows.Count,
+            ActiveDrivers = rows.Count(row => row.IsActive),
+            DriversWithAccounts = rows.Count(row => row.AccountLogin is not null),
+            DriversWithoutAccount = rows.Count(row => row.AccountLogin is null),
+            DriversWithOpenContraventions = rows.Count(row => row.OpenContraventions > 0),
+            IncompleteContactData = rows.Count(row => string.IsNullOrWhiteSpace(row.Email) || string.IsNullOrWhiteSpace(row.PhoneNumber))
+        },
+        Drivers = rows
+    };
+}
+
+static async Task<object> BuildTractorIndicatorsAsync(NewNexusDbContext dbContext)
+{
+    var tractors = await dbContext.Materials
+        .AsNoTracking()
+        .Include(material => material.Exploitation)
+        .Where(material => material.MaterialType == "TRACTEUR")
+        .OrderBy(material => material.FleetNumber)
+        .ToListAsync();
+    var contraventions = await dbContext.Contraventions
+        .AsNoTracking()
+        .Where(item => item.MaterialId != null)
+        .ToListAsync();
+    var contraventionsByMaterialId = contraventions
+        .GroupBy(item => item.MaterialId!.Value)
+        .ToDictionary(group => group.Key, group => group.ToList());
+
+    var rows = tractors.Select(tractor =>
+    {
+        contraventionsByMaterialId.TryGetValue(tractor.Id, out var tractorContraventions);
+        tractorContraventions ??= [];
+
+        return new
+        {
+            tractor.Id,
+            tractor.FleetNumber,
+            tractor.Label,
+            tractor.RegistrationNumber,
+            tractor.SourceSystem,
+            tractor.IsActive,
+            tractor.LastSyncedAtUtc,
+            Exploitation = tractor.Exploitation is null
+                ? null
+                : new
+                {
+                    tractor.Exploitation.Id,
+                    tractor.Exploitation.Code,
+                    tractor.Exploitation.Label
+                },
+            OpenContraventions = tractorContraventions.Count(item => !IsClosedContraventionStatus(item.StatusCode)),
+            TotalContraventions = tractorContraventions.Count,
+            DataQuality = BuildTractorDataQuality(tractor)
+        };
+    }).ToList();
+
+    return new
+    {
+        Summary = new
+        {
+            TotalTractors = rows.Count,
+            ActiveTractors = rows.Count(row => row.IsActive),
+            TruckOnlineLinked = rows.Count(row => string.Equals(row.SourceSystem, "TRUCKONLINE", StringComparison.OrdinalIgnoreCase)),
+            YellowBoxLinked = rows.Count(row => string.Equals(row.SourceSystem, "YELLOWBOX", StringComparison.OrdinalIgnoreCase)),
+            WithExploitation = rows.Count(row => row.Exploitation is not null),
+            WithOpenContraventions = rows.Count(row => row.OpenContraventions > 0)
+        },
+        Tractors = rows
+    };
+}
+
+static bool IsClosedContraventionStatus(string statusCode)
+{
+    var normalizedStatus = NormalizeContraventionStatus(statusCode);
+    return normalizedStatus is "PAYEE" or "CLASSEE";
+}
+
+static string BuildDriverDataQuality(Employee driver, UserAccount? account)
+{
+    var missing = new List<string>();
+    if (string.IsNullOrWhiteSpace(driver.Email))
+    {
+        missing.Add("email");
+    }
+    if (string.IsNullOrWhiteSpace(driver.PhoneNumber))
+    {
+        missing.Add("telephone");
+    }
+    if (account is null)
+    {
+        missing.Add("compte");
+    }
+
+    return missing.Count == 0 ? "Complet" : $"A completer: {string.Join(", ", missing)}";
+}
+
+static string BuildTractorDataQuality(Material tractor)
+{
+    var missing = new List<string>();
+    if (string.IsNullOrWhiteSpace(tractor.RegistrationNumber))
+    {
+        missing.Add("immatriculation");
+    }
+    if (string.IsNullOrWhiteSpace(tractor.SourceSystem))
+    {
+        missing.Add("source");
+    }
+    if (tractor.ExploitationId is null)
+    {
+        missing.Add("exploitation");
+    }
+
+    return missing.Count == 0 ? "Complet" : $"A completer: {string.Join(", ", missing)}";
 }
 
 static async Task AddApplicationTraceAsync(
@@ -3964,6 +4455,370 @@ static object BuildLoadingPointResponse(LoadingPoint loadingPoint)
     };
 }
 
+static object BuildLoadingPointMapResponse(IReadOnlyCollection<LoadingPoint> points)
+{
+    var geocodedPoints = points
+        .Where(point => point.Latitude is not null && point.Longitude is not null)
+        .ToList();
+    var centerLatitude = geocodedPoints.Count == 0 ? 46.603354m : geocodedPoints.Average(point => point.Latitude!.Value);
+    var centerLongitude = geocodedPoints.Count == 0 ? 1.888334m : geocodedPoints.Average(point => point.Longitude!.Value);
+
+    return new
+    {
+        Provider = "OpenStreetMap",
+        TileUrlTemplate = "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        Attribution = "© OpenStreetMap contributors",
+        Center = new
+        {
+            Latitude = Math.Round(centerLatitude, 6),
+            Longitude = Math.Round(centerLongitude, 6)
+        },
+        Bounds = geocodedPoints.Count == 0
+            ? null
+            : new
+            {
+                MinLatitude = geocodedPoints.Min(point => point.Latitude),
+                MaxLatitude = geocodedPoints.Max(point => point.Latitude),
+                MinLongitude = geocodedPoints.Min(point => point.Longitude),
+                MaxLongitude = geocodedPoints.Max(point => point.Longitude)
+            },
+        Points = points.Select(BuildLoadingPointResponse)
+    };
+}
+
+static async Task<GeocodingResult> GeocodeLoadingPointAsync(
+    LoadingPoint loadingPoint,
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider,
+    IHttpClientFactory httpClientFactory,
+    CancellationToken cancellationToken)
+{
+    var address = string.Join(", ", new[]
+    {
+        loadingPoint.AddressLine,
+        loadingPoint.PostalCode,
+        loadingPoint.City,
+        loadingPoint.CountryCode
+    }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+    if (string.IsNullOrWhiteSpace(address))
+    {
+        return GeocodingResult.Failed("Adresse vide.");
+    }
+
+    var geoapifyKey = await GetActiveCredentialValueAsync(dbContext, dataProtectionProvider, "GEOAPIFY", "GEOAPIFY_API_KEY", cancellationToken);
+    if (!string.IsNullOrWhiteSpace(geoapifyKey))
+    {
+        var geoapify = await TryGeocodeGeoapifyAsync(httpClientFactory, address, geoapifyKey, cancellationToken);
+        if (geoapify.IsSuccess)
+        {
+            return geoapify;
+        }
+    }
+
+    var googleKey = await GetActiveCredentialValueAsync(dbContext, dataProtectionProvider, "GOOGLE_MAPS", "GOOGLE_GEOCODING_API_KEY", cancellationToken);
+    if (!string.IsNullOrWhiteSpace(googleKey))
+    {
+        var google = await TryGeocodeGoogleAsync(httpClientFactory, address, googleKey, cancellationToken);
+        if (google.IsSuccess)
+        {
+            return google;
+        }
+    }
+
+    var nominatimBaseUrl = await GetActiveCredentialValueAsync(
+            dbContext,
+            dataProtectionProvider,
+            "OPENSTREETMAP",
+            "OPENSTREETMAP_NOMINATIM_BASE_URL",
+            cancellationToken) ??
+        "https://nominatim.openstreetmap.org";
+    var nominatim = await TryGeocodeNominatimAsync(httpClientFactory, address, nominatimBaseUrl, cancellationToken);
+    return nominatim.IsSuccess
+        ? nominatim
+        : GeocodingResult.Failed("Aucun fournisseur de geocodage n'a retourne de coordonnees.");
+}
+
+static async Task<GeocodingResult> TryGeocodeGeoapifyAsync(
+    IHttpClientFactory httpClientFactory,
+    string address,
+    string apiKey,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        var client = httpClientFactory.CreateClient("Integrations");
+        using var response = await client.GetAsync(
+            $"https://api.geoapify.com/v1/geocode/search?limit=1&text={Uri.EscapeDataString(address)}&apiKey={Uri.EscapeDataString(apiKey)}",
+            cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return GeocodingResult.Failed($"Geoapify retourne {(int)response.StatusCode} {response.ReasonPhrase}.");
+        }
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var feature = document.RootElement.GetProperty("features").EnumerateArray().FirstOrDefault();
+        if (feature.ValueKind == JsonValueKind.Undefined ||
+            !feature.TryGetProperty("properties", out var properties) ||
+            !TryGetJsonDecimal(properties, "lat", out var latitude) ||
+            !TryGetJsonDecimal(properties, "lon", out var longitude))
+        {
+            return GeocodingResult.Failed("Geoapify ne retourne aucune coordonnee.");
+        }
+
+        return GeocodingResult.Success("Geoapify", latitude, longitude);
+    }
+    catch (Exception exception)
+    {
+        return GeocodingResult.Failed($"Geoapify indisponible: {exception.Message}");
+    }
+}
+
+static async Task<GeocodingResult> TryGeocodeGoogleAsync(
+    IHttpClientFactory httpClientFactory,
+    string address,
+    string apiKey,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        var client = httpClientFactory.CreateClient("Integrations");
+        using var response = await client.GetAsync(
+            $"https://maps.googleapis.com/maps/api/geocode/json?address={Uri.EscapeDataString(address)}&key={Uri.EscapeDataString(apiKey)}",
+            cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return GeocodingResult.Failed($"Google Geocoding retourne {(int)response.StatusCode} {response.ReasonPhrase}.");
+        }
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var result = document.RootElement.GetProperty("results").EnumerateArray().FirstOrDefault();
+        if (result.ValueKind == JsonValueKind.Undefined ||
+            !result.TryGetProperty("geometry", out var geometry) ||
+            !geometry.TryGetProperty("location", out var location) ||
+            !TryGetJsonDecimal(location, "lat", out var latitude) ||
+            !TryGetJsonDecimal(location, "lng", out var longitude))
+        {
+            return GeocodingResult.Failed("Google Geocoding ne retourne aucune coordonnee.");
+        }
+
+        return GeocodingResult.Success("Google Maps", latitude, longitude);
+    }
+    catch (Exception exception)
+    {
+        return GeocodingResult.Failed($"Google Geocoding indisponible: {exception.Message}");
+    }
+}
+
+static async Task<GeocodingResult> TryGeocodeNominatimAsync(
+    IHttpClientFactory httpClientFactory,
+    string address,
+    string baseUrl,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        var client = httpClientFactory.CreateClient("Integrations");
+        var trimmedBaseUrl = baseUrl.TrimEnd('/');
+        using var response = await client.GetAsync(
+            $"{trimmedBaseUrl}/search?format=json&limit=1&q={Uri.EscapeDataString(address)}",
+            cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return GeocodingResult.Failed($"Nominatim retourne {(int)response.StatusCode} {response.ReasonPhrase}.");
+        }
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var item = document.RootElement.EnumerateArray().FirstOrDefault();
+        if (item.ValueKind == JsonValueKind.Undefined ||
+            !TryGetJsonDecimal(item, "lat", out var latitude) ||
+            !TryGetJsonDecimal(item, "lon", out var longitude))
+        {
+            return GeocodingResult.Failed("Nominatim ne retourne aucune coordonnee.");
+        }
+
+        return GeocodingResult.Success("OpenStreetMap / Nominatim", latitude, longitude);
+    }
+    catch (Exception exception)
+    {
+        return GeocodingResult.Failed($"Nominatim indisponible: {exception.Message}");
+    }
+}
+
+static bool TryGetJsonDecimal(JsonElement element, string propertyName, out decimal value)
+{
+    value = 0;
+    if (!element.TryGetProperty(propertyName, out var property))
+    {
+        return false;
+    }
+
+    return property.ValueKind switch
+    {
+        JsonValueKind.Number => property.TryGetDecimal(out value),
+        JsonValueKind.String => decimal.TryParse(property.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value),
+        _ => false
+    };
+}
+
+static async Task<object> BuildIntegrationReadinessAsync(
+    NewNexusDbContext dbContext,
+    IDataProtectionProvider dataProtectionProvider)
+{
+    var credentials = await dbContext.IntegrationCredentials
+        .AsNoTracking()
+        .ToListAsync();
+    var materials = await dbContext.Materials
+        .AsNoTracking()
+        .ToListAsync();
+    var loadingPoints = await dbContext.LoadingPoints
+        .AsNoTracking()
+        .ToListAsync();
+
+    bool HasActiveValue(string providerCode, string keyName)
+    {
+        var credential = credentials.SingleOrDefault(item =>
+            string.Equals(item.ProviderCode, providerCode, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(item.KeyName, keyName, StringComparison.OrdinalIgnoreCase) &&
+            item.IsActive);
+
+        return !string.IsNullOrWhiteSpace(credential?.ProtectedValue) &&
+            !string.IsNullOrWhiteSpace(UnprotectCredentialValue(credential.ProtectedValue, dataProtectionProvider));
+    }
+
+    object Provider(string code, string label, string status, string detail, string nextStep, object metrics)
+    {
+        return new
+        {
+            Code = code,
+            Label = label,
+            Status = status,
+            Detail = detail,
+            NextStep = nextStep,
+            Metrics = metrics
+        };
+    }
+
+    var truckOnlineReady = HasActiveValue("TRUCKONLINE", "TRUCKONLINE_BASE_URL") && HasActiveValue("TRUCKONLINE", "TRUCKONLINE_API_KEY");
+    var yellowBoxReady = HasActiveValue("YELLOWBOX", "YELLOWBOX_BASE_URL") &&
+        (HasActiveValue("YELLOWBOX", "YELLOWBOX_API_KEY") ||
+            (HasActiveValue("YELLOWBOX", "YELLOWBOX_BASIC_LOGIN") && HasActiveValue("YELLOWBOX", "YELLOWBOX_BASIC_PASSWORD")));
+    var geocodingReady = HasActiveValue("GEOAPIFY", "GEOAPIFY_API_KEY") ||
+        HasActiveValue("GOOGLE_MAPS", "GOOGLE_GEOCODING_API_KEY") ||
+        HasActiveValue("OPENSTREETMAP", "OPENSTREETMAP_NOMINATIM_BASE_URL");
+
+    return new[]
+    {
+        Provider(
+            "TRUCKONLINE",
+            "TruckOnline",
+            truckOnlineReady ? "PRET" : "CLE_A_COMPLETER",
+            "Import materiels et controle parc raccordes cote NewNexus; appel API externe a valider avec le contrat TruckOnline.",
+            "Renseigner URL + cle API puis executer la tache TruckOnline.",
+            new
+            {
+                Tractors = materials.Count(item => item.MaterialType == "TRACTEUR"),
+                Linked = materials.Count(item => string.Equals(item.SourceSystem, "TRUCKONLINE", StringComparison.OrdinalIgnoreCase))
+            }),
+        Provider(
+            "YELLOWBOX",
+            "YellowBox",
+            yellowBoxReady ? "PRET" : "CLE_A_COMPLETER",
+            "Import materiels et controle telematique raccordes cote NewNexus; appel API externe a valider avec le contrat YellowBox.",
+            "Renseigner URL + mode d'authentification puis executer la tache YellowBox.",
+            new
+            {
+                Tractors = materials.Count(item => item.MaterialType == "TRACTEUR"),
+                Linked = materials.Count(item => string.Equals(item.SourceSystem, "YELLOWBOX", StringComparison.OrdinalIgnoreCase))
+            }),
+        Provider(
+            "GEOCODING",
+            "Geocodage",
+            geocodingReady ? "PRET" : "NOMINATIM_FALLBACK",
+            "Geocodage des points raccorde avec priorite Geoapify, puis Google Maps, puis Nominatim.",
+            "Geocoder les points sans coordonnees depuis le module carte.",
+            new
+            {
+                Points = loadingPoints.Count,
+                MissingCoordinates = loadingPoints.Count(item => item.IsActive && (item.Latitude is null || item.Longitude is null))
+            }),
+        Provider(
+            "OPENSTREETMAP",
+            "Cartographie",
+            "PRET",
+            "Flux cartographique expose via OpenStreetMap avec centre, bornes et points actifs.",
+            "Recetter la carte sur les points geocodes.",
+            new
+            {
+                Points = loadingPoints.Count(item => item.IsActive),
+                Geocoded = loadingPoints.Count(item => item.IsActive && item.Latitude is not null && item.Longitude is not null)
+            })
+    };
+}
+
+static async Task<MaterialImportResult> ImportMaterialsFromProviderAsync(
+    NewNexusDbContext dbContext,
+    string providerCode,
+    IReadOnlyCollection<ImportMaterialItemRequest> requestedMaterials,
+    CancellationToken cancellationToken)
+{
+    var normalizedProviderCode = NormalizeTechnicalCode(providerCode);
+    var existingMaterials = await dbContext.Materials
+        .ToDictionaryAsync(material => material.FleetNumber, StringComparer.OrdinalIgnoreCase, cancellationToken);
+    var created = 0;
+    var updated = 0;
+    var skipped = 0;
+    var now = DateTime.UtcNow;
+    var importedRows = new List<object>();
+
+    foreach (var requestedMaterial in requestedMaterials)
+    {
+        var fleetNumber = NormalizeOptionalText(requestedMaterial.FleetNumber)?.ToUpperInvariant();
+        var label = NormalizeOptionalText(requestedMaterial.Label);
+        if (string.IsNullOrWhiteSpace(fleetNumber) || string.IsNullOrWhiteSpace(label))
+        {
+            skipped++;
+            continue;
+        }
+
+        if (!existingMaterials.TryGetValue(fleetNumber, out var material))
+        {
+            material = new Material
+            {
+                Id = Guid.NewGuid(),
+                FleetNumber = fleetNumber,
+                CreatedAtUtc = now
+            };
+            dbContext.Materials.Add(material);
+            existingMaterials[fleetNumber] = material;
+            created++;
+        }
+        else
+        {
+            updated++;
+        }
+
+        material.Label = label;
+        material.MaterialType = NormalizeOptionalText(requestedMaterial.MaterialType)?.ToUpperInvariant() ?? "TRACTEUR";
+        material.RegistrationNumber = NormalizeOptionalText(requestedMaterial.RegistrationNumber);
+        material.SourceSystem = normalizedProviderCode;
+        material.IsActive = requestedMaterial.IsActive;
+        material.LastSyncedAtUtc = now;
+        importedRows.Add(new
+        {
+            material.Id,
+            material.FleetNumber,
+            material.Label,
+            material.MaterialType,
+            material.SourceSystem
+        });
+    }
+
+    await dbContext.SaveChangesAsync(cancellationToken);
+
+    return new MaterialImportResult(normalizedProviderCode, created, updated, skipped, importedRows);
+}
+
 static ProfileRightsBuildResult TryBuildDesiredRights(
     IReadOnlyCollection<ProfileModuleRightRequest> requestedRights,
     IReadOnlyCollection<SecurityModule> modules)
@@ -4024,6 +4879,22 @@ static async Task<bool> HasModuleAccessAsync(
         ModuleAccessLevel.Read => accessLevel is ModuleAccessLevel.Read or ModuleAccessLevel.Write,
         ModuleAccessLevel.Write => accessLevel is ModuleAccessLevel.Write,
         _ => accessLevel is not null
+    };
+}
+
+static Func<EndpointFilterInvocationContext, EndpointFilterDelegate, ValueTask<object?>> RequireModuleAccessFilter(
+    string moduleCode,
+    ModuleAccessLevel requiredAccess)
+{
+    return async (context, next) =>
+    {
+        var dbContext = context.HttpContext.RequestServices.GetRequiredService<NewNexusDbContext>();
+        if (!await HasModuleAccessAsync(dbContext, context.HttpContext.User, moduleCode, requiredAccess))
+        {
+            return Results.Forbid();
+        }
+
+        return await next(context);
     };
 }
 
@@ -4738,6 +5609,7 @@ internal sealed record LoginRequest(string Login, string Password);
 internal sealed record ForgotPasswordRequest(string LoginOrEmail);
 internal sealed record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
 internal sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
+internal sealed record UpdateUserPreferencesRequest(bool IsSidebarCollapsed);
 internal sealed record UpdateAccountProfileRequest(Guid? SecurityProfileId);
 internal sealed record UpdateAccountStatusRequest(bool IsActive);
 internal sealed record CreateUserAccountRequest(
@@ -4840,6 +5712,32 @@ internal sealed record UpsertLoadingPointRequest(
     Guid? ExploitationId,
     bool IsActive,
     string? Notes);
+internal sealed record ImportMaterialsRequest(List<ImportMaterialItemRequest> Materials);
+internal sealed record ImportMaterialItemRequest(
+    string FleetNumber,
+    string Label,
+    string? MaterialType,
+    string? RegistrationNumber,
+    bool IsActive);
+internal sealed record MaterialImportResult(
+    string ProviderCode,
+    int CreatedCount,
+    int UpdatedCount,
+    int SkippedCount,
+    List<object> ImportedMaterials);
+internal sealed record GeocodingResult(
+    bool IsSuccess,
+    string? Provider,
+    decimal? Latitude,
+    decimal? Longitude,
+    string? ErrorDetail)
+{
+    public static GeocodingResult Success(string provider, decimal latitude, decimal longitude) =>
+        new(true, provider, latitude, longitude, null);
+
+    public static GeocodingResult Failed(string errorDetail) =>
+        new(false, null, null, null, errorDetail);
+}
 internal sealed record ProfileRightsBuildResult(bool IsValid, Dictionary<string, string[]> Errors, Dictionary<Guid, ModuleAccessLevel> RightsByModuleId);
 internal sealed record UpsertIntegrationCredentialRequest(
     string ProviderCode,

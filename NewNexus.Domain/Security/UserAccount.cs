@@ -10,6 +10,7 @@ public sealed class UserAccount
     public string PasswordHash { get; set; } = string.Empty;
     public bool MustChangePassword { get; set; } = true;
     public int SessionTimeoutMinutes { get; set; } = 60;
+    public bool IsSidebarCollapsed { get; set; }
     public Guid? SecurityProfileId { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAtUtc { get; set; }

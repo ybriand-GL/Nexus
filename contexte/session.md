@@ -1,6 +1,6 @@
 ﻿# Contexte NewNexus
 Auteur du suivi: Codex
-Derniere mise a jour: 2026-04-29
+Derniere mise a jour: 2026-05-06
 
 ## Objet du chantier
 
@@ -470,6 +470,7 @@ Ordre cible de construction:
 - validation technique:
   - `dotnet build NewNexus.slnx` OK
   - `npm run build` OK
+
 - publication IIS:
   - `scripts\publish_newnexus_iis.ps1` OK
 - validation publication:
@@ -1961,3 +1962,186 @@ Ordre cible de construction:
   - `GET /newNexus/api/system/info` retourne `200 application/json`
   - `GET /newNexus/api/modules/loading-points` retourne `401` sans session
   - `GET /newNexus/api/modules/loading-points/referentials` retourne `401` sans session
+
+## 2026-05-05 - Passe raccord interfaces, indicateurs et dashboards profils
+
+- demande:
+  - traiter en une seule passe les interfaces TruckOnline, YellowBox, geocodage et cartographie
+  - definir/developper les indicateurs conducteurs et tracteurs
+  - verrouiller la preparation `/newNexus`
+  - checker les accents, anomalies et coherence visuelle
+  - preparer les tableaux de bord par profil
+- corrections API:
+  - ajout du client HTTP `Integrations`
+  - ajout de `GET /api/admin/integrations/readiness`
+  - ajout de `POST /api/admin/integrations/{providerCode}/materials/import` pour ingestion TruckOnline/YellowBox vers le referentiel materiels
+  - taches `TRUCKONLINE_FLEET_SYNC`, `YELLOWBOX_TELEMATICS_SYNC` et `GEOCODING_LOADING_POINTS` rendues executables en controle local
+  - ajout de `GET /api/modules/loading-points/map` pour exposer les donnees cartographiques OpenStreetMap
+  - ajout de `POST /api/modules/loading-points/{loadingPointId}/geocode` avec priorite Geoapify, Google Maps puis OpenStreetMap/Nominatim
+  - ajout de `GET /api/modules/driver-indicators`
+  - ajout de `GET /api/modules/tractor-indicators`
+- corrections UI:
+  - modules `Les indicateurs conducteurs` et `Les indicateurs des tracteurs` remplaces par des ecrans operationnels avec KPIs et listes detaillees
+  - accueil enrichi par tableaux de bord profil: Informatique, Direction, Exploitation, Administratif et fallback sans profil
+  - styles ajoutes pour panneaux de dashboard profil, cartes indicateurs et lignes responsive
+- qualite:
+  - check accents source effectue sur frontend/API/seeds, aucun motif `Ã`, `Â` ou caractere de remplacement restant dans les fichiers actifs controles
+  - coherence visuelle controlee par build frontend et revue CSS: grilles responsive, lignes indicateurs empilables mobile, pas de nouvelle carte imbriquee
+- backlog:
+  - TruckOnline, YellowBox, Geocodage et Cartographie passent de `A_DEVELOPPER` a `A_TESTER`
+  - Indicateurs conducteurs et tracteurs passent de `SCAFFOLDE` a `A_TESTER`
+  - Dashboard par profil precise en `A_TESTER`
+  - publication sous `/newNexus` precisee en `A_TESTER`
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation publication:
+  - `GET /newNexus/` retourne `200 text/html`
+  - `GET /newNexus/api/system/info` retourne `200 application/json` avec `basePath=/newNexus`
+  - `GET /newNexus/api/modules/driver-indicators` retourne `401` sans session
+  - `GET /newNexus/api/modules/loading-points/map` retourne `401` sans session
+  - test authentifie avec `admin / legri00` non valide sur l'environnement publie: `401`, payloads metier a recetter avec un compte actif connu
+
+## 2026-05-06 - Verrouillage auth et droits Donnees Communes
+
+- demande:
+  - tester avec le compte `yannick / GroupeLaure`
+  - corriger le rendu post-auth ou l'accueil apparaissait avant l'animation, puis re-apparaissait
+  - soumettre le module `Donnees Communes` au modele de droits
+- corrections securite:
+  - ajout du module de securite `DONNEES_COMMUNES`
+  - migration `CommonDataSecurityModule` generee et appliquee localement
+  - droits semes:
+    - Informatique: `Write`
+    - Direction: `Read`
+    - Exploitation: `Read`
+    - Administratif: `None`
+  - endpoints `/api/settings/*` remplaces par un controle module:
+    - `Read` pour bootstrap et recherche SIRENE
+    - `Write` pour creation, modification, import Lucca et provisioning comptes salaries
+- corrections UI:
+  - entree principale et sous-menu `Donnees Communes` affiches selon le droit `DONNEES_COMMUNES`
+  - chargement des referentiels communs autorise pour les profils non Informatique ayant le droit Lecture
+  - actions de modification Donnees Communes desactivees sans droit Ecriture
+  - loader post-auth declenche avant l'hydratation applicative pour eviter le flash Accueil -> animation -> Accueil
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation HTTP:
+  - `POST /newNexus/api/auth/login` avec `yannick / GroupeLaure` retourne `200`
+  - compte confirme: `yannick`, profil `INFORMATIQUE`, droit `DONNEES_COMMUNES=Write`
+  - `GET /newNexus/api/security/modules` expose `DONNEES_COMMUNES`, libelle `Données Communes`
+  - `GET /newNexus/api/settings/bootstrap` avec cookie de session retourne `200`
+  - `GET /newNexus/api/settings/bootstrap` sans session retourne `401`
+
+## 2026-05-06 - Carrousel tableaux de bord profil pour Informatique
+
+- demande:
+  - avec le profil Informatique, pouvoir consulter les tableaux de bord des autres profils via un carrousel
+- corrections UI:
+  - ajout d'un carrousel dans l'accueil pour le profil `INFORMATIQUE`
+  - profils consultables: Informatique, Direction, Exploitation, Administratif selon les profils actifs charges
+  - les KPIs et actions rapides sont recalcules selon le profil affiche
+  - les modules visibles du tableau affiche sont derives des droits du profil consulte, pas uniquement du profil connecte
+  - fallback conserve pour les comptes non Informatique: affichage du tableau de bord du profil courant
+- validation technique:
+  - `npm run build` OK
+
+## 2026-05-06 - Cube dashboards et droits de consultation
+
+- demande:
+  - retirer le bloc haut `Accueil` sur la page d'accueil
+  - retirer le bloc bas `Synthese`
+  - remplacer le carrousel de dashboards par un cube pivotant plus visuel
+  - permettre de definir par profil quels dashboards sont visibles
+- corrections securite:
+  - ajout des modules de droits:
+    - `DASHBOARD_INFORMATIQUE`
+    - `DASHBOARD_DIRECTION`
+    - `DASHBOARD_EXPLOITATION`
+    - `DASHBOARD_ADMINISTRATIF`
+  - migration `DashboardAccessRights` generee et appliquee localement
+  - droits semes:
+    - Informatique: `Write` sur les quatre dashboards
+    - Direction: `Read` sur son dashboard
+    - Exploitation: `Read` sur son dashboard
+    - Administratif: `Read` sur son dashboard
+  - l'ecran Profils permet maintenant de piloter ces droits dans la matrice existante
+- corrections UI:
+  - le hero de page n'est plus affiche quand la navigation active est `Accueil`
+  - le panneau `Lecture de votre session` est supprime de l'accueil
+  - le choix des dashboards est filtre par les droits `DASHBOARD_*` du compte connecte
+  - le carrousel est remplace par un cube 3D pivotant avec boutons precedent/suivant et selection directe
+  - les droits dashboards sont exclus des modules de travail visibles pour eviter de polluer les menus metier
+- validation technique:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation HTTP:
+  - `GET /newNexus/` retourne `200`
+  - `POST /newNexus/api/auth/login` avec `yannick / GroupeLaure` retourne `200`
+  - compte confirme: `yannick`, profil `INFORMATIQUE`
+  - droits confirmes: `DASHBOARD_INFORMATIQUE=Write`, `DASHBOARD_DIRECTION=Write`, `DASHBOARD_EXPLOITATION=Write`, `DASHBOARD_ADMINISTRATIF=Write`
+
+## 2026-05-06 - Cube applique au bloc dashboard complet
+
+- demande:
+  - l'effet cube doit porter sur le bloc entier du tableau de bord, pas seulement sur son nom
+- correction UI:
+  - chaque face du cube contient maintenant le panneau complet: titre, description, KPIs et actions rapides
+  - les controles precedent/suivant et les onglets restent externes au cube pour conserver une navigation stable
+  - profondeur du cube ajustee desktop/mobile via variable CSS `--dashboard-cube-depth`
+- validation technique:
+  - `npm run build` OK
+
+## 2026-05-06 - Simplification navigation cube dashboards
+
+- demande:
+  - supprimer les boutons texte precedent/suivant
+  - supprimer les noms de dashboards sous forme d'onglets
+  - placer des fleches a gauche et a droite du dashboard
+  - supprimer le bloc `Acces rapides`
+- correction UI:
+  - controles du cube remplaces par deux fleches laterales iconiques
+  - onglets de noms des dashboards retires
+  - bloc `Acces rapides / Espaces disponibles` retire de l'accueil
+- validation technique:
+  - `npm run build` OK
+
+## 2026-05-06 - Menu retractable, cube ralenti et accents
+
+- demande:
+  - ralentir l'animation du cube
+  - rapprocher le tableau de bord du haut de page
+  - rendre le menu de navigation retractable
+  - enregistrer ce choix sur le compte utilisateur pour la prochaine connexion
+  - refaire un check complet des accents visibles
+- corrections backend:
+  - ajout de `UserAccount.IsSidebarCollapsed`
+  - endpoint `PUT /api/auth/preferences` pour enregistrer la preference utilisateur connecte
+  - retour `isSidebarCollapsed` ajoute a `login`, `me` et aux reponses d'authentification
+  - migration `UserSidebarPreference` generee et appliquee localement
+- corrections UI:
+  - bouton de repli/depli ajoute dans la sidebar
+  - etat de sidebar hydrate depuis le compte et sauvegarde a chaque changement
+  - layout principal adapte a une sidebar compacte
+  - animation du cube ralentie a `1.35s`
+  - accueil remonte via une variante `nexus-main-home`
+  - normalisation visible enrichie pour les accents courants: taches, planifiees, pret/prete, creation, materiels, salaries, societes, cles, coordonnees, etc.
+- validation technique:
+  - `dotnet ef database update --project NewNexus.Data.Postgres --startup-project NewNexus.Api` OK
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+- publication IIS:
+  - `scripts\publish_newnexus_iis.ps1` OK
+- validation HTTP/API:
+  - `GET /newNexus/` retourne `200`
+  - login `yannick / GroupeLaure` OK, profil `INFORMATIQUE`
+  - preference testee: `false -> true`, relue via `GET /api/auth/me`, puis restauree a `false`

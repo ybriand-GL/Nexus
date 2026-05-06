@@ -1823,6 +1823,99 @@ app.MapGet("/api/nexa/admin/routing-rules", async (NewNexusDbContext dbContext, 
     return Results.Ok(rules.Select(BuildNexaRoutingRuleResponse));
 }).RequireAuthorization("RequireInformatique");
 
+app.MapGet("/api/nexa/admin/referents", async (NewNexusDbContext dbContext, HttpContext httpContext) =>
+{
+    var referents = await dbContext.NexaReferents
+        .AsNoTracking()
+        .Include(referent => referent.NexaModule)
+        .Include(referent => referent.UserAccount)
+        .OrderBy(referent => referent.NexaModule!.DisplayOrder)
+        .ThenByDescending(referent => referent.IsPrimary)
+        .ThenBy(referent => referent.UserAccount!.DisplayName)
+        .ToListAsync(httpContext.RequestAborted);
+    return Results.Ok(referents.Select(BuildNexaReferentResponse));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/nexa/admin/referents", async (
+    NexaReferentRequest request,
+    NewNexusDbContext dbContext,
+    HttpContext httpContext) =>
+{
+    var moduleExists = await dbContext.NexaModules.AnyAsync(module => module.Id == request.ModuleId && module.IsActive, httpContext.RequestAborted);
+    var accountExists = await dbContext.UserAccounts.AnyAsync(account => account.Id == request.UserAccountId && account.IsActive, httpContext.RequestAborted);
+    if (!moduleExists || !accountExists)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["referent"] = ["Le module et le compte referent sont obligatoires."]
+        });
+    }
+
+    var existing = await dbContext.NexaReferents
+        .SingleOrDefaultAsync(referent => referent.NexaModuleId == request.ModuleId && referent.UserAccountId == request.UserAccountId, httpContext.RequestAborted);
+    if (existing is not null)
+    {
+        existing.IsPrimary = request.IsPrimary;
+        existing.IsActive = request.IsActive;
+    }
+    else
+    {
+        existing = new NexaReferent
+        {
+            Id = Guid.NewGuid(),
+            NexaModuleId = request.ModuleId,
+            UserAccountId = request.UserAccountId,
+            IsPrimary = request.IsPrimary,
+            IsActive = request.IsActive,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        dbContext.NexaReferents.Add(existing);
+    }
+
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    var referent = await dbContext.NexaReferents
+        .AsNoTracking()
+        .Include(item => item.NexaModule)
+        .Include(item => item.UserAccount)
+        .SingleAsync(item => item.Id == existing.Id, httpContext.RequestAborted);
+    return Results.Ok(BuildNexaReferentResponse(referent));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/nexa/admin/referents/{referentId:guid}", async (
+    Guid referentId,
+    NexaReferentRequest request,
+    NewNexusDbContext dbContext,
+    HttpContext httpContext) =>
+{
+    var referent = await dbContext.NexaReferents.SingleOrDefaultAsync(item => item.Id == referentId, httpContext.RequestAborted);
+    if (referent is null)
+    {
+        return Results.NotFound();
+    }
+
+    var moduleExists = await dbContext.NexaModules.AnyAsync(module => module.Id == request.ModuleId && module.IsActive, httpContext.RequestAborted);
+    var accountExists = await dbContext.UserAccounts.AnyAsync(account => account.Id == request.UserAccountId && account.IsActive, httpContext.RequestAborted);
+    if (!moduleExists || !accountExists)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["referent"] = ["Le module et le compte referent sont obligatoires."]
+        });
+    }
+
+    referent.NexaModuleId = request.ModuleId;
+    referent.UserAccountId = request.UserAccountId;
+    referent.IsPrimary = request.IsPrimary;
+    referent.IsActive = request.IsActive;
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    var updated = await dbContext.NexaReferents
+        .AsNoTracking()
+        .Include(item => item.NexaModule)
+        .Include(item => item.UserAccount)
+        .SingleAsync(item => item.Id == referent.Id, httpContext.RequestAborted);
+    return Results.Ok(BuildNexaReferentResponse(updated));
+}).RequireAuthorization("RequireInformatique");
+
 app.MapPost("/api/nexa/admin/routing-rules", async (
     NexaRoutingRuleRequest request,
     NewNexusDbContext dbContext,
@@ -7446,6 +7539,19 @@ static object BuildNexaRoutingRuleResponse(NexaRoutingRule rule)
     };
 }
 
+static object BuildNexaReferentResponse(NexaReferent referent)
+{
+    return new
+    {
+        referent.Id,
+        Module = referent.NexaModule is null ? null : new { referent.NexaModule.Id, referent.NexaModule.Code, referent.NexaModule.Label },
+        User = BuildNexaUserSummary(referent.UserAccount),
+        referent.IsPrimary,
+        referent.IsActive,
+        referent.CreatedAtUtc
+    };
+}
+
 static string NormalizeNexaPriority(string? priorityCode)
 {
     var normalized = NormalizeProfileCode(priorityCode ?? "NORMAL");
@@ -7530,6 +7636,7 @@ internal sealed record NexaKnowledgeUpsertRequest(
     string? Keywords,
     decimal? ReliabilityScore);
 internal sealed record NexaKnowledgeFeedbackRequest(bool IsPositive, string? Comment);
+internal sealed record NexaReferentRequest(Guid ModuleId, Guid UserAccountId, bool IsPrimary, bool IsActive);
 internal sealed record NexaRoutingRuleRequest(
     Guid? ModuleId,
     Guid? CategoryId,

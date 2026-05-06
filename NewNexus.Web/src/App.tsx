@@ -139,6 +139,27 @@ type NexaKnowledgeItem = {
   category: NexaReferenceCategory | null
 }
 
+type NexaReferentItem = {
+  id: string
+  module: NexaReferenceModule | null
+  user: { id: string; login: string; displayName: string } | null
+  isPrimary: boolean
+  isActive: boolean
+  createdAtUtc: string
+}
+
+type NexaRoutingRuleItem = {
+  id: string
+  module: NexaReferenceModule | null
+  category: NexaReferenceCategory | null
+  keywordPattern: string | null
+  priorityCode: string | null
+  referent: { id: string; login: string; displayName: string } | null
+  secondaryReferent: { id: string; login: string; displayName: string } | null
+  isActive: boolean
+  displayOrder: number
+}
+
 type SecurityModuleItem = {
   id: string
   code: string
@@ -760,7 +781,7 @@ const loadingPointsModuleCode = 'CARTE_POINTS_CHARGEMENT_DECHARGEMENT'
 const driverIndicatorsModuleCode = 'INDICATEURS_CONDUCTEURS'
 const tractorIndicatorsModuleCode = 'INDICATEURS_TRACTEURS'
 const contraventionStatuses = [
-  { code: 'A_TRAITER', label: 'A traiter' },
+  { code: 'A_TRAITER', label: 'À traiter' },
   { code: 'EN_CONTESTATION', label: 'En contestation' },
   { code: 'A_PAYER', label: 'A payer' },
   { code: 'PAYEE', label: 'Payee' },
@@ -1036,7 +1057,7 @@ function App() {
   const [nexaChatMessages, setNexaChatMessages] = useState<NexaChatMessage[]>([
     {
       role: 'assistant',
-      content: 'Je suis Nexa. Je reponds uniquement a partir des connaissances internes validees. Si la reponse est incertaine, je vous propose un ticket.',
+      content: 'Je suis Nexa. Je réponds uniquement à partir des connaissances internes validées. Si la réponse est incertaine, je vous propose un ticket.',
       mode: 'local-fallback',
     },
   ])
@@ -1047,6 +1068,8 @@ function App() {
   const [nexaCategories, setNexaCategories] = useState<NexaReferenceCategory[]>([])
   const [nexaTickets, setNexaTickets] = useState<NexaTicketItem[]>([])
   const [nexaKnowledge, setNexaKnowledge] = useState<NexaKnowledgeItem[]>([])
+  const [nexaReferents, setNexaReferents] = useState<NexaReferentItem[]>([])
+  const [nexaRoutingRules, setNexaRoutingRules] = useState<NexaRoutingRuleItem[]>([])
   const [nexaSelectedModuleId, setNexaSelectedModuleId] = useState('')
   const [nexaSelectedCategoryId, setNexaSelectedCategoryId] = useState('')
   const [nexaTicketPriority, setNexaTicketPriority] = useState('NORMAL')
@@ -1054,6 +1077,19 @@ function App() {
   const [nexaLastAsk, setNexaLastAsk] = useState<NexaAskResponse | null>(null)
   const [isCreatingNexaTicket, setIsCreatingNexaTicket] = useState(false)
   const [nexaTicketAnswers, setNexaTicketAnswers] = useState<Record<string, string>>({})
+  const [nexaTicketView, setNexaTicketView] = useState<'mine' | 'to_process' | 'all'>('all')
+  const [nexaTicketStatusFilter, setNexaTicketStatusFilter] = useState('ALL')
+  const [nexaTicketModuleFilter, setNexaTicketModuleFilter] = useState('ALL')
+  const [nexaSelectedTicketId, setNexaSelectedTicketId] = useState<string | null>(null)
+  const [nexaReferentForm, setNexaReferentForm] = useState({ moduleId: '', userAccountId: '', isPrimary: true })
+  const [nexaRoutingRuleForm, setNexaRoutingRuleForm] = useState({
+    moduleId: '',
+    categoryId: '',
+    keywordPattern: '',
+    priorityCode: '',
+    referentUserAccountId: '',
+    secondaryReferentUserAccountId: '',
+  })
   const lastNexaUsageSignalRef = useRef('')
   const nexaUsageSignalTimerRef = useRef<number | null>(null)
   const [credentials, setCredentials] = useState({
@@ -1250,6 +1286,28 @@ function App() {
       ? commonDataNavigationEntries
       : settingsNavigationEntries
   const canEditReferenceData = selectedNavigation === commonDataNavigationLabel ? canWriteCommonData : isInformatique
+  const filteredNexaTickets = useMemo(() => {
+    return nexaTickets.filter((ticket) => {
+      if (nexaTicketView === 'mine' && ticket.requester?.id !== currentUser?.id) {
+        return false
+      }
+
+      if (nexaTicketView === 'to_process' && ticket.assignedTo?.id !== currentUser?.id && !isInformatique) {
+        return false
+      }
+
+      if (nexaTicketStatusFilter !== 'ALL' && ticket.statusCode !== nexaTicketStatusFilter) {
+        return false
+      }
+
+      if (nexaTicketModuleFilter !== 'ALL' && ticket.module?.id !== nexaTicketModuleFilter) {
+        return false
+      }
+
+      return true
+    })
+  }, [currentUser?.id, isInformatique, nexaTicketModuleFilter, nexaTicketStatusFilter, nexaTicketView, nexaTickets])
+  const selectedNexaTicket = filteredNexaTickets.find((ticket) => ticket.id === nexaSelectedTicketId) ?? filteredNexaTickets[0] ?? null
 
   const currentWorkspaceModules = selectedNavigation === 'Exploitation' || selectedNavigation === 'Gestion administrative'
     ? modulesByGroup[selectedNavigation] ?? []
@@ -1811,6 +1869,9 @@ function App() {
     void loadNexaReferenceData()
     void loadNexaTickets()
     void loadNexaKnowledge()
+    if (user.profile?.code === 'INFORMATIQUE') {
+      void loadNexaAdminData()
+    }
     const hasContraventionsAccess = user.rights.some(
       (right) => right.moduleCode === contraventionsModuleCode && canAccessModule(right.accessLevel),
     )
@@ -1936,6 +1997,8 @@ function App() {
       setNexaCategories(payload.categories)
       if (!nexaSelectedModuleId && payload.modules.length > 0) {
         setNexaSelectedModuleId(payload.modules[0].id)
+        setNexaReferentForm((current) => ({ ...current, moduleId: current.moduleId || payload.modules[0].id }))
+        setNexaRoutingRuleForm((current) => ({ ...current, moduleId: current.moduleId || payload.modules[0].id }))
       }
     } catch {
       // Nexa reference data is optional for the shell; the assistant will surface errors on action.
@@ -1965,6 +2028,21 @@ function App() {
       setNexaKnowledge((await response.json()) as NexaKnowledgeItem[])
     } catch {
       setNexaKnowledge([])
+    }
+  }
+
+  async function loadNexaAdminData() {
+    const [referentsResponse, routingRulesResponse] = await Promise.all([
+      fetch(apiPath('api/nexa/admin/referents')),
+      fetch(apiPath('api/nexa/admin/routing-rules')),
+    ])
+
+    if (referentsResponse.ok) {
+      setNexaReferents((await referentsResponse.json()) as NexaReferentItem[])
+    }
+
+    if (routingRulesResponse.ok) {
+      setNexaRoutingRules((await routingRulesResponse.json()) as NexaRoutingRuleItem[])
     }
   }
 
@@ -2064,7 +2142,7 @@ function App() {
         ...current,
         {
           role: 'assistant',
-          content: `Ticket ${ticket.ticketNumber} cree et affecte a ${ticket.assignedTo?.displayName ?? 'un referent a definir'}.`,
+          content: `Ticket ${ticket.ticketNumber} créé et affecté à ${ticket.assignedTo?.displayName ?? 'un référent à définir'}.`,
           mode: 'ticketing',
         },
       ])
@@ -2105,7 +2183,7 @@ function App() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ comment: 'Reponse validee depuis Nexus.' }),
+      body: JSON.stringify({ comment: 'Réponse validée depuis Nexus.' }),
     })
     if (!response.ok) {
       setNexaChatError(await getRequestError(response, 'Impossible de valider la reponse.'))
@@ -2123,7 +2201,7 @@ function App() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ comment: 'Reponse insuffisante.' }),
+      body: JSON.stringify({ comment: 'Réponse insuffisante.' }),
     })
     if (!response.ok) {
       setNexaChatError(await getRequestError(response, 'Impossible de refuser la reponse.'))
@@ -2143,6 +2221,115 @@ function App() {
       body: JSON.stringify({ isPositive, comment: null }),
     })
     await loadNexaKnowledge()
+  }
+
+  async function saveNexaReferent() {
+    if (!nexaReferentForm.moduleId || !nexaReferentForm.userAccountId) {
+      setNexaChatError('Sélectionnez un module et un référent.')
+      return
+    }
+
+    const response = await fetch(apiPath('api/nexa/admin/referents'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        moduleId: nexaReferentForm.moduleId,
+        userAccountId: nexaReferentForm.userAccountId,
+        isPrimary: nexaReferentForm.isPrimary,
+        isActive: true,
+      }),
+    })
+
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible d’enregistrer le référent Nexa.'))
+      return
+    }
+
+    await loadNexaAdminData()
+  }
+
+  async function toggleNexaReferent(referent: NexaReferentItem) {
+    if (!referent.module?.id || !referent.user?.id) {
+      return
+    }
+
+    const response = await fetch(apiPath(`api/nexa/admin/referents/${referent.id}`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        moduleId: referent.module.id,
+        userAccountId: referent.user.id,
+        isPrimary: referent.isPrimary,
+        isActive: !referent.isActive,
+      }),
+    })
+
+    if (response.ok) {
+      await loadNexaAdminData()
+    }
+  }
+
+  async function saveNexaRoutingRule() {
+    if (!nexaRoutingRuleForm.referentUserAccountId) {
+      setNexaChatError('Sélectionnez un référent principal pour la règle.')
+      return
+    }
+
+    const response = await fetch(apiPath('api/nexa/admin/routing-rules'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        moduleId: nexaRoutingRuleForm.moduleId || null,
+        categoryId: nexaRoutingRuleForm.categoryId || null,
+        keywordPattern: nexaRoutingRuleForm.keywordPattern.trim() || null,
+        priorityCode: nexaRoutingRuleForm.priorityCode || null,
+        referentUserAccountId: nexaRoutingRuleForm.referentUserAccountId,
+        secondaryReferentUserAccountId: nexaRoutingRuleForm.secondaryReferentUserAccountId || null,
+        isActive: true,
+        displayOrder: nexaRoutingRules.length + 1,
+      }),
+    })
+
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible d’enregistrer la règle Nexa.'))
+      return
+    }
+
+    setNexaRoutingRuleForm((current) => ({ ...current, keywordPattern: '', priorityCode: '', secondaryReferentUserAccountId: '' }))
+    await loadNexaAdminData()
+  }
+
+  async function toggleNexaRoutingRule(rule: NexaRoutingRuleItem) {
+    if (!rule.referent?.id) {
+      return
+    }
+
+    const response = await fetch(apiPath(`api/nexa/admin/routing-rules/${rule.id}`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        moduleId: rule.module?.id ?? null,
+        categoryId: rule.category?.id ?? null,
+        keywordPattern: rule.keywordPattern,
+        priorityCode: rule.priorityCode,
+        referentUserAccountId: rule.referent.id,
+        secondaryReferentUserAccountId: rule.secondaryReferent?.id ?? null,
+        isActive: !rule.isActive,
+        displayOrder: rule.displayOrder,
+      }),
+    })
+
+    if (response.ok) {
+      await loadNexaAdminData()
+    }
   }
 
   async function loadAdminSecurityData() {
@@ -4875,7 +5062,7 @@ function App() {
                 <h2>Assistant, tickets et connaissances</h2>
               </div>
               <p className="profiles-toolbar-copy">
-                Nexa reste interne a Nexus: le navigateur appelle uniquement le backend, les droits filtrent les donnees et seules les reponses validees alimentent la connaissance.
+                Nexa reste interne à Nexus: le navigateur appelle uniquement le backend, les droits filtrent les données et seules les réponses validées alimentent la connaissance.
               </p>
               <section className="settings-kpis">
                 <div className="metric-card metric-card-navy">
@@ -4883,53 +5070,75 @@ function App() {
                   <strong>{nexaTickets.length}</strong>
                 </div>
                 <div className="metric-card metric-card-champagne">
-                  <span className="metric-label">A traiter</span>
-                  <strong>{nexaTickets.filter((ticket) => !['VALIDE', 'CLOTURE', 'ANNULE'].includes(ticket.statusCode)).length}</strong>
+                  <span className="metric-label">À traiter</span>
+                  <strong>{nexaTickets.filter((ticket) => ['NOUVEAU', 'AFFECTE', 'EN_COURS', 'EN_ATTENTE_VALIDATION_DEMANDEUR', 'REFUSE'].includes(ticket.statusCode)).length}</strong>
                 </div>
                 <div className="metric-card metric-card-cyan">
                   <span className="metric-label">Connaissances</span>
                   <strong>{nexaKnowledge.length}</strong>
                 </div>
               </section>
+              <section className="nexa-admin-filters" aria-label="Filtres tickets Nexa">
+                <div className="segmented-control">
+                  <button className={nexaTicketView === 'all' ? 'is-active' : ''} onClick={() => setNexaTicketView('all')} type="button">Tous</button>
+                  <button className={nexaTicketView === 'mine' ? 'is-active' : ''} onClick={() => setNexaTicketView('mine')} type="button">Mes demandes</button>
+                  <button className={nexaTicketView === 'to_process' ? 'is-active' : ''} onClick={() => setNexaTicketView('to_process')} type="button">À traiter</button>
+                </div>
+                <select value={nexaTicketStatusFilter} onChange={(event) => setNexaTicketStatusFilter(event.target.value)}>
+                  <option value="ALL">Tous les statuts</option>
+                  {['NOUVEAU', 'AFFECTE', 'EN_COURS', 'EN_ATTENTE_VALIDATION_DEMANDEUR', 'VALIDE', 'REFUSE', 'CLOTURE', 'ANNULE'].map((statusCode) => (
+                    <option key={statusCode} value={statusCode}>{formatNexaTicketStatus(statusCode)}</option>
+                  ))}
+                </select>
+                <select value={nexaTicketModuleFilter} onChange={(event) => setNexaTicketModuleFilter(event.target.value)}>
+                  <option value="ALL">Tous les modules</option>
+                  {nexaModules.map((module) => (
+                    <option key={module.id} value={module.id}>{module.label}</option>
+                  ))}
+                </select>
+              </section>
               <div className="nexa-admin-layout">
                 <section className="settings-list-section">
                   <div className="settings-list-header">
                     <div>
                       <h3>Tickets Nexa</h3>
-                      <small>Demandes issues des questions non resolues</small>
+                      <small>Demandes issues des questions non résolues</small>
                     </div>
-                    <button className="secondary-button" onClick={() => void loadNexaTickets()} type="button">Actualiser</button>
+                    <button className="secondary-button" onClick={() => { void loadNexaTickets(); void loadNexaAdminData() }} type="button">Actualiser</button>
                   </div>
                   <div className="settings-list">
-                    {nexaTickets.length === 0 ? (
+                    {filteredNexaTickets.length === 0 ? (
                       <div className="settings-empty">Aucun ticket Nexa pour le moment.</div>
-                    ) : nexaTickets.map((ticket) => (
-                      <article className="settings-edit-card nexa-ticket-card" key={ticket.id}>
+                    ) : filteredNexaTickets.map((ticket) => (
+                      <article className={`settings-edit-card nexa-ticket-card ${selectedNexaTicket?.id === ticket.id ? 'nexa-ticket-card-selected' : ''}`} key={ticket.id}>
                         <div className="settings-list-header">
                           <div>
                             <h4>{ticket.ticketNumber}</h4>
-                            <small>{ticket.module?.label ?? 'Module non renseigne'} - {ticket.statusCode}</small>
+                            <small>{ticket.module?.label ?? 'Module non renseigné'} - {formatNexaTicketStatus(ticket.statusCode)}</small>
                           </div>
-                          <span className="profile-status-badge is-active">{ticket.priorityCode}</span>
+                          <span className="profile-status-badge is-active">{formatNexaPriority(ticket.priorityCode)}</span>
                         </div>
                         <p>{ticket.question}</p>
-                        <small>Demandeur: {ticket.requester?.displayName ?? '-'} | Referent: {ticket.assignedTo?.displayName ?? 'Non affecte'}</small>
+                        <small>Demandeur: {ticket.requester?.displayName ?? '-'} | Référent: {ticket.assignedTo?.displayName ?? 'Non affecté'}</small>
+                        <button className="secondary-button" onClick={() => setNexaSelectedTicketId(ticket.id)} type="button">
+                          Voir la fiche
+                        </button>
                         {ticket.referentAnswer ? (
                           <div className="nexa-ticket-answer">
-                            <strong>Reponse referent</strong>
+                            <strong>Réponse référent</strong>
                             <p>{ticket.referentAnswer}</p>
                           </div>
                         ) : null}
                         {!['VALIDE', 'CLOTURE', 'ANNULE'].includes(ticket.statusCode) ? (
                           <div className="nexa-ticket-actions">
                             <textarea
-                              placeholder="Reponse du referent"
+                              placeholder="Réponse du référent"
                               rows={3}
                               value={nexaTicketAnswers[ticket.id] ?? ''}
                               onChange={(event) => setNexaTicketAnswers((current) => ({ ...current, [ticket.id]: event.target.value }))}
                             />
                             <button className="secondary-button" disabled={!(nexaTicketAnswers[ticket.id] ?? '').trim()} onClick={() => void answerNexaTicket(ticket.id)} type="button">
-                              Repondre
+                              Répondre
                             </button>
                           </div>
                         ) : null}
@@ -4948,16 +5157,48 @@ function App() {
                   </div>
                 </section>
                 <section className="settings-list-section">
+                  {selectedNexaTicket ? (
+                    <article className="settings-edit-card nexa-ticket-detail">
+                      <div className="settings-list-header">
+                        <div>
+                          <h3>{selectedNexaTicket.ticketNumber}</h3>
+                          <small>{formatNexaTicketStatus(selectedNexaTicket.statusCode)} - {selectedNexaTicket.module?.label ?? 'Module non renseigné'}</small>
+                        </div>
+                        <span className="profile-status-badge is-active">{formatNexaPriority(selectedNexaTicket.priorityCode)}</span>
+                      </div>
+                      <p>{selectedNexaTicket.question}</p>
+                      <div className="profile-summary-rights">
+                        <div className="profile-summary-right">
+                          <span>Demandeur</span>
+                          <strong>{selectedNexaTicket.requester?.displayName ?? '-'}</strong>
+                        </div>
+                        <div className="profile-summary-right">
+                          <span>Référent</span>
+                          <strong>{selectedNexaTicket.assignedTo?.displayName ?? 'Non affecté'}</strong>
+                        </div>
+                        <div className="profile-summary-right">
+                          <span>Création</span>
+                          <strong>{new Date(selectedNexaTicket.createdAtUtc).toLocaleString('fr-FR')}</strong>
+                        </div>
+                      </div>
+                      {selectedNexaTicket.referentAnswer ? (
+                        <div className="nexa-ticket-answer">
+                          <strong>Réponse transmise</strong>
+                          <p>{selectedNexaTicket.referentAnswer}</p>
+                        </div>
+                      ) : null}
+                    </article>
+                  ) : null}
                   <div className="settings-list-header">
                     <div>
                       <h3>Base de connaissance</h3>
-                      <small>Reponses validees et reutilisables</small>
+                      <small>Réponses validées et réutilisables</small>
                     </div>
                     <button className="secondary-button" onClick={() => void loadNexaKnowledge()} type="button">Actualiser</button>
                   </div>
                   <div className="settings-list">
                     {nexaKnowledge.length === 0 ? (
-                      <div className="settings-empty">Aucune connaissance validee pour le moment.</div>
+                      <div className="settings-empty">Aucune connaissance validée pour le moment.</div>
                     ) : nexaKnowledge.map((knowledge) => (
                       <article className="settings-edit-card nexa-knowledge-card" key={knowledge.id}>
                         <div className="settings-list-header">
@@ -4966,13 +5207,13 @@ function App() {
                         </div>
                         <strong>{knowledge.originalQuestion}</strong>
                         <p>{knowledge.answer}</p>
-                        <small>{knowledge.keywords ?? 'Sans mot-cle'} - utilisee {knowledge.usageCount} fois</small>
+                        <small>{knowledge.keywords ?? 'Sans mot-clé'} - utilisée {knowledge.usageCount} fois</small>
                         <div className="profile-action-row">
                           <button className="secondary-button" onClick={() => void sendNexaKnowledgeFeedback(knowledge.id, true)} type="button">
                             Utile
                           </button>
                           <button className="secondary-button" onClick={() => void sendNexaKnowledgeFeedback(knowledge.id, false)} type="button">
-                            A corriger
+                            À corriger
                           </button>
                         </div>
                       </article>
@@ -4980,6 +5221,119 @@ function App() {
                   </div>
                 </section>
               </div>
+              <section className="nexa-admin-layout nexa-admin-settings-layout" aria-label="Administration Nexa">
+                <article className="settings-list-section">
+                  <div className="settings-list-header">
+                    <div>
+                      <h3>Référents par module</h3>
+                      <small>Affectation simple utilisée si aucune règle ne correspond</small>
+                    </div>
+                    <button className="secondary-button" onClick={() => void loadNexaAdminData()} type="button">Actualiser</button>
+                  </div>
+                  <div className="settings-form settings-create-form">
+                    <label>
+                      <span>Module</span>
+                      <select value={nexaReferentForm.moduleId} onChange={(event) => setNexaReferentForm((current) => ({ ...current, moduleId: event.target.value }))}>
+                        <option value="">Sélectionner</option>
+                        {nexaModules.map((module) => (
+                          <option key={module.id} value={module.id}>{module.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Référent</span>
+                      <select value={nexaReferentForm.userAccountId} onChange={(event) => setNexaReferentForm((current) => ({ ...current, userAccountId: event.target.value }))}>
+                        <option value="">Sélectionner</option>
+                        {accounts.filter((account) => account.isActive).map((account) => (
+                          <option key={account.id} value={account.id}>{account.displayName}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="toggle-label settings-toggle">
+                      <input checked={nexaReferentForm.isPrimary} onChange={(event) => setNexaReferentForm((current) => ({ ...current, isPrimary: event.target.checked }))} type="checkbox" />
+                      <span>Référent principal</span>
+                    </label>
+                    <button className="primary-button" onClick={() => void saveNexaReferent()} type="button">Ajouter</button>
+                  </div>
+                  <div className="settings-list">
+                    {nexaReferents.length === 0 ? (
+                      <div className="settings-empty">Aucun référent Nexa configuré.</div>
+                    ) : nexaReferents.map((referent) => (
+                      <article className="settings-edit-card nexa-routing-card" key={referent.id}>
+                        <div>
+                          <strong>{referent.module?.label ?? 'Module inconnu'}</strong>
+                          <p>{referent.user?.displayName ?? 'Compte inconnu'}</p>
+                        </div>
+                        <div className="profile-action-row">
+                          <span className={`profile-status-badge ${referent.isActive ? 'is-active' : 'is-inactive'}`}>
+                            {referent.isPrimary ? 'Principal' : 'Secondaire'}
+                          </span>
+                          <button className="secondary-button" onClick={() => void toggleNexaReferent(referent)} type="button">
+                            {referent.isActive ? 'Désactiver' : 'Activer'}
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+                <article className="settings-list-section">
+                  <div className="settings-list-header">
+                    <div>
+                      <h3>Règles de routage</h3>
+                      <small>Prioritaires sur le référent simple du module</small>
+                    </div>
+                  </div>
+                  <div className="settings-form settings-create-form">
+                    <label>
+                      <span>Module</span>
+                      <select value={nexaRoutingRuleForm.moduleId} onChange={(event) => setNexaRoutingRuleForm((current) => ({ ...current, moduleId: event.target.value }))}>
+                        <option value="">Tous</option>
+                        {nexaModules.map((module) => (
+                          <option key={module.id} value={module.id}>{module.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Catégorie</span>
+                      <select value={nexaRoutingRuleForm.categoryId} onChange={(event) => setNexaRoutingRuleForm((current) => ({ ...current, categoryId: event.target.value }))}>
+                        <option value="">Toutes</option>
+                        {nexaCategories.map((category) => (
+                          <option key={category.id} value={category.id}>{category.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Mots-clés</span>
+                      <input value={nexaRoutingRuleForm.keywordPattern} onChange={(event) => setNexaRoutingRuleForm((current) => ({ ...current, keywordPattern: event.target.value }))} placeholder="contravention, indicateur..." />
+                    </label>
+                    <label>
+                      <span>Référent</span>
+                      <select value={nexaRoutingRuleForm.referentUserAccountId} onChange={(event) => setNexaRoutingRuleForm((current) => ({ ...current, referentUserAccountId: event.target.value }))}>
+                        <option value="">Sélectionner</option>
+                        {accounts.filter((account) => account.isActive).map((account) => (
+                          <option key={account.id} value={account.id}>{account.displayName}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button className="primary-button" onClick={() => void saveNexaRoutingRule()} type="button">Créer la règle</button>
+                  </div>
+                  <div className="settings-list">
+                    {nexaRoutingRules.length === 0 ? (
+                      <div className="settings-empty">Aucune règle de routage Nexa.</div>
+                    ) : nexaRoutingRules.map((rule) => (
+                      <article className="settings-edit-card nexa-routing-card" key={rule.id}>
+                        <div>
+                          <strong>{rule.module?.label ?? 'Tous modules'}{' -> '}{rule.referent?.displayName ?? 'Référent inconnu'}</strong>
+                          <p>{rule.category?.label ?? 'Toutes catégories'} {rule.keywordPattern ? `- ${rule.keywordPattern}` : ''}</p>
+                        </div>
+                        <button className="secondary-button" onClick={() => void toggleNexaRoutingRule(rule)} type="button">
+                          {rule.isActive ? 'Désactiver' : 'Activer'}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+              </section>
             </article>
           </section>
         ) : null}
@@ -8352,6 +8706,44 @@ function translateAccessLevel(accessLevel: string) {
       return 'Écriture'
     default:
       return 'Aucun'
+  }
+}
+
+function formatNexaTicketStatus(statusCode: string) {
+  switch (statusCode) {
+    case 'NOUVEAU':
+      return 'Nouveau'
+    case 'AFFECTE':
+      return 'Affecte'
+    case 'EN_COURS':
+      return 'En cours'
+    case 'REPONSE_APPORTEE':
+      return 'Reponse apportee'
+    case 'EN_ATTENTE_VALIDATION_DEMANDEUR':
+      return 'En attente de validation'
+    case 'VALIDE':
+      return 'Valide'
+    case 'REFUSE':
+      return 'Refuse'
+    case 'CLOTURE':
+      return 'Cloture'
+    case 'ANNULE':
+      return 'Annule'
+    default:
+      return statusCode
+  }
+}
+
+function formatNexaPriority(priorityCode: string) {
+  switch (priorityCode) {
+    case 'BASSE':
+      return 'Basse'
+    case 'HAUTE':
+      return 'Haute'
+    case 'URGENTE':
+      return 'Urgente'
+    default:
+      return 'Normale'
   }
 }
 

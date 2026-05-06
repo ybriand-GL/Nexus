@@ -1107,9 +1107,64 @@
   gap: 16px;
 }
 
+.nexa-admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .04);
+}
+
+.nexa-admin-filters select {
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 12px;
+  color: var(--nexus-text);
+  background: rgba(4, 6, 10, .72);
+  padding: 0 10px;
+}
+
+.segmented-control {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .18);
+}
+
+.segmented-control button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, .7);
+  background: transparent;
+  padding: 0 12px;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.segmented-control button.is-active {
+  color: #04060a;
+  background: var(--nexus-gold-soft);
+}
+
+.nexa-admin-settings-layout {
+  margin-top: 16px;
+}
+
 .nexa-ticket-card,
 .nexa-knowledge-card {
   gap: 12px;
+}
+
+.nexa-ticket-card-selected {
+  border-color: rgba(247, 217, 138, .38);
 }
 
 .nexa-ticket-answer {
@@ -1128,6 +1183,17 @@
 
 .nexa-ticket-actions textarea {
   width: 100%;
+}
+
+.nexa-ticket-detail {
+  margin-bottom: 16px;
+}
+
+.nexa-routing-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
 }
 
 .nexus-top-meta {

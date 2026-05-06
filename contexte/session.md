@@ -2335,6 +2335,28 @@ Ordre cible de construction:
   - publication IIS `/newNexus` OK
   - test API complet avec `yannick / GroupeLaure`: question sans connaissance, creation ticket, affectation, reponse referent, validation demandeur, creation de connaissance, seconde question resolue avec confiance 98%
 - suites:
-  - administration avancee des regles/referents depuis l'UI
   - pieces jointes effectives
+  - embeddings locaux et RAG Ollama controle en phase suivante
+
+## 2026-05-06 - Nexa administration referents et routage
+
+- objectif:
+  - rendre administrable le MVP Nexa sans modification de code
+  - donner une fiche de suivi plus lisible pour les tickets Nexa
+- backend:
+  - ajout des endpoints admin referents: `GET /api/nexa/admin/referents`, `POST /api/nexa/admin/referents`, `PUT /api/nexa/admin/referents/{id}`
+  - les regles de routage existantes restent administrees par les endpoints `/api/nexa/admin/routing-rules`
+- frontend:
+  - filtres tickets par vue, statut et module dans `Administration > Nexa`
+  - fiche ticket de consultation avec demandeur, module, categorie, priorite, affectation et reponse
+  - formulaires d'administration des referents par module et des regles de routage simples
+- validations:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+  - publication IIS `/newNexus` OK
+  - test authentifie `yannick / GroupeLaure`: `GET/POST /api/nexa/admin/referents` OK, `GET/POST /api/nexa/admin/routing-rules` OK
+  - referent principal et regle `contravention` initialises sur le compte Yannick pour le module Contraventions
+- suites:
+  - pieces jointes effectives
+  - workflow complet depuis la fiche ticket UI pour reponse/validation sans passer par API
   - embeddings locaux et RAG Ollama controle en phase suivante

@@ -2229,3 +2229,23 @@ Ordre cible de construction:
   - coordonnees utilisees: latitude `47.278`, longitude `-1.779`
   - la ville par defaut est affichee dans le bandeau haut
   - la meteo Open-Meteo utilise cette localisation tant que la geolocalisation client fiable n'est pas recadree
+
+## 2026-05-06 - Nexa tranche 1 personnalisation locale
+
+- prealable:
+  - commit/push realise sur `main` avant demarrage Nexa: `70a8856 feat: refine dashboard header and weather`
+- objectif:
+  - poser le premier moteur Nexa sans service externe
+  - personnaliser l'accroche d'accueil avec les usages locaux disponibles
+- backend:
+  - endpoint authentifie `GET /api/nexa/session-insight`
+  - sources exploitees: compte connecte, profil, droits modules, sessions utilisateur recentes, traces applicatives des 30 derniers jours
+  - reponse: compagnon `Nexa`, mode `local-personalization`, message, signaux analyses et suggestions explicables
+  - aucun stockage nouveau ni appel IA externe pour cette tranche
+- frontend:
+  - l'accueil conserve un fallback de generation locale
+  - apres hydratation du compte, le bandeau appelle `/api/nexa/session-insight` et remplace l'accroche par le message Nexa si disponible
+- suite cible:
+  - tracer les consultations de modules pour enrichir l'apprentissage
+  - ajouter un stockage dedie des signaux Nexa si les traces applicatives ne suffisent plus
+  - brancher plus tard un moteur LLM local heberge sur le meme serveur, avec RAG sur contexte/backlog/modules

@@ -840,6 +840,55 @@ app.MapGet("/api/auth/me", async (NewNexusDbContext dbContext, ClaimsPrincipal p
     return account is null ? Results.Unauthorized() : Results.Ok(BuildAuthenticatedUser(account));
 });
 
+app.MapGet("/api/nexa/session-insight", async (NewNexusDbContext dbContext, ClaimsPrincipal principal) =>
+{
+    var userId = GetUserId(principal);
+    if (userId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var account = await dbContext.UserAccounts
+        .AsNoTracking()
+        .Include(userAccount => userAccount.SecurityProfile!)
+            .ThenInclude(profile => profile.ModuleRights)
+                .ThenInclude(right => right.SecurityModule)
+        .SingleOrDefaultAsync(userAccount => userAccount.Id == userId.Value && userAccount.IsActive);
+
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var now = DateTime.UtcNow;
+    var since = now.AddDays(-30);
+    var sessions = await dbContext.UserSessions
+        .AsNoTracking()
+        .Where(session => session.UserAccountId == account.Id)
+        .OrderByDescending(session => session.LoginAtUtc)
+        .Take(12)
+        .Select(session => new NexaSessionSignal(
+            session.LoginAtUtc,
+            session.LastSeenAtUtc,
+            session.LogoutAtUtc,
+            session.RevokedAtUtc))
+        .ToListAsync();
+    var traces = await dbContext.ApplicationTraces
+        .AsNoTracking()
+        .Where(trace => trace.CreatedAtUtc >= since &&
+            (trace.ActorUserAccountId == account.Id || trace.ActorLogin == account.Login))
+        .OrderByDescending(trace => trace.CreatedAtUtc)
+        .Take(60)
+        .Select(trace => new NexaTraceSignal(
+            trace.StreamCode,
+            trace.EventCode,
+            trace.Level,
+            trace.CreatedAtUtc))
+        .ToListAsync();
+
+    return Results.Ok(BuildNexaSessionInsight(account, sessions, traces, now));
+}).RequireAuthorization();
+
 app.MapPut("/api/auth/preferences", async (
     UpdateUserPreferencesRequest request,
     NewNexusDbContext dbContext,
@@ -3700,6 +3749,189 @@ static object BuildAuthenticatedUser(UserAccount account)
     };
 }
 
+static object BuildNexaSessionInsight(
+    UserAccount account,
+    IReadOnlyCollection<NexaSessionSignal> sessions,
+    IReadOnlyCollection<NexaTraceSignal> traces,
+    DateTime now)
+{
+    var profile = account.SecurityProfile;
+    var profileCode = profile?.Code ?? "SANS_PROFIL";
+    var readableModules = profile?.ModuleRights
+        .Count(right => right.AccessLevel != ModuleAccessLevel.None && !IsNexaDashboardModule(right.SecurityModule?.Code)) ?? 0;
+    var writableModules = profile?.ModuleRights
+        .Count(right => right.AccessLevel == ModuleAccessLevel.Write && !IsNexaDashboardModule(right.SecurityModule?.Code)) ?? 0;
+    var dashboardCount = profile?.ModuleRights
+        .Count(right => right.AccessLevel != ModuleAccessLevel.None && IsNexaDashboardModule(right.SecurityModule?.Code)) ?? 0;
+    var dominantStream = traces
+        .GroupBy(trace => trace.StreamCode)
+        .OrderByDescending(group => group.Count())
+        .Select(group => group.Key)
+        .FirstOrDefault();
+    var warningCount = traces.Count(trace =>
+        string.Equals(trace.Level, "Warning", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(trace.Level, "Error", StringComparison.OrdinalIgnoreCase));
+    var lastCompletedSession = sessions
+        .Where(session => session.LogoutAtUtc is not null || session.RevokedAtUtc is not null)
+        .OrderByDescending(session => session.LoginAtUtc)
+        .FirstOrDefault();
+    var averageSessionMinutes = sessions.Count == 0
+        ? 0
+        : (int)Math.Round(sessions.Average(session =>
+            Math.Max(1, ((session.LogoutAtUtc ?? session.RevokedAtUtc ?? session.LastSeenAtUtc) - session.LoginAtUtc).TotalMinutes)));
+
+    var opening = PickNexaPart(GetNexaOpenings(profileCode));
+    var focus = PickNexaPart(GetNexaFocuses(profileCode, dominantStream));
+    var rhythm = PickNexaPart([
+        FormatNexaDayMoment(now),
+        lastCompletedSession is null
+            ? "pour consolider cette première session suivie"
+            : $"depuis votre dernière session du {lastCompletedSession.LoginAtUtc.ToLocalTime():dd/MM/yyyy}",
+        $"avec {readableModules} module(s) accessible(s)",
+        dashboardCount > 1 ? $"avec {dashboardCount} tableaux de bord consultables" : "avec votre tableau de bord principal"
+    ]);
+    var ending = PickNexaPart([
+        writableModules > 0 ? $"{writableModules} zone(s) modifiable(s) sont prêtes." : "les vues restent ouvertes en consultation.",
+        warningCount > 0 ? $"{warningCount} signalement(s) technique(s) récent(s) méritent un contrôle." : "aucun signal critique récent ne domine votre activité.",
+        averageSessionMinutes > 0 ? $"votre rythme moyen observé est de {averageSessionMinutes} minute(s) par session." : "Nexa initialise son historique local.",
+        "les recommandations resteront explicables et locales au serveur."
+    ]);
+
+    return new
+    {
+        Companion = "Nexa",
+        Mode = "local-personalization",
+        ProfileCode = profileCode,
+        GeneratedAtUtc = now,
+        Message = $"{opening} pour {focus}, {rhythm}: {ending}",
+        Signals = new[]
+        {
+            $"{sessions.Count} session(s) récentes analysées",
+            $"{traces.Count} trace(s) utilisateur sur 30 jours",
+            dominantStream is null ? "aucun flux dominant détecté" : $"flux dominant: {dominantStream}",
+            $"{warningCount} alerte(s) ou erreur(s) récente(s)"
+        },
+        Suggestions = BuildNexaSuggestions(profileCode, dominantStream, warningCount, writableModules)
+    };
+}
+
+static bool IsNexaDashboardModule(string? moduleCode)
+{
+    return moduleCode is not null && moduleCode.StartsWith("DASHBOARD_", StringComparison.OrdinalIgnoreCase);
+}
+
+static IReadOnlyList<string> GetNexaOpenings(string profileCode)
+{
+    return profileCode switch
+    {
+        "INFORMATIQUE" => [
+            "Nexa affine votre poste de pilotage technique",
+            "Nexa prépare votre supervision du socle",
+            "Nexa met en avant les contrôles utiles"
+        ],
+        "DIRECTION" => [
+            "Nexa assemble votre lecture de pilotage",
+            "Nexa prépare une synthèse orientée décision",
+            "Nexa met en relief les signaux de direction"
+        ],
+        "EXPLOITATION" => [
+            "Nexa organise votre cockpit opérationnel",
+            "Nexa recentre les priorités terrain",
+            "Nexa prépare les vues exploitation utiles"
+        ],
+        "ADMINISTRATIF" => [
+            "Nexa prépare votre suivi administratif",
+            "Nexa priorise les traitements à contrôler",
+            "Nexa structure les dossiers à reprendre"
+        ],
+        _ => [
+            "Nexa personnalise votre session",
+            "Nexa prépare votre environnement",
+            "Nexa initialise votre accompagnement"
+        ]
+    };
+}
+
+static IReadOnlyList<string> GetNexaFocuses(string profileCode, string? dominantStream)
+{
+    var streamFocus = dominantStream is null ? "vos usages récents" : $"le flux {dominantStream}";
+
+    return profileCode switch
+    {
+        "INFORMATIQUE" => [
+            "droits, interfaces et qualité applicative",
+            "readiness, traces et raccords sensibles",
+            $"sécurité du socle et {streamFocus}"
+        ],
+        "DIRECTION" => [
+            "arbitrages, tendances et points de vigilance",
+            "vision globale et trajectoire",
+            $"indicateurs consolidés et {streamFocus}"
+        ],
+        "EXPLOITATION" => [
+            "points, conducteurs, tracteurs et opérations",
+            "parc, terrain et actions à suivre",
+            $"flux exploitation et {streamFocus}"
+        ],
+        "ADMINISTRATIF" => [
+            "contraventions, rattachements et traitements",
+            "dossiers ouverts et contrôles administratifs",
+            $"suivi documentaire et {streamFocus}"
+        ],
+        _ => [
+            "vos espaces accessibles",
+            "les informations disponibles",
+            streamFocus
+        ]
+    };
+}
+
+static string FormatNexaDayMoment(DateTime now)
+{
+    var localHour = now.ToLocalTime().Hour;
+    return localHour < 11 ? "ce matin" : localHour < 18 ? "cet après-midi" : "ce soir";
+}
+
+static string PickNexaPart(IReadOnlyList<string> values)
+{
+    if (values.Count == 0)
+    {
+        return string.Empty;
+    }
+
+    return values[RandomNumberGenerator.GetInt32(values.Count)];
+}
+
+static IReadOnlyList<string> BuildNexaSuggestions(string profileCode, string? dominantStream, int warningCount, int writableModules)
+{
+    var suggestions = new List<string>();
+    if (warningCount > 0)
+    {
+        suggestions.Add("Contrôler les traces récentes avant d'élargir les raccordements.");
+    }
+
+    if (writableModules > 0)
+    {
+        suggestions.Add("Reprendre les zones modifiables les plus fréquentes pour accélérer les prochains parcours.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(dominantStream))
+    {
+        suggestions.Add($"Conserver {dominantStream} comme signal prioritaire de personnalisation.");
+    }
+
+    suggestions.Add(profileCode switch
+    {
+        "INFORMATIQUE" => "Prioriser les droits, la readiness et les interfaces critiques.",
+        "DIRECTION" => "Remonter les indicateurs consolidés en premier niveau.",
+        "EXPLOITATION" => "Mettre en avant points, conducteurs et tracteurs.",
+        "ADMINISTRATIF" => "Surveiller les dossiers ouverts et les échéances.",
+        _ => "Stabiliser les droits du profil pour enrichir les recommandations."
+    });
+
+    return suggestions;
+}
+
 static object BuildUserSessionResponse(UserSession session, DateTime now)
 {
     var endAtUtc = session.LogoutAtUtc ?? session.RevokedAtUtc ?? (session.ExpiresAtUtc <= now ? session.ExpiresAtUtc : null);
@@ -5610,6 +5842,8 @@ internal sealed record ForgotPasswordRequest(string LoginOrEmail);
 internal sealed record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
 internal sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
 internal sealed record UpdateUserPreferencesRequest(bool IsSidebarCollapsed);
+internal sealed record NexaSessionSignal(DateTime LoginAtUtc, DateTime LastSeenAtUtc, DateTime? LogoutAtUtc, DateTime? RevokedAtUtc);
+internal sealed record NexaTraceSignal(string StreamCode, string EventCode, string Level, DateTime CreatedAtUtc);
 internal sealed record UpdateAccountProfileRequest(Guid? SecurityProfileId);
 internal sealed record UpdateAccountStatusRequest(bool IsActive);
 internal sealed record CreateUserAccountRequest(

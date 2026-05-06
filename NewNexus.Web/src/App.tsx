@@ -44,6 +44,16 @@ type ClientWeather = {
   status: 'loading' | 'ready' | 'unavailable'
 }
 
+type NexaSessionInsight = {
+  companion: string
+  message: string
+  generatedAtUtc: string
+  mode: string
+  profileCode: string
+  signals: string[]
+  suggestions: string[]
+}
+
 type SecurityModuleItem = {
   id: string
   code: string
@@ -1636,6 +1646,7 @@ function App() {
     localStorage.setItem(knownSessionStorageKey, 'true')
     setIsSidebarCollapsed(user.isSidebarCollapsed)
     setSessionInsight(buildSessionInsight(user))
+    void loadNexaSessionInsight(user)
     const hasContraventionsAccess = user.rights.some(
       (right) => right.moduleCode === contraventionsModuleCode && canAccessModule(right.accessLevel),
     )
@@ -1712,6 +1723,20 @@ function App() {
     setEditableProfiles({})
     setEditableAnalytics({})
     setEditableExploitations({})
+  }
+
+  async function loadNexaSessionInsight(user: AuthenticatedUser) {
+    try {
+      const response = await fetch(apiPath('api/nexa/session-insight'))
+      if (!response.ok) {
+        return
+      }
+
+      const insight = (await response.json()) as NexaSessionInsight
+      setSessionInsight(insight.message || buildSessionInsight(user))
+    } catch {
+      setSessionInsight(buildSessionInsight(user))
+    }
   }
 
   async function loadAdminSecurityData() {

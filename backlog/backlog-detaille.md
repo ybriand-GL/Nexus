@@ -90,7 +90,7 @@ Derniere mise a jour: 2026-05-06
 | UX | Responsive tablette / smartphone / PC | A_TESTER | Passe CSS responsive initiale appliquee sur shell, menus, grilles, formulaires et modales; recette multi-format a effectuer |
 | UX | Sidebar reduite | A_TESTER | Icônes SVG premium dans les raccourcis, infobulles au survol/focus en mode reduit avec z-index/overflow corriges et deconnexion par icone basse |
 | IA | Assistant Nexa | CADRE | Assistant IA local a cadrer: moteur heberge sur le serveur NewNexus, apprentissage des usages par traces/intentions, personnalisation des accroches puis guidage utilisateur dans l'outil |
-| IA | Moteur de personnalisation Nexa | A_FAIRE | Capitaliser connexions, modules consultes, actions frequentes, erreurs et profil pour generer des recommandations explicables sans exposer les donnees hors serveur |
+| IA | Moteur de personnalisation Nexa | A_TESTER | Premiere tranche locale: endpoint `/api/nexa/session-insight` base sur compte, profil, sessions et traces applicatives; l'accueil consomme ce message avec fallback frontend |
 
 ## 4. Donnees Communes
 

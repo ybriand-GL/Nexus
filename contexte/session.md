@@ -2407,3 +2407,38 @@ Ordre cible de construction:
   - feedback persistant depuis les bulles de conversation
   - filtres avances sur base de connaissance
   - RAG local avance avec embeddings
+
+## 2026-05-06 - Passe backlog Nexa 7 points
+
+- objectif:
+  - traiter en une passe les 7 points restants du backlog Nexa MVP et preparation avancee
+- backend:
+  - pieces jointes effectives sur tickets Nexa: upload, stockage interne `App_Data/nexa-attachments`, telechargement via API avec controle de droits
+  - feedback persistant depuis les bulles et la base de connaissance via `/api/nexa/knowledge/{id}/feedback`
+  - detail, modification, archivage et versioning des connaissances via les endpoints `/api/nexa/knowledge`
+  - filtre categorie sur la recherche de connaissances
+  - index local `local-token-v1` a chaque creation ou modification de connaissance
+  - synthese RAG locale optionnelle via Ollama lorsque la connaissance validee est fiable, avec fallback strict sur la reponse validee
+  - endpoint admin `/api/nexa/admin/settings` pour seuils, indexation et statut IA locale
+- frontend:
+  - upload de piece jointe depuis la creation ticket Nexa et depuis la fiche ticket
+  - fiche ticket enrichie avec liste de pieces jointes telechargeables
+  - filtres avances de base de connaissance: module, categorie, statut et recherche texte
+  - editeur de connaissance: creation, modification, fiabilite, mots-cles, reformulations, versioning et archivage
+  - KPI Nexa: resolution auto, retours negatifs et index local
+  - panneau d'administration IA locale avec seuils, perimetres indexables et statut moteur
+- documentation:
+  - recette fonctionnelle ajoutee dans `docs/nexa/recette-nexa.md`
+- backlog:
+  - `Nexa | Pieces jointes effectives`: A TESTER
+  - `Nexa | Feedback persistant`: A TESTER
+  - `Nexa | Base de connaissance avancee`: A TESTER
+  - `Nexa | Administration avancee`: A TESTER
+  - `Nexa | RAG local avance`: A TESTER
+  - `Nexa | Tableaux de bord`: A TESTER
+  - `Nexa | Recette fonctionnelle complete`: A TESTER
+- validations:
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+  - publication IIS `/newNexus` OK
+  - controle authentifie `yannick / GroupeLaure`: login OK, `/api/nexa/admin/settings` OK, `/api/nexa/tickets` OK, detail ticket OK

@@ -96,7 +96,13 @@ Derniere mise a jour: 2026-05-06
 | IA | Administration Nexa | A_TESTER | Filtres tickets par vue/statut/module, fiche ticket de consultation, administration simple des referents par module et des regles de routage depuis `Administration > Nexa` |
 | IA | Identite visuelle Nexa | A_TESTER | Logo conversationnel, variantes SVG/PNG/ICO, tokens dedies, mini-charte et integration UI du bouton, panneau, bulles, badges, ticketing et administration Nexa |
 | IA | Workflow ticket Nexa UI | A_TESTER | Fiche ticket actionnable: chargement detaille, affectation, reponse referent, validation avec commentaire, refus motive, cloture admin et historique des actions |
-| IA | Nexa RAG local avance | A_FAIRE | Embeddings locaux, base vectorielle exploitee, reformulation par Ollama et seuils de confiance avances apres stabilisation du ticketing MVP |
+| IA | Pieces jointes Nexa | A_TESTER | Upload depuis le panneau Nexa et la fiche ticket, stockage interne, historique et telechargement controle par droits backend |
+| IA | Feedback persistant Nexa | A_TESTER | Retours utile / a corriger relies aux connaissances validees depuis les bulles et l'administration |
+| IA | Base de connaissance Nexa avancee | A_TESTER | Filtres module/categorie/statut/recherche, creation manuelle, modification, archivage, versioning et reindexation locale |
+| IA | Administration Nexa avancee | A_TESTER | Parametres IA locale, seuils de confiance, perimetres indexables, referents et routage administrables |
+| IA | Nexa RAG local avance | A_TESTER | Index local `local-token-v1`, synthese Ollama controlee depuis le backend, sources internes et fallback strict sur connaissance validee |
+| IA | Tableaux de bord Nexa | A_TESTER | KPI tickets, a traiter, connaissances, resolution auto, retours negatifs et index local dans `Administration > Nexa` |
+| IA | Recette fonctionnelle Nexa | A_TESTER | Procedure complete disponible dans `docs/nexa/recette-nexa.md` pour le workflow question-ticket-validation-connaissance |
 
 ## 4. Donnees Communes
 

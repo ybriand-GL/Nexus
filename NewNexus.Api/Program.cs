@@ -1098,7 +1098,9 @@ app.MapPost("/api/nexa/ask", async (
     NexaAskRequest request,
     NewNexusDbContext dbContext,
     HttpContext httpContext,
-    ClaimsPrincipal principal) =>
+    ClaimsPrincipal principal,
+    IConfiguration configuration,
+    IHttpClientFactory httpClientFactory) =>
 {
     var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: true);
     if (account is null)
@@ -1141,6 +1143,28 @@ app.MapPost("/api/nexa/ask", async (
     var answer = isReliable
         ? match!.Knowledge.Answer
         : "Je ne dispose pas encore d'une reponse suffisamment fiable a cette question. Souhaitez-vous ouvrir un ticket afin qu'un referent puisse vous repondre ?";
+    var mode = isReliable ? "knowledge-base" : "ticket-proposed";
+    string? ragWarning = null;
+    if (isReliable)
+    {
+        var localAiOptions = GetNexaLocalAiOptions(configuration);
+        var ragResult = await TryCallNexaLocalAiAsync(
+            httpClientFactory,
+            localAiOptions,
+            BuildNexaRagSystemPrompt(match!.Knowledge),
+            [],
+            normalizedQuestion,
+            httpContext.RequestAborted);
+        if (!string.IsNullOrWhiteSpace(ragResult.Content))
+        {
+            answer = ragResult.Content;
+            mode = "rag-local";
+        }
+        else if (!string.IsNullOrWhiteSpace(ragResult.Error))
+        {
+            ragWarning = "Synthese IA locale indisponible; reponse issue directement de la base de connaissance validee.";
+        }
+    }
     var sources = isReliable
         ? new[]
         {
@@ -1196,7 +1220,7 @@ app.MapPost("/api/nexa/ask", async (
         Response = answer,
         SourcesJson = JsonSerializer.Serialize(sources),
         ConfidenceScore = match?.ConfidenceScore ?? 0m,
-        Mode = isReliable ? "knowledge-base" : "ticket-proposed",
+        Mode = mode,
         CreatedAtUtc = now
     });
     await AddApplicationTraceAsync(
@@ -1221,6 +1245,8 @@ app.MapPost("/api/nexa/ask", async (
         CanCreateTicket = !isReliable,
         MatchedKnowledgeId = isReliable ? match!.Knowledge.Id : (Guid?)null,
         Sources = sources,
+        Mode = mode,
+        Warning = ragWarning,
         GeneratedAtUtc = now
     });
 }).RequireAuthorization();
@@ -1383,6 +1409,8 @@ app.MapGet("/api/nexa/tickets/{ticketId:guid}", async (
             .ThenInclude(history => history.ActorUserAccount)
         .Include(item => item.Comments.OrderBy(comment => comment.CreatedAtUtc))
             .ThenInclude(comment => comment.AuthorUserAccount)
+        .Include(item => item.Attachments.OrderBy(attachment => attachment.CreatedAtUtc))
+            .ThenInclude(attachment => attachment.UploadedByUserAccount)
         .SingleOrDefaultAsync(item => item.Id == ticketId, httpContext.RequestAborted);
     if (ticket is null)
     {
@@ -1395,6 +1423,117 @@ app.MapGet("/api/nexa/tickets/{ticketId:guid}", async (
     }
 
     return Results.Ok(BuildNexaTicketResponse(ticket, includeDetail: true));
+}).RequireAuthorization();
+
+app.MapPost("/api/nexa/tickets/{ticketId:guid}/attachments", async (
+    Guid ticketId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext,
+    IWebHostEnvironment environment) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: false);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var ticket = await dbContext.NexaTickets.SingleOrDefaultAsync(item => item.Id == ticketId, httpContext.RequestAborted);
+    if (ticket is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!CanReadNexaTicket(ticket, principal))
+    {
+        return Results.Forbid();
+    }
+
+    if (!httpContext.Request.HasFormContentType)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["file"] = ["Une piece jointe multipart/form-data est obligatoire."]
+        });
+    }
+
+    var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted);
+    var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
+    if (file is null || file.Length == 0)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["file"] = ["Le fichier est obligatoire."]
+        });
+    }
+
+    const long maxAttachmentSizeBytes = 10L * 1024L * 1024L;
+    if (file.Length > maxAttachmentSizeBytes)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["file"] = ["La piece jointe ne doit pas depasser 10 Mo."]
+        });
+    }
+
+    var now = DateTime.UtcNow;
+    var safeFileName = SanitizeNexaFileName(file.FileName);
+    var extension = Path.GetExtension(safeFileName);
+    var storageRoot = Path.Combine(environment.ContentRootPath, "App_Data", "nexa-attachments", ticket.Id.ToString("N"));
+    Directory.CreateDirectory(storageRoot);
+    var storedFileName = $"{Guid.NewGuid():N}{extension}";
+    var storagePath = Path.Combine(storageRoot, storedFileName);
+    await using (var stream = File.Create(storagePath))
+    {
+        await file.CopyToAsync(stream, httpContext.RequestAborted);
+    }
+
+    var attachment = new NexaTicketAttachment
+    {
+        Id = Guid.NewGuid(),
+        NexaTicketId = ticket.Id,
+        UploadedByUserAccountId = account.Id,
+        FileName = safeFileName,
+        ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+        SizeBytes = file.Length,
+        StoragePath = storagePath,
+        CreatedAtUtc = now
+    };
+    dbContext.NexaTicketAttachments.Add(attachment);
+    dbContext.NexaTicketHistory.Add(BuildNexaTicketHistory(ticket.Id, "PIECE_JOINTE", ticket.StatusCode, ticket.StatusCode, $"Piece jointe ajoutee: {safeFileName}.", account.Id, now));
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    var updatedTicket = await LoadNexaTicketForResponseAsync(dbContext, ticket.Id, httpContext.RequestAborted);
+    return Results.Created($"/api/nexa/tickets/{ticket.Id}/attachments/{attachment.Id}", BuildNexaTicketResponse(updatedTicket!, includeDetail: true));
+}).RequireAuthorization();
+
+app.MapGet("/api/nexa/tickets/{ticketId:guid}/attachments/{attachmentId:guid}", async (
+    Guid ticketId,
+    Guid attachmentId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var attachment = await dbContext.NexaTicketAttachments
+        .AsNoTracking()
+        .Include(item => item.NexaTicket)
+        .SingleOrDefaultAsync(item => item.Id == attachmentId && item.NexaTicketId == ticketId, httpContext.RequestAborted);
+    if (attachment?.NexaTicket is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!CanReadNexaTicket(attachment.NexaTicket, principal))
+    {
+        return Results.Forbid();
+    }
+
+    if (!File.Exists(attachment.StoragePath))
+    {
+        return Results.NotFound();
+    }
+
+    return Results.File(attachment.StoragePath, attachment.ContentType, attachment.FileName);
 }).RequireAuthorization();
 
 app.MapPut("/api/nexa/tickets/{ticketId:guid}/assign", async (
@@ -1561,6 +1700,7 @@ app.MapPut("/api/nexa/tickets/{ticketId:guid}/validate", async (
         CreatedAtUtc = now
     });
     dbContext.NexaKnowledgeBase.Add(knowledge);
+    dbContext.NexaEmbeddingIndex.Add(BuildNexaEmbeddingIndex(knowledge.Id, ticket.Question, ticket.ReferentAnswer, now));
     dbContext.NexaAiLogs.Add(new NexaAiLog
     {
         Id = Guid.NewGuid(),
@@ -1641,6 +1781,7 @@ app.MapPut("/api/nexa/tickets/{ticketId:guid}/close", async (
 
 app.MapGet("/api/nexa/knowledge", async (
     Guid? moduleId,
+    Guid? categoryId,
     string? status,
     string? search,
     NewNexusDbContext dbContext,
@@ -1669,6 +1810,11 @@ app.MapGet("/api/nexa/knowledge", async (
         query = query.Where(knowledge => knowledge.NexaModuleId == moduleId.Value);
     }
 
+    if (categoryId is not null)
+    {
+        query = query.Where(knowledge => knowledge.NexaCategoryId == categoryId.Value);
+    }
+
     if (!string.IsNullOrWhiteSpace(status))
     {
         var normalizedStatus = status.Trim().ToUpperInvariant();
@@ -1685,7 +1831,39 @@ app.MapGet("/api/nexa/knowledge", async (
         .OrderByDescending(knowledge => knowledge.UpdatedAtUtc)
         .Take(200)
         .ToListAsync(httpContext.RequestAborted);
-    return Results.Ok(items.Select(BuildNexaKnowledgeResponse));
+    return Results.Ok(items.Select(item => BuildNexaKnowledgeResponse(item)));
+}).RequireAuthorization();
+
+app.MapGet("/api/nexa/knowledge/{knowledgeId:guid}", async (
+    Guid knowledgeId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: true);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var knowledge = await dbContext.NexaKnowledgeBase
+        .AsNoTracking()
+        .Include(item => item.NexaModule)
+        .Include(item => item.NexaCategory)
+        .Include(item => item.Versions.OrderByDescending(version => version.Version))
+            .ThenInclude(version => version.CreatedByUserAccount)
+        .SingleOrDefaultAsync(item => item.Id == knowledgeId, httpContext.RequestAborted);
+    if (knowledge is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!IsInformatique(principal) && (knowledge.NexaModule is null || !CanUserUseNexaModule(account, knowledge.NexaModule.Code) || knowledge.StatusCode != "VALIDE"))
+    {
+        return Results.Forbid();
+    }
+
+    return Results.Ok(BuildNexaKnowledgeResponse(knowledge, includeDetail: true));
 }).RequireAuthorization();
 
 app.MapPost("/api/nexa/knowledge", async (
@@ -1742,8 +1920,72 @@ app.MapPost("/api/nexa/knowledge", async (
         CreatedAtUtc = now
     });
     dbContext.NexaKnowledgeBase.Add(knowledge);
+    dbContext.NexaEmbeddingIndex.Add(BuildNexaEmbeddingIndex(knowledge.Id, manualQuestion, manualAnswer, now));
     await dbContext.SaveChangesAsync(httpContext.RequestAborted);
     return Results.Created($"/api/nexa/knowledge/{knowledge.Id}", BuildNexaKnowledgeResponse(knowledge));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/nexa/knowledge/{knowledgeId:guid}", async (
+    Guid knowledgeId,
+    NexaKnowledgeUpsertRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!IsInformatique(principal))
+    {
+        return Results.Forbid();
+    }
+
+    var accountId = GetUserId(principal);
+    var knowledge = await dbContext.NexaKnowledgeBase
+        .Include(item => item.Versions)
+        .SingleOrDefaultAsync(item => item.Id == knowledgeId, httpContext.RequestAborted);
+    var module = await dbContext.NexaModules.SingleOrDefaultAsync(item => item.Id == request.ModuleId && item.IsActive, httpContext.RequestAborted);
+    var question = NormalizeTraceText(request.Question ?? string.Empty, 4000);
+    var answer = NormalizeTraceText(request.Answer ?? string.Empty, 8000);
+    if (knowledge is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (module is null || string.IsNullOrWhiteSpace(question) || string.IsNullOrWhiteSpace(answer))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["knowledge"] = ["Module, question et reponse sont obligatoires."]
+        });
+    }
+
+    var now = DateTime.UtcNow;
+    knowledge.OriginalQuestion = question;
+    knowledge.Reformulations = NormalizeOptionalText(request.Reformulations);
+    knowledge.Answer = answer;
+    knowledge.NexaModuleId = module.Id;
+    knowledge.NexaCategoryId = request.CategoryId;
+    knowledge.Keywords = NormalizeOptionalText(request.Keywords) ?? BuildNexaKeywords(question);
+    knowledge.ReliabilityScore = Math.Clamp(request.ReliabilityScore ?? knowledge.ReliabilityScore, 0m, 1m);
+    knowledge.Version++;
+    knowledge.StatusCode = "VALIDE";
+    knowledge.UpdatedAtUtc = now;
+    knowledge.Versions.Add(new NexaKnowledgeVersion
+    {
+        Id = Guid.NewGuid(),
+        Version = knowledge.Version,
+        QuestionSnapshot = question,
+        AnswerSnapshot = answer,
+        ChangeNote = "Modification depuis Administration Nexa.",
+        CreatedByUserAccountId = accountId,
+        CreatedAtUtc = now
+    });
+    dbContext.NexaEmbeddingIndex.Add(BuildNexaEmbeddingIndex(knowledge.Id, question, answer, now));
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    var updated = await dbContext.NexaKnowledgeBase
+        .AsNoTracking()
+        .Include(item => item.NexaModule)
+        .Include(item => item.NexaCategory)
+        .SingleAsync(item => item.Id == knowledge.Id, httpContext.RequestAborted);
+    return Results.Ok(BuildNexaKnowledgeResponse(updated));
 }).RequireAuthorization("RequireInformatique");
 
 app.MapPut("/api/nexa/knowledge/{knowledgeId:guid}/archive", async (
@@ -1993,6 +2235,35 @@ app.MapPut("/api/nexa/admin/routing-rules/{ruleId:guid}", async (
         .Include(item => item.SecondaryReferentUserAccount)
         .SingleAsync(item => item.Id == rule.Id, httpContext.RequestAborted);
     return Results.Ok(BuildNexaRoutingRuleResponse(updated));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapGet("/api/nexa/admin/settings", async (
+    IConfiguration configuration,
+    IHttpClientFactory httpClientFactory,
+    NewNexusDbContext dbContext,
+    HttpContext httpContext) =>
+{
+    var options = GetNexaLocalAiOptions(configuration);
+    var status = await GetNexaLocalAiStatusAsync(httpClientFactory, options, httpContext.RequestAborted);
+    var activeModules = await dbContext.NexaModules.AsNoTracking().CountAsync(module => module.IsActive, httpContext.RequestAborted);
+    var indexableModules = await dbContext.NexaModules.AsNoTracking().CountAsync(module => module.IsActive && module.IsIndexable, httpContext.RequestAborted);
+    var indexedItems = await dbContext.NexaEmbeddingIndex.AsNoTracking().CountAsync(httpContext.RequestAborted);
+    return Results.Ok(new
+    {
+        LocalAi = status,
+        Thresholds = new
+        {
+            ReliableAnswer = 0.72m,
+            CandidateKnowledge = 0.48m
+        },
+        Indexing = new
+        {
+            ActiveModules = activeModules,
+            IndexableModules = indexableModules,
+            IndexedItems = indexedItems,
+            SensitiveDataExcludedByDefault = true
+        }
+    });
 }).RequireAuthorization("RequireInformatique");
 
 app.MapPut("/api/auth/preferences", async (
@@ -7432,6 +7703,54 @@ static NexaTicketHistory BuildNexaTicketHistory(Guid ticketId, string actionCode
     };
 }
 
+static string SanitizeNexaFileName(string? fileName)
+{
+    var fallback = "piece-jointe";
+    var name = Path.GetFileName(string.IsNullOrWhiteSpace(fileName) ? fallback : fileName).Trim();
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        name = fallback;
+    }
+
+    foreach (var invalid in Path.GetInvalidFileNameChars())
+    {
+        name = name.Replace(invalid, '_');
+    }
+
+    return name.Length > 180 ? name[..180] : name;
+}
+
+static NexaEmbeddingIndex BuildNexaEmbeddingIndex(Guid knowledgeId, string question, string answer, DateTime now)
+{
+    var tokens = BuildNexaSearchTokens(NormalizeSearchText($"{question} {answer}"))
+        .OrderBy(token => token, StringComparer.OrdinalIgnoreCase)
+        .Take(96)
+        .ToList();
+    return new NexaEmbeddingIndex
+    {
+        Id = Guid.NewGuid(),
+        NexaKnowledgeBaseId = knowledgeId,
+        VectorJson = JsonSerializer.Serialize(tokens),
+        Provider = "LOCAL",
+        Model = "local-token-v1",
+        CreatedAtUtc = now
+    };
+}
+
+static string BuildNexaRagSystemPrompt(NexaKnowledgeBase knowledge)
+{
+    return string.Join('\n', [
+        "Tu es Nexa, assistante IA interne de Nexus.",
+        "Tu dois repondre uniquement a partir du contexte fourni.",
+        "Si le contexte ne suffit pas, indique que la reponse n'est pas fiable.",
+        "Reponse courte, professionnelle, en francais.",
+        "Contexte valide:",
+        $"Question source: {knowledge.OriginalQuestion}",
+        $"Reponse validee: {knowledge.Answer}",
+        $"Mots-cles: {knowledge.Keywords}"
+    ]);
+}
+
 static async Task<NexaTicket?> LoadNexaTicketForResponseAsync(NewNexusDbContext dbContext, Guid ticketId, CancellationToken cancellationToken)
 {
     return await dbContext.NexaTickets
@@ -7444,6 +7763,8 @@ static async Task<NexaTicket?> LoadNexaTicketForResponseAsync(NewNexusDbContext 
             .ThenInclude(history => history.ActorUserAccount)
         .Include(ticket => ticket.Comments.OrderBy(comment => comment.CreatedAtUtc))
             .ThenInclude(comment => comment.AuthorUserAccount)
+        .Include(ticket => ticket.Attachments.OrderBy(attachment => attachment.CreatedAtUtc))
+            .ThenInclude(attachment => attachment.UploadedByUserAccount)
         .SingleOrDefaultAsync(ticket => ticket.Id == ticketId, cancellationToken);
 }
 
@@ -7484,6 +7805,16 @@ static object BuildNexaTicketResponse(NexaTicket ticket, bool includeDetail = fa
             comment.Comment,
             Author = BuildNexaUserSummary(comment.AuthorUserAccount),
             comment.CreatedAtUtc
+        }) : null,
+        Attachments = includeDetail ? ticket.Attachments.Select(attachment => new
+        {
+            attachment.Id,
+            attachment.FileName,
+            attachment.ContentType,
+            attachment.SizeBytes,
+            UploadedBy = BuildNexaUserSummary(attachment.UploadedByUserAccount),
+            attachment.CreatedAtUtc,
+            DownloadUrl = $"/api/nexa/tickets/{ticket.Id}/attachments/{attachment.Id}"
         }) : null
     };
 }
@@ -7498,7 +7829,7 @@ static object? BuildNexaUserSummary(UserAccount? account)
     };
 }
 
-static object BuildNexaKnowledgeResponse(NexaKnowledgeBase knowledge)
+static object BuildNexaKnowledgeResponse(NexaKnowledgeBase knowledge, bool includeDetail = false)
 {
     return new
     {
@@ -7519,7 +7850,17 @@ static object BuildNexaKnowledgeResponse(NexaKnowledgeBase knowledge)
         knowledge.PositiveFeedbackCount,
         knowledge.NegativeFeedbackCount,
         knowledge.CreatedAtUtc,
-        knowledge.UpdatedAtUtc
+        knowledge.UpdatedAtUtc,
+        Versions = includeDetail ? knowledge.Versions.Select(version => new
+        {
+            version.Id,
+            version.Version,
+            version.QuestionSnapshot,
+            version.AnswerSnapshot,
+            version.ChangeNote,
+            CreatedBy = BuildNexaUserSummary(version.CreatedByUserAccount),
+            version.CreatedAtUtc
+        }) : null
     };
 }
 

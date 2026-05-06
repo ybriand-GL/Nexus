@@ -2294,3 +2294,21 @@ Ordre cible de construction:
   - `npm run build` OK
 - point restant:
   - installer/demarrer le runtime local Ollama et telecharger le modele configure pour obtenir le mode `local-llm`; sans cela Nexa reste volontairement en fallback local
+
+## 2026-05-06 - Installation locale Nexa et repositionnement
+
+- installation:
+  - runtime Ollama CLI installe localement dans `.tools/ollama`
+  - stockage des modeles dans `.ollama/models`
+  - script de redemarrage ajoute: `scripts/start-nexa-ollama.ps1`
+  - `.tools`, `.ollama` et `.downloads` exclus du depot
+- modele:
+  - `llama3.1:8b` telecharge mais non exploitable avec la RAM libre observee
+  - modele actif bascule sur `qwen2.5:1.5b` dans `Nexa:LocalAi`
+- UX:
+  - Nexa n'est plus positionne dans le haut de page
+  - assistant affiche uniquement a la demande via bouton flottant discret
+  - conseils rapides visuels retires du bandeau et masques dans le formulaire
+- validation a faire:
+  - tester le chat direct Ollama avec `qwen2.5:1.5b`
+  - rebuild, republier IIS et tester `/api/nexa/chat`

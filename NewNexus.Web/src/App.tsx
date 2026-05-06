@@ -974,7 +974,6 @@ function App() {
     status: 'loading',
   })
   const [sessionInsight, setSessionInsight] = useState('')
-  const [nexaInsight, setNexaInsight] = useState<NexaSessionInsight | null>(null)
   const [isNexaAssistantOpen, setIsNexaAssistantOpen] = useState(false)
   const [nexaChatMessages, setNexaChatMessages] = useState<NexaChatMessage[]>([
     {
@@ -1826,10 +1825,8 @@ function App() {
       }
 
       const insight = (await response.json()) as NexaSessionInsight
-      setNexaInsight(insight)
       setSessionInsight(insight.message || buildSessionInsight(user))
     } catch {
-      setNexaInsight(null)
       setSessionInsight(buildSessionInsight(user))
     }
   }
@@ -4304,30 +4301,8 @@ function App() {
       <main className={`nexus-main ${selectedNavigation === 'Accueil' ? 'nexus-main-home' : ''}`}>
         <section className="nexus-top-banner" aria-label="Informations de session">
           <div className="nexus-top-hello">
-            <strong><span className="nexa-companion-badge">Nexa</span> Bonjour {getFirstName(currentUser.displayName)}</strong>
+            <strong>Bonjour {getFirstName(currentUser.displayName)}</strong>
             <span>{sessionInsight}</span>
-            {nexaInsight?.suggestions?.length ? (
-              <div className="nexa-suggestion-row" aria-label="Suggestions Nexa">
-                {nexaInsight.suggestions.slice(0, 2).map((suggestion) => (
-                  <span className="nexa-suggestion-chip" key={suggestion}>{suggestion}</span>
-                ))}
-              </div>
-            ) : null}
-            <div className="nexa-top-actions">
-              <button className="nexa-chat-open-button" onClick={() => setIsNexaAssistantOpen(true)} type="button">
-                Interroger Nexa
-              </button>
-              <button
-                className="nexa-chat-quick-button"
-                onClick={() => {
-                  setIsNexaAssistantOpen(true)
-                  void sendNexaChatMessage('Que me conseilles-tu de traiter maintenant ?')
-                }}
-                type="button"
-              >
-                Conseil rapide
-              </button>
-            </div>
           </div>
           <div className="nexus-top-meta">
             <img
@@ -7499,6 +7474,16 @@ function App() {
           </div>
         ) : null}
       </main>
+      <button
+        aria-label="Interroger Nexa"
+        className="nexa-floating-button"
+        onClick={() => setIsNexaAssistantOpen((isOpen) => !isOpen)}
+        title="Interroger Nexa"
+        type="button"
+      >
+        <span aria-hidden="true">N</span>
+        <strong>Nexa</strong>
+      </button>
     </div>
   )
 }

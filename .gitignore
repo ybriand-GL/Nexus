@@ -10,3 +10,8 @@
 *.log
 .env
 .env.*
+.downloads/
+.ollama/
+.tools/
+.dotnet/
+.nuget/

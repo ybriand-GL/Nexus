@@ -902,9 +902,19 @@
   border-color: rgba(255, 255, 255, .12);
 }
 
+.nexa-chat-form-actions .ghost-button {
+  display: none;
+}
+
 .nexa-assistant-panel {
+  position: fixed;
+  right: 26px;
+  bottom: 94px;
+  z-index: 80;
   display: grid;
   gap: 14px;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 128px));
   padding: 18px;
   border-radius: 22px;
   border: 1px solid rgba(247, 217, 138, .22);
@@ -912,6 +922,43 @@
     linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04)),
     radial-gradient(circle at 100% 0, rgba(247,217,138,.14), transparent 42%);
   box-shadow: 0 20px 54px rgba(0, 0, 0, .24);
+}
+
+.nexa-floating-button {
+  position: fixed;
+  right: 26px;
+  bottom: 26px;
+  z-index: 82;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 50px;
+  padding: 8px 14px 8px 9px;
+  color: var(--nexus-text);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  border: 1px solid rgba(247, 217, 138, .38);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05)),
+    rgba(4, 6, 10, .94);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .34);
+}
+
+.nexa-floating-button span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  color: #04060a;
+  background: var(--nexus-gold-soft);
+  font-weight: 950;
+}
+
+.nexa-floating-button strong {
+  font-size: .9rem;
 }
 
 .nexa-assistant-header {
@@ -935,7 +982,7 @@
 .nexa-assistant-messages {
   display: grid;
   gap: 10px;
-  max-height: 360px;
+  max-height: min(360px, calc(100vh - 380px));
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -4641,6 +4688,18 @@
 
   .nexus-top-meta > div {
     text-align: left;
+  }
+
+  .nexa-assistant-panel {
+    right: 14px;
+    bottom: 82px;
+    width: calc(100vw - 28px);
+    max-height: calc(100vh - 104px);
+  }
+
+  .nexa-floating-button {
+    right: 14px;
+    bottom: 14px;
   }
 
   .nexus-main .hero-card,

@@ -89,9 +89,9 @@ Derniere mise a jour: 2026-05-06
 | UX | Accueil par profil | A_TESTER | Entree `Accueil` retiree de la navigation principale; retour accueil via logo/nom Nexus, bandeau haut global avec Bonjour, ville, date/heure, meteo image et phrase de session personnalisee; meteo forcee temporairement sur Saint-Etienne-de-Montluc 44360 |
 | UX | Responsive tablette / smartphone / PC | A_TESTER | Passe CSS responsive initiale appliquee sur shell, menus, grilles, formulaires et modales; recette multi-format a effectuer |
 | UX | Sidebar reduite | A_TESTER | Icônes SVG premium dans les raccourcis, infobulles au survol/focus en mode reduit avec z-index/overflow corriges et deconnexion par icone basse |
-| IA | Assistant Nexa | CADRE | Assistant IA local a cadrer: moteur heberge sur le serveur NewNexus, apprentissage des usages par traces/intentions, personnalisation des accroches puis guidage utilisateur dans l'outil |
+| IA | Assistant Nexa | A_TESTER | Compagnon discret appele a la demande via bouton flottant; moteur local heberge sur le serveur NewNexus; apprentissage des usages par traces/intentions et personnalisation des accroches |
 | IA | Moteur de personnalisation Nexa | A_TESTER | Endpoint `/api/nexa/session-insight` base sur compte, profil, sessions, traces et signaux d'usage; collecte `/api/nexa/usage-signal` depuis la navigation; recommandations affichees dans le bandeau |
-| IA | Chat Nexa local | A_TESTER | Endpoints `/api/nexa/chat` et `/api/nexa/local-ai/status` raccordes a un moteur local compatible Ollama (`Nexa:LocalAi`); fallback local deterministe si le modele n'est pas joignable; panneau de chat integre dans le bandeau applicatif |
+| IA | Chat Nexa local | A_TESTER | Endpoints `/api/nexa/chat` et `/api/nexa/local-ai/status` raccordes a Ollama local (`Nexa:LocalAi`); modele actif `qwen2.5:1.5b`; fallback local deterministe si le modele n'est pas joignable; panneau flottant hors bandeau haut |
 
 ## 4. Donnees Communes
 

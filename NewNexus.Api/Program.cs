@@ -4125,7 +4125,7 @@ static NexaLocalAiOptions GetNexaLocalAiOptions(IConfiguration configuration)
         section.GetValue("Enabled", true),
         FirstNonEmpty(section["Provider"], "Ollama")!,
         FirstNonEmpty(section["BaseUrl"], "http://127.0.0.1:11434")!,
-        FirstNonEmpty(section["Model"], "llama3.1:8b")!,
+        FirstNonEmpty(section["Model"], "qwen2.5:1.5b")!,
         Math.Clamp(section.GetValue("TimeoutSeconds", 12), 2, 90),
         Math.Clamp(section.GetValue("MaxResponseTokens", 480), 80, 2048));
 }

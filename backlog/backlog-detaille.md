@@ -92,6 +92,8 @@ Derniere mise a jour: 2026-05-06
 | IA | Assistant Nexa | A_TESTER | Compagnon discret appele a la demande via bouton flottant; moteur local heberge sur le serveur NewNexus; apprentissage des usages par traces/intentions et personnalisation des accroches |
 | IA | Moteur de personnalisation Nexa | A_TESTER | Endpoint `/api/nexa/session-insight` base sur compte, profil, sessions, traces et signaux d'usage; collecte `/api/nexa/usage-signal` depuis la navigation; recommandations affichees dans le bandeau |
 | IA | Chat Nexa local | A_TESTER | Endpoints `/api/nexa/chat` et `/api/nexa/local-ai/status` raccordes a Ollama local (`Nexa:LocalAi`); modele actif `qwen2.5:1.5b`; fallback local deterministe si le modele n'est pas joignable; panneau flottant hors bandeau haut |
+| IA | Nexa ticketing MVP | A_TESTER | Schema `nexa`, `/api/nexa/ask`, tickets, affectation simple par regle/referent/module, reponse referent, validation demandeur, creation automatique de connaissance validee et reutilisation sur question similaire |
+| IA | Nexa RAG local avance | A_FAIRE | Embeddings locaux, base vectorielle exploitee, reformulation par Ollama et seuils de confiance avances apres stabilisation du ticketing MVP |
 
 ## 4. Donnees Communes
 

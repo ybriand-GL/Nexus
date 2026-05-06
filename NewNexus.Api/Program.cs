@@ -13,6 +13,7 @@ using Microsoft.Data.SqlClient;
 using NewNexus.Data.Postgres;
 using NewNexus.Domain.Administration;
 using NewNexus.Domain.Modules;
+using NewNexus.Domain.Nexa;
 using NewNexus.Domain.Security;
 using NewNexus.Domain.Transverse;
 
@@ -1056,6 +1057,850 @@ app.MapPost("/api/nexa/chat", async (
             : null
     });
 }).RequireAuthorization();
+
+app.MapGet("/api/nexa/reference", async (NewNexusDbContext dbContext) =>
+{
+    var modules = await dbContext.NexaModules
+        .AsNoTracking()
+        .Where(module => module.IsActive)
+        .OrderBy(module => module.DisplayOrder)
+        .Select(module => new
+        {
+            module.Id,
+            module.Code,
+            module.Label,
+            module.IsIndexable
+        })
+        .ToListAsync();
+    var categories = await dbContext.NexaCategories
+        .AsNoTracking()
+        .Where(category => category.IsActive)
+        .OrderBy(category => category.DisplayOrder)
+        .Select(category => new
+        {
+            category.Id,
+            category.NexaModuleId,
+            category.Code,
+            category.Label
+        })
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        Modules = modules,
+        Categories = categories,
+        Priorities = BuildNexaPriorityOptions(),
+        TicketStatuses = BuildNexaTicketStatusOptions()
+    });
+}).RequireAuthorization();
+
+app.MapPost("/api/nexa/ask", async (
+    NexaAskRequest request,
+    NewNexusDbContext dbContext,
+    HttpContext httpContext,
+    ClaimsPrincipal principal) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: true);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var normalizedQuestion = NormalizeTraceText(request.Question, 1600);
+    if (string.IsNullOrWhiteSpace(normalizedQuestion))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["question"] = ["La question Nexa est obligatoire."]
+        });
+    }
+
+    var selectedModule = request.ModuleId is null
+        ? null
+        : await dbContext.NexaModules.AsNoTracking().SingleOrDefaultAsync(module => module.Id == request.ModuleId.Value && module.IsActive, httpContext.RequestAborted);
+    if (request.ModuleId is not null && selectedModule is null)
+    {
+        return Results.NotFound(new { Message = "Module Nexa introuvable." });
+    }
+
+    if (selectedModule is not null && !CanUserUseNexaModule(account, selectedModule.Code))
+    {
+        return Results.Forbid();
+    }
+
+    var allowedModuleCodes = await BuildAllowedNexaModuleCodesAsync(dbContext, account, httpContext.RequestAborted);
+    var match = await FindNexaKnowledgeMatchAsync(
+        dbContext,
+        normalizedQuestion,
+        selectedModule?.Id,
+        request.CategoryId,
+        allowedModuleCodes,
+        httpContext.RequestAborted);
+    var now = DateTime.UtcNow;
+    var isReliable = match is not null && match.ConfidenceScore >= 0.72m;
+    var answer = isReliable
+        ? match!.Knowledge.Answer
+        : "Je ne dispose pas encore d'une reponse suffisamment fiable a cette question. Souhaitez-vous ouvrir un ticket afin qu'un referent puisse vous repondre ?";
+    var sources = isReliable
+        ? new[]
+        {
+            new
+            {
+                Type = "knowledge",
+                Id = match!.Knowledge.Id,
+                Label = $"{match.Knowledge.NexaModule?.Label ?? "Nexa"} - v{match.Knowledge.Version}",
+                ReliabilityScore = match.Knowledge.ReliabilityScore
+            }
+        }
+        : Array.Empty<object>();
+
+    var conversation = new NexaConversation
+    {
+        Id = Guid.NewGuid(),
+        UserAccountId = account.Id,
+        NexaModuleId = selectedModule?.Id,
+        Title = normalizedQuestion.Length > 120 ? normalizedQuestion[..120] : normalizedQuestion,
+        CreatedAtUtc = now,
+        LastMessageAtUtc = now
+    };
+    conversation.Messages.Add(new NexaMessage
+    {
+        Id = Guid.NewGuid(),
+        Role = "user",
+        Content = normalizedQuestion,
+        CreatedAtUtc = now
+    });
+    conversation.Messages.Add(new NexaMessage
+    {
+        Id = Guid.NewGuid(),
+        Role = "assistant",
+        Content = answer,
+        ConfidenceScore = match?.ConfidenceScore ?? 0m,
+        SourcesJson = JsonSerializer.Serialize(sources),
+        CreatedAtUtc = now
+    });
+    dbContext.NexaConversations.Add(conversation);
+    if (isReliable)
+    {
+        match!.Knowledge.LastUsedAtUtc = now;
+        match.Knowledge.UsageCount++;
+    }
+
+    dbContext.NexaAiLogs.Add(new NexaAiLog
+    {
+        Id = Guid.NewGuid(),
+        UserAccountId = account.Id,
+        NexaConversationId = conversation.Id,
+        EventCode = "ASK",
+        Question = normalizedQuestion,
+        Response = answer,
+        SourcesJson = JsonSerializer.Serialize(sources),
+        ConfidenceScore = match?.ConfidenceScore ?? 0m,
+        Mode = isReliable ? "knowledge-base" : "ticket-proposed",
+        CreatedAtUtc = now
+    });
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "NEXA_USAGE",
+        "ASK",
+        isReliable ? "Info" : "Warning",
+        isReliable ? "Nexa a repondu depuis la base de connaissance." : "Nexa a propose l'ouverture d'un ticket.",
+        JsonSerializer.Serialize(new { selectedModule?.Code, Confidence = match?.ConfidenceScore ?? 0m }),
+        "Question Nexa");
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    return Results.Ok(new
+    {
+        Companion = "Nexa",
+        ConversationId = conversation.Id,
+        Answer = answer,
+        ConfidenceScore = match?.ConfidenceScore ?? 0m,
+        IsReliable = isReliable,
+        CanCreateTicket = !isReliable,
+        MatchedKnowledgeId = isReliable ? match!.Knowledge.Id : (Guid?)null,
+        Sources = sources,
+        GeneratedAtUtc = now
+    });
+}).RequireAuthorization();
+
+app.MapPost("/api/nexa/tickets", async (
+    NexaCreateTicketRequest request,
+    NewNexusDbContext dbContext,
+    HttpContext httpContext,
+    ClaimsPrincipal principal) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: true);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var question = NormalizeTraceText(request.Question, 4000);
+    if (string.IsNullOrWhiteSpace(question))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["question"] = ["La question initiale est obligatoire."]
+        });
+    }
+
+    var module = await dbContext.NexaModules.SingleOrDefaultAsync(item => item.Id == request.ModuleId && item.IsActive, httpContext.RequestAborted);
+    if (module is null)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["moduleId"] = ["Le module concerne est obligatoire."]
+        });
+    }
+
+    if (!CanUserUseNexaModule(account, module.Code))
+    {
+        return Results.Forbid();
+    }
+
+    var category = request.CategoryId is null
+        ? null
+        : await dbContext.NexaCategories.SingleOrDefaultAsync(item => item.Id == request.CategoryId.Value && item.IsActive, httpContext.RequestAborted);
+    var assignedUserId = await ResolveNexaTicketAssigneeAsync(dbContext, account, module.Id, category?.Id, question, request.PriorityCode, httpContext.RequestAborted);
+    var now = DateTime.UtcNow;
+    var statusCode = assignedUserId is null ? "NOUVEAU" : "AFFECTE";
+    var ticket = new NexaTicket
+    {
+        Id = Guid.NewGuid(),
+        TicketNumber = $"NX-{now:yyyyMMddHHmmssfff}",
+        CreatedAtUtc = now,
+        UpdatedAtUtc = now,
+        RequesterUserAccountId = account.Id,
+        Question = question,
+        NexaModuleId = module.Id,
+        NexaCategoryId = category?.Id,
+        PriorityCode = NormalizeNexaPriority(request.PriorityCode),
+        StatusCode = statusCode,
+        AssignedUserAccountId = assignedUserId
+    };
+    ticket.History.Add(BuildNexaTicketHistory(ticket.Id, "CREATION", null, statusCode, "Ticket cree depuis Nexa.", account.Id, now));
+    if (!string.IsNullOrWhiteSpace(request.Comment))
+    {
+        ticket.Comments.Add(new NexaTicketComment
+        {
+            Id = Guid.NewGuid(),
+            AuthorUserAccountId = account.Id,
+            Comment = NormalizeTraceText(request.Comment, 3000) ?? string.Empty,
+            CreatedAtUtc = now
+        });
+    }
+
+    dbContext.NexaTickets.Add(ticket);
+    dbContext.NexaAiLogs.Add(new NexaAiLog
+    {
+        Id = Guid.NewGuid(),
+        UserAccountId = account.Id,
+        NexaTicketId = ticket.Id,
+        EventCode = "TICKET_CREATED",
+        Question = question,
+        Mode = "ticketing",
+        CreatedAtUtc = now
+    });
+    await AddApplicationTraceAsync(
+        dbContext,
+        httpContext,
+        principal,
+        "NEXA_USAGE",
+        "TICKET_CREATED",
+        "Info",
+        "Ticket Nexa cree.",
+        JsonSerializer.Serialize(new { ticket.TicketNumber, Module = module.Code, ticket.StatusCode, ticket.AssignedUserAccountId }),
+        ticket.TicketNumber);
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+
+    var createdTicket = await LoadNexaTicketForResponseAsync(dbContext, ticket.Id, httpContext.RequestAborted);
+    return Results.Created($"/api/nexa/tickets/{ticket.Id}", BuildNexaTicketResponse(createdTicket!));
+}).RequireAuthorization();
+
+app.MapGet("/api/nexa/tickets", async (
+    string? view,
+    string? status,
+    Guid? moduleId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: false);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var isAdmin = IsInformatique(principal);
+    var query = dbContext.NexaTickets
+        .AsNoTracking()
+        .Include(ticket => ticket.RequesterUserAccount)
+        .Include(ticket => ticket.AssignedUserAccount)
+        .Include(ticket => ticket.NexaModule)
+        .Include(ticket => ticket.NexaCategory)
+        .AsQueryable();
+
+    query = (view ?? string.Empty).Trim().ToUpperInvariant() switch
+    {
+        "TO_PROCESS" => query.Where(ticket => isAdmin || ticket.AssignedUserAccountId == account.Id),
+        "ALL" when isAdmin => query,
+        _ => query.Where(ticket => ticket.RequesterUserAccountId == account.Id || ticket.AssignedUserAccountId == account.Id || isAdmin)
+    };
+
+    if (!string.IsNullOrWhiteSpace(status))
+    {
+        var normalizedStatus = status.Trim().ToUpperInvariant();
+        query = query.Where(ticket => ticket.StatusCode == normalizedStatus);
+    }
+
+    if (moduleId is not null)
+    {
+        query = query.Where(ticket => ticket.NexaModuleId == moduleId.Value);
+    }
+
+    var tickets = await query
+        .OrderByDescending(ticket => ticket.UpdatedAtUtc)
+        .Take(200)
+        .ToListAsync(httpContext.RequestAborted);
+    return Results.Ok(tickets.Select(ticket => BuildNexaTicketResponse(ticket)));
+}).RequireAuthorization();
+
+app.MapGet("/api/nexa/tickets/{ticketId:guid}", async (
+    Guid ticketId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var ticket = await dbContext.NexaTickets
+        .AsNoTracking()
+        .Include(item => item.RequesterUserAccount)
+        .Include(item => item.AssignedUserAccount)
+        .Include(item => item.NexaModule)
+        .Include(item => item.NexaCategory)
+        .Include(item => item.History.OrderBy(history => history.CreatedAtUtc))
+            .ThenInclude(history => history.ActorUserAccount)
+        .Include(item => item.Comments.OrderBy(comment => comment.CreatedAtUtc))
+            .ThenInclude(comment => comment.AuthorUserAccount)
+        .SingleOrDefaultAsync(item => item.Id == ticketId, httpContext.RequestAborted);
+    if (ticket is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!CanReadNexaTicket(ticket, principal))
+    {
+        return Results.Forbid();
+    }
+
+    return Results.Ok(BuildNexaTicketResponse(ticket, includeDetail: true));
+}).RequireAuthorization();
+
+app.MapPut("/api/nexa/tickets/{ticketId:guid}/assign", async (
+    Guid ticketId,
+    NexaAssignTicketRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!IsInformatique(principal))
+    {
+        return Results.Forbid();
+    }
+
+    var ticket = await dbContext.NexaTickets.AsNoTracking().SingleOrDefaultAsync(item => item.Id == ticketId, httpContext.RequestAborted);
+    var assignee = await dbContext.UserAccounts.AsNoTracking().SingleOrDefaultAsync(item => item.Id == request.AssignedUserAccountId && item.IsActive, httpContext.RequestAborted);
+    if (ticket is null || assignee is null)
+    {
+        return Results.NotFound();
+    }
+
+    var previousStatus = ticket.StatusCode;
+    ticket.AssignedUserAccountId = assignee.Id;
+    ticket.StatusCode = "AFFECTE";
+    ticket.UpdatedAtUtc = DateTime.UtcNow;
+    ticket.History.Add(BuildNexaTicketHistory(ticket.Id, "AFFECTATION", previousStatus, ticket.StatusCode, $"Affecte a {assignee.DisplayName}.", GetUserId(principal), ticket.UpdatedAtUtc));
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    return Results.Ok(BuildNexaTicketResponse((await LoadNexaTicketForResponseAsync(dbContext, ticket.Id, httpContext.RequestAborted))!));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/nexa/tickets/{ticketId:guid}/answer", async (
+    Guid ticketId,
+    NexaAnswerTicketRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: false);
+    var ticket = await dbContext.NexaTickets.SingleOrDefaultAsync(item => item.Id == ticketId, httpContext.RequestAborted);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (ticket is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!IsInformatique(principal) && ticket.AssignedUserAccountId != account.Id)
+    {
+        return Results.Forbid();
+    }
+
+    var answer = NormalizeTraceText(request.Answer, 6000);
+    if (string.IsNullOrWhiteSpace(answer))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["answer"] = ["La reponse du referent est obligatoire."]
+        });
+    }
+
+    var previousStatus = ticket.StatusCode;
+    var now = DateTime.UtcNow;
+    var updatedRows = await dbContext.NexaTickets
+        .Where(item => item.Id == ticket.Id)
+        .ExecuteUpdateAsync(updates => updates
+            .SetProperty(item => item.ReferentAnswer, answer)
+            .SetProperty(item => item.AnsweredAtUtc, now)
+            .SetProperty(item => item.StatusCode, "EN_ATTENTE_VALIDATION_DEMANDEUR")
+            .SetProperty(item => item.UpdatedAtUtc, now), httpContext.RequestAborted);
+    if (updatedRows == 0)
+    {
+        return Results.NotFound();
+    }
+
+    dbContext.NexaTicketHistory.Add(BuildNexaTicketHistory(ticket.Id, "REPONSE", previousStatus, "EN_ATTENTE_VALIDATION_DEMANDEUR", "Reponse apportee par le referent.", account.Id, now));
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    return Results.Ok(BuildNexaTicketResponse((await LoadNexaTicketForResponseAsync(dbContext, ticket.Id, httpContext.RequestAborted))!));
+}).RequireAuthorization();
+
+app.MapPut("/api/nexa/tickets/{ticketId:guid}/validate", async (
+    Guid ticketId,
+    NexaValidateTicketRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: false);
+    var ticket = await dbContext.NexaTickets
+        .AsNoTracking()
+        .Include(item => item.NexaModule)
+        .SingleOrDefaultAsync(item => item.Id == ticketId, httpContext.RequestAborted);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (ticket is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!IsInformatique(principal) && ticket.RequesterUserAccountId != account.Id)
+    {
+        return Results.Forbid();
+    }
+
+    if (string.IsNullOrWhiteSpace(ticket.ReferentAnswer))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["answer"] = ["Le ticket ne contient pas encore de reponse validable."]
+        });
+    }
+
+    var now = DateTime.UtcNow;
+    var previousStatus = ticket.StatusCode;
+    var validationComment = NormalizeOptionalText(request.Comment);
+    var updatedRows = await dbContext.NexaTickets
+        .Where(item => item.Id == ticket.Id)
+        .ExecuteUpdateAsync(updates => updates
+            .SetProperty(item => item.StatusCode, "VALIDE")
+            .SetProperty(item => item.ValidatedAtUtc, now)
+            .SetProperty(item => item.ClosedAtUtc, now)
+            .SetProperty(item => item.RequesterValidationComment, validationComment)
+            .SetProperty(item => item.UpdatedAtUtc, now), httpContext.RequestAborted);
+    if (updatedRows == 0)
+    {
+        return Results.NotFound();
+    }
+
+    dbContext.NexaTicketHistory.Add(BuildNexaTicketHistory(ticket.Id, "VALIDATION", previousStatus, "VALIDE", "Reponse validee par le demandeur.", account.Id, now));
+
+    var knowledge = new NexaKnowledgeBase
+    {
+        Id = Guid.NewGuid(),
+        OriginalQuestion = ticket.Question,
+        Reformulations = BuildNexaReformulations(ticket.Question),
+        Answer = ticket.ReferentAnswer,
+        NexaModuleId = ticket.NexaModuleId,
+        NexaCategoryId = ticket.NexaCategoryId,
+        Keywords = BuildNexaKeywords(ticket.Question),
+        SourceType = "TICKET",
+        SourceTicketId = ticket.Id,
+        AuthorUserAccountId = ticket.AssignedUserAccountId,
+        ValidatorUserAccountId = account.Id,
+        ValidatedAtUtc = now,
+        Version = 1,
+        StatusCode = "VALIDE",
+        ReliabilityScore = 0.9m,
+        CreatedAtUtc = now,
+        UpdatedAtUtc = now
+    };
+    knowledge.Versions.Add(new NexaKnowledgeVersion
+    {
+        Id = Guid.NewGuid(),
+        Version = 1,
+        QuestionSnapshot = knowledge.OriginalQuestion,
+        AnswerSnapshot = knowledge.Answer,
+        ChangeNote = "Creation automatique apres validation ticket.",
+        CreatedByUserAccountId = account.Id,
+        CreatedAtUtc = now
+    });
+    dbContext.NexaKnowledgeBase.Add(knowledge);
+    dbContext.NexaAiLogs.Add(new NexaAiLog
+    {
+        Id = Guid.NewGuid(),
+        UserAccountId = account.Id,
+        NexaTicketId = ticket.Id,
+        EventCode = "KNOWLEDGE_CREATED",
+        Question = ticket.Question,
+        Response = ticket.ReferentAnswer,
+        Mode = "validated-learning",
+        ConfidenceScore = knowledge.ReliabilityScore,
+        CreatedAtUtc = now
+    });
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    return Results.Ok(BuildNexaTicketResponse((await LoadNexaTicketForResponseAsync(dbContext, ticket.Id, httpContext.RequestAborted))!));
+}).RequireAuthorization();
+
+app.MapPut("/api/nexa/tickets/{ticketId:guid}/reject", async (
+    Guid ticketId,
+    NexaRejectTicketRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: false);
+    var ticket = await dbContext.NexaTickets.SingleOrDefaultAsync(item => item.Id == ticketId, httpContext.RequestAborted);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (ticket is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!IsInformatique(principal) && ticket.RequesterUserAccountId != account.Id)
+    {
+        return Results.Forbid();
+    }
+
+    var now = DateTime.UtcNow;
+    var previousStatus = ticket.StatusCode;
+    ticket.StatusCode = "REFUSE";
+    ticket.RejectedAtUtc = now;
+    ticket.RequesterValidationComment = NormalizeTraceText(request.Comment, 2000);
+    ticket.UpdatedAtUtc = now;
+    ticket.History.Add(BuildNexaTicketHistory(ticket.Id, "REFUS", previousStatus, ticket.StatusCode, ticket.RequesterValidationComment, account.Id, now));
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    return Results.Ok(BuildNexaTicketResponse((await LoadNexaTicketForResponseAsync(dbContext, ticket.Id, httpContext.RequestAborted))!));
+}).RequireAuthorization();
+
+app.MapPut("/api/nexa/tickets/{ticketId:guid}/close", async (
+    Guid ticketId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!IsInformatique(principal))
+    {
+        return Results.Forbid();
+    }
+
+    var ticket = await dbContext.NexaTickets.SingleOrDefaultAsync(item => item.Id == ticketId, httpContext.RequestAborted);
+    if (ticket is null)
+    {
+        return Results.NotFound();
+    }
+
+    var now = DateTime.UtcNow;
+    var previousStatus = ticket.StatusCode;
+    ticket.StatusCode = "CLOTURE";
+    ticket.ClosedAtUtc = now;
+    ticket.UpdatedAtUtc = now;
+    ticket.History.Add(BuildNexaTicketHistory(ticket.Id, "CLOTURE", previousStatus, ticket.StatusCode, "Ticket cloture.", GetUserId(principal), now));
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    return Results.Ok(BuildNexaTicketResponse((await LoadNexaTicketForResponseAsync(dbContext, ticket.Id, httpContext.RequestAborted))!));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapGet("/api/nexa/knowledge", async (
+    Guid? moduleId,
+    string? status,
+    string? search,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var account = await GetActiveUserAccountAsync(dbContext, principal, includeRights: true);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var allowedModuleCodes = await BuildAllowedNexaModuleCodesAsync(dbContext, account, httpContext.RequestAborted);
+    var query = dbContext.NexaKnowledgeBase
+        .AsNoTracking()
+        .Include(knowledge => knowledge.NexaModule)
+        .Include(knowledge => knowledge.NexaCategory)
+        .Where(knowledge => knowledge.NexaModule != null && allowedModuleCodes.Contains(knowledge.NexaModule.Code));
+    if (!IsInformatique(principal))
+    {
+        query = query.Where(knowledge => knowledge.StatusCode == "VALIDE");
+    }
+
+    if (moduleId is not null)
+    {
+        query = query.Where(knowledge => knowledge.NexaModuleId == moduleId.Value);
+    }
+
+    if (!string.IsNullOrWhiteSpace(status))
+    {
+        var normalizedStatus = status.Trim().ToUpperInvariant();
+        query = query.Where(knowledge => knowledge.StatusCode == normalizedStatus);
+    }
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        var normalizedSearch = search.Trim().ToLowerInvariant();
+        query = query.Where(knowledge => knowledge.OriginalQuestion.ToLower().Contains(normalizedSearch) || knowledge.Answer.ToLower().Contains(normalizedSearch));
+    }
+
+    var items = await query
+        .OrderByDescending(knowledge => knowledge.UpdatedAtUtc)
+        .Take(200)
+        .ToListAsync(httpContext.RequestAborted);
+    return Results.Ok(items.Select(BuildNexaKnowledgeResponse));
+}).RequireAuthorization();
+
+app.MapPost("/api/nexa/knowledge", async (
+    NexaKnowledgeUpsertRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!IsInformatique(principal))
+    {
+        return Results.Forbid();
+    }
+
+    var accountId = GetUserId(principal);
+    var module = await dbContext.NexaModules.SingleOrDefaultAsync(item => item.Id == request.ModuleId && item.IsActive, httpContext.RequestAborted);
+    var manualQuestion = NormalizeTraceText(request.Question ?? string.Empty, 4000);
+    var manualAnswer = NormalizeTraceText(request.Answer ?? string.Empty, 8000);
+    if (module is null || string.IsNullOrWhiteSpace(manualQuestion) || string.IsNullOrWhiteSpace(manualAnswer))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["knowledge"] = ["Module, question et reponse sont obligatoires."]
+        });
+    }
+
+    var now = DateTime.UtcNow;
+    var knowledge = new NexaKnowledgeBase
+    {
+        Id = Guid.NewGuid(),
+        OriginalQuestion = manualQuestion,
+        Reformulations = NormalizeOptionalText(request.Reformulations),
+        Answer = manualAnswer,
+        NexaModuleId = module.Id,
+        NexaCategoryId = request.CategoryId,
+        Keywords = NormalizeOptionalText(request.Keywords) ?? BuildNexaKeywords(manualQuestion),
+        SourceType = "MANUAL",
+        AuthorUserAccountId = accountId,
+        ValidatorUserAccountId = accountId,
+        ValidatedAtUtc = now,
+        Version = 1,
+        StatusCode = "VALIDE",
+        ReliabilityScore = Math.Clamp(request.ReliabilityScore ?? 0.85m, 0m, 1m),
+        CreatedAtUtc = now,
+        UpdatedAtUtc = now
+    };
+    knowledge.Versions.Add(new NexaKnowledgeVersion
+    {
+        Id = Guid.NewGuid(),
+        Version = 1,
+        QuestionSnapshot = knowledge.OriginalQuestion,
+        AnswerSnapshot = knowledge.Answer,
+        ChangeNote = "Saisie manuelle.",
+        CreatedByUserAccountId = accountId,
+        CreatedAtUtc = now
+    });
+    dbContext.NexaKnowledgeBase.Add(knowledge);
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    return Results.Created($"/api/nexa/knowledge/{knowledge.Id}", BuildNexaKnowledgeResponse(knowledge));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/nexa/knowledge/{knowledgeId:guid}/archive", async (
+    Guid knowledgeId,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    if (!IsInformatique(principal))
+    {
+        return Results.Forbid();
+    }
+
+    var knowledge = await dbContext.NexaKnowledgeBase.SingleOrDefaultAsync(item => item.Id == knowledgeId, httpContext.RequestAborted);
+    if (knowledge is null)
+    {
+        return Results.NotFound();
+    }
+
+    knowledge.StatusCode = "ARCHIVE";
+    knowledge.UpdatedAtUtc = DateTime.UtcNow;
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    return Results.Ok(BuildNexaKnowledgeResponse(knowledge));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/nexa/knowledge/{knowledgeId:guid}/feedback", async (
+    Guid knowledgeId,
+    NexaKnowledgeFeedbackRequest request,
+    NewNexusDbContext dbContext,
+    ClaimsPrincipal principal,
+    HttpContext httpContext) =>
+{
+    var accountId = GetUserId(principal);
+    if (accountId is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var knowledge = await dbContext.NexaKnowledgeBase.SingleOrDefaultAsync(item => item.Id == knowledgeId && item.StatusCode == "VALIDE", httpContext.RequestAborted);
+    if (knowledge is null)
+    {
+        return Results.NotFound();
+    }
+
+    dbContext.NexaKnowledgeFeedback.Add(new NexaKnowledgeFeedback
+    {
+        Id = Guid.NewGuid(),
+        NexaKnowledgeBaseId = knowledge.Id,
+        UserAccountId = accountId.Value,
+        IsPositive = request.IsPositive,
+        Comment = NormalizeOptionalText(request.Comment),
+        CreatedAtUtc = DateTime.UtcNow
+    });
+    if (request.IsPositive)
+    {
+        knowledge.PositiveFeedbackCount++;
+    }
+    else
+    {
+        knowledge.NegativeFeedbackCount++;
+    }
+
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    return Results.Ok(BuildNexaKnowledgeResponse(knowledge));
+}).RequireAuthorization();
+
+app.MapGet("/api/nexa/admin/routing-rules", async (NewNexusDbContext dbContext, HttpContext httpContext) =>
+{
+    var rules = await dbContext.NexaRoutingRules
+        .AsNoTracking()
+        .Include(rule => rule.NexaModule)
+        .Include(rule => rule.NexaCategory)
+        .Include(rule => rule.ReferentUserAccount)
+        .Include(rule => rule.SecondaryReferentUserAccount)
+        .OrderBy(rule => rule.DisplayOrder)
+        .ToListAsync(httpContext.RequestAborted);
+    return Results.Ok(rules.Select(BuildNexaRoutingRuleResponse));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPost("/api/nexa/admin/routing-rules", async (
+    NexaRoutingRuleRequest request,
+    NewNexusDbContext dbContext,
+    HttpContext httpContext) =>
+{
+    var referentExists = await dbContext.UserAccounts.AnyAsync(account => account.Id == request.ReferentUserAccountId && account.IsActive, httpContext.RequestAborted);
+    if (!referentExists)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["referentUserAccountId"] = ["Le referent principal est obligatoire."]
+        });
+    }
+
+    var rule = new NexaRoutingRule
+    {
+        Id = Guid.NewGuid(),
+        NexaModuleId = request.ModuleId,
+        NexaCategoryId = request.CategoryId,
+        KeywordPattern = NormalizeOptionalText(request.KeywordPattern),
+        PriorityCode = NormalizeOptionalText(request.PriorityCode),
+        ReferentUserAccountId = request.ReferentUserAccountId,
+        SecondaryReferentUserAccountId = request.SecondaryReferentUserAccountId,
+        IsActive = request.IsActive,
+        DisplayOrder = request.DisplayOrder,
+        CreatedAtUtc = DateTime.UtcNow
+    };
+    dbContext.NexaRoutingRules.Add(rule);
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    var created = await dbContext.NexaRoutingRules
+        .AsNoTracking()
+        .Include(item => item.NexaModule)
+        .Include(item => item.NexaCategory)
+        .Include(item => item.ReferentUserAccount)
+        .Include(item => item.SecondaryReferentUserAccount)
+        .SingleAsync(item => item.Id == rule.Id, httpContext.RequestAborted);
+    return Results.Created($"/api/nexa/admin/routing-rules/{rule.Id}", BuildNexaRoutingRuleResponse(created));
+}).RequireAuthorization("RequireInformatique");
+
+app.MapPut("/api/nexa/admin/routing-rules/{ruleId:guid}", async (
+    Guid ruleId,
+    NexaRoutingRuleRequest request,
+    NewNexusDbContext dbContext,
+    HttpContext httpContext) =>
+{
+    var rule = await dbContext.NexaRoutingRules.SingleOrDefaultAsync(item => item.Id == ruleId, httpContext.RequestAborted);
+    var referentExists = await dbContext.UserAccounts.AnyAsync(account => account.Id == request.ReferentUserAccountId && account.IsActive, httpContext.RequestAborted);
+    if (rule is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!referentExists)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["referentUserAccountId"] = ["Le referent principal est obligatoire."]
+        });
+    }
+
+    rule.NexaModuleId = request.ModuleId;
+    rule.NexaCategoryId = request.CategoryId;
+    rule.KeywordPattern = NormalizeOptionalText(request.KeywordPattern);
+    rule.PriorityCode = NormalizeOptionalText(request.PriorityCode);
+    rule.ReferentUserAccountId = request.ReferentUserAccountId;
+    rule.SecondaryReferentUserAccountId = request.SecondaryReferentUserAccountId;
+    rule.IsActive = request.IsActive;
+    rule.DisplayOrder = request.DisplayOrder;
+    await dbContext.SaveChangesAsync(httpContext.RequestAborted);
+    var updated = await dbContext.NexaRoutingRules
+        .AsNoTracking()
+        .Include(item => item.NexaModule)
+        .Include(item => item.NexaCategory)
+        .Include(item => item.ReferentUserAccount)
+        .Include(item => item.SecondaryReferentUserAccount)
+        .SingleAsync(item => item.Id == rule.Id, httpContext.RequestAborted);
+    return Results.Ok(BuildNexaRoutingRuleResponse(updated));
+}).RequireAuthorization("RequireInformatique");
 
 app.MapPut("/api/auth/preferences", async (
     UpdateUserPreferencesRequest request,
@@ -6270,6 +7115,391 @@ static string FormatLoadingPointType(string pointTypeCode)
     };
 }
 
+static async Task<UserAccount?> GetActiveUserAccountAsync(NewNexusDbContext dbContext, ClaimsPrincipal principal, bool includeRights)
+{
+    var userId = GetUserId(principal);
+    if (userId is null)
+    {
+        return null;
+    }
+
+    var query = dbContext.UserAccounts.AsQueryable();
+    if (includeRights)
+    {
+        query = query
+            .Include(account => account.SecurityProfile!)
+                .ThenInclude(profile => profile.ModuleRights)
+                    .ThenInclude(right => right.SecurityModule);
+    }
+
+    return await query.SingleOrDefaultAsync(account => account.Id == userId.Value && account.IsActive);
+}
+
+static bool IsInformatique(ClaimsPrincipal principal)
+{
+    return string.Equals(principal.FindFirstValue("profile_code"), "INFORMATIQUE", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool CanReadNexaTicket(NexaTicket ticket, ClaimsPrincipal principal)
+{
+    if (IsInformatique(principal))
+    {
+        return true;
+    }
+
+    var userId = GetUserId(principal);
+    return userId is not null &&
+        (ticket.RequesterUserAccountId == userId.Value || ticket.AssignedUserAccountId == userId.Value);
+}
+
+static bool CanUserUseNexaModule(UserAccount account, string moduleCode)
+{
+    var securityModuleCode = MapNexaModuleToSecurityModuleCode(moduleCode);
+    if (securityModuleCode is null)
+    {
+        return true;
+    }
+
+    return account.SecurityProfile?.ModuleRights.Any(right =>
+        right.SecurityModule is not null &&
+        string.Equals(right.SecurityModule.Code, securityModuleCode, StringComparison.OrdinalIgnoreCase) &&
+        right.SecurityModule.IsActive &&
+        right.AccessLevel is ModuleAccessLevel.Read or ModuleAccessLevel.Write) == true;
+}
+
+static string? MapNexaModuleToSecurityModuleCode(string moduleCode)
+{
+    return moduleCode.Trim().ToUpperInvariant() switch
+    {
+        "CONTRAVENTIONS" => "CONTRAVENTIONS",
+        "CONDUCTEURS" => "INDICATEURS_CONDUCTEURS",
+        "TRACTEURS" => "INDICATEURS_TRACTEURS",
+        "POINTS_CHARGEMENT_DECHARGEMENT" => "CARTE_POINTS_CHARGEMENT_DECHARGEMENT",
+        "ADMINISTRATION" => "ADMINISTRATION",
+        _ => null
+    };
+}
+
+static async Task<HashSet<string>> BuildAllowedNexaModuleCodesAsync(NewNexusDbContext dbContext, UserAccount account, CancellationToken cancellationToken)
+{
+    var modules = await dbContext.NexaModules
+        .AsNoTracking()
+        .Where(module => module.IsActive)
+        .ToListAsync(cancellationToken);
+    return modules
+        .Where(module => CanUserUseNexaModule(account, module.Code))
+        .Select(module => module.Code)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+}
+
+static async Task<NexaKnowledgeMatch?> FindNexaKnowledgeMatchAsync(
+    NewNexusDbContext dbContext,
+    string question,
+    Guid? moduleId,
+    Guid? categoryId,
+    IReadOnlySet<string> allowedModuleCodes,
+    CancellationToken cancellationToken)
+{
+    var normalizedQuestion = NormalizeSearchText(question);
+    var questionTokens = BuildNexaSearchTokens(normalizedQuestion);
+    var query = dbContext.NexaKnowledgeBase
+        .Include(knowledge => knowledge.NexaModule)
+        .Include(knowledge => knowledge.NexaCategory)
+        .Where(knowledge => knowledge.StatusCode == "VALIDE" &&
+            knowledge.NexaModule != null &&
+            allowedModuleCodes.Contains(knowledge.NexaModule.Code));
+
+    if (moduleId is not null)
+    {
+        query = query.Where(knowledge => knowledge.NexaModuleId == moduleId.Value);
+    }
+
+    if (categoryId is not null)
+    {
+        query = query.Where(knowledge => knowledge.NexaCategoryId == categoryId.Value);
+    }
+
+    var candidates = await query
+        .OrderByDescending(knowledge => knowledge.ReliabilityScore)
+        .Take(80)
+        .ToListAsync(cancellationToken);
+    return candidates
+        .Select(knowledge => new NexaKnowledgeMatch(knowledge, ComputeNexaKnowledgeConfidence(normalizedQuestion, questionTokens, knowledge)))
+        .OrderByDescending(match => match.ConfidenceScore)
+        .FirstOrDefault(match => match.ConfidenceScore >= 0.48m);
+}
+
+static decimal ComputeNexaKnowledgeConfidence(string normalizedQuestion, IReadOnlySet<string> questionTokens, NexaKnowledgeBase knowledge)
+{
+    var source = NormalizeSearchText(string.Join(' ', knowledge.OriginalQuestion, knowledge.Reformulations, knowledge.Keywords));
+    if (string.IsNullOrWhiteSpace(source))
+    {
+        return 0m;
+    }
+
+    if (source.Contains(normalizedQuestion, StringComparison.OrdinalIgnoreCase) ||
+        normalizedQuestion.Contains(NormalizeSearchText(knowledge.OriginalQuestion), StringComparison.OrdinalIgnoreCase))
+    {
+        return Math.Min(1m, knowledge.ReliabilityScore + 0.08m);
+    }
+
+    var sourceTokens = BuildNexaSearchTokens(source);
+    if (questionTokens.Count == 0 || sourceTokens.Count == 0)
+    {
+        return 0m;
+    }
+
+    var overlap = questionTokens.Count(sourceTokens.Contains);
+    var score = (decimal)overlap / Math.Max(questionTokens.Count, 1);
+    return Math.Round((score * 0.72m) + (knowledge.ReliabilityScore * 0.28m), 2);
+}
+
+static string NormalizeSearchText(string value)
+{
+    var builder = new StringBuilder(value.Length);
+    foreach (var character in value.Normalize(NormalizationForm.FormD))
+    {
+        var category = CharUnicodeInfo.GetUnicodeCategory(character);
+        if (category == UnicodeCategory.NonSpacingMark)
+        {
+            continue;
+        }
+
+        builder.Append(char.IsLetterOrDigit(character) ? char.ToLowerInvariant(character) : ' ');
+    }
+
+    return string.Join(' ', builder.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+}
+
+static HashSet<string> BuildNexaSearchTokens(string value)
+{
+    return value.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Where(token => token.Length >= 3)
+        .Where(token => !IsNexaStopWord(token))
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+}
+
+static async Task<Guid?> ResolveNexaTicketAssigneeAsync(
+    NewNexusDbContext dbContext,
+    UserAccount requester,
+    Guid moduleId,
+    Guid? categoryId,
+    string question,
+    string? priorityCode,
+    CancellationToken cancellationToken)
+{
+    var normalizedQuestion = NormalizeSearchText(question);
+    var rules = await dbContext.NexaRoutingRules
+        .AsNoTracking()
+        .Where(rule => rule.IsActive)
+        .OrderBy(rule => rule.DisplayOrder)
+        .ToListAsync(cancellationToken);
+    var matchingRule = rules.FirstOrDefault(rule =>
+        (rule.NexaModuleId is null || rule.NexaModuleId == moduleId) &&
+        (rule.NexaCategoryId is null || rule.NexaCategoryId == categoryId) &&
+        (string.IsNullOrWhiteSpace(rule.PriorityCode) || string.Equals(rule.PriorityCode, NormalizeNexaPriority(priorityCode), StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(rule.RequesterProfileCode) || string.Equals(rule.RequesterProfileCode, requester.SecurityProfile?.Code, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(rule.KeywordPattern) || rule.KeywordPattern.Split(',', ';').Any(keyword => normalizedQuestion.Contains(NormalizeSearchText(keyword), StringComparison.OrdinalIgnoreCase))));
+    if (matchingRule is not null)
+    {
+        return matchingRule.ReferentUserAccountId;
+    }
+
+    var referent = await dbContext.NexaReferents
+        .AsNoTracking()
+        .Where(item => item.NexaModuleId == moduleId && item.IsActive)
+        .OrderByDescending(item => item.IsPrimary)
+        .Select(item => (Guid?)item.UserAccountId)
+        .FirstOrDefaultAsync(cancellationToken);
+    if (referent is not null)
+    {
+        return referent;
+    }
+
+    return await dbContext.UserAccounts
+        .AsNoTracking()
+        .Where(account => account.IsActive && account.SecurityProfile != null && account.SecurityProfile.Code == "INFORMATIQUE")
+        .OrderBy(account => account.DisplayName)
+        .Select(account => (Guid?)account.Id)
+        .FirstOrDefaultAsync(cancellationToken);
+}
+
+static NexaTicketHistory BuildNexaTicketHistory(Guid ticketId, string actionCode, string? fromStatusCode, string toStatusCode, string? detail, Guid? actorUserAccountId, DateTime now)
+{
+    return new NexaTicketHistory
+    {
+        Id = Guid.NewGuid(),
+        NexaTicketId = ticketId,
+        ActionCode = actionCode,
+        FromStatusCode = fromStatusCode,
+        ToStatusCode = toStatusCode,
+        Detail = detail,
+        ActorUserAccountId = actorUserAccountId,
+        CreatedAtUtc = now
+    };
+}
+
+static async Task<NexaTicket?> LoadNexaTicketForResponseAsync(NewNexusDbContext dbContext, Guid ticketId, CancellationToken cancellationToken)
+{
+    return await dbContext.NexaTickets
+        .AsNoTracking()
+        .Include(ticket => ticket.RequesterUserAccount)
+        .Include(ticket => ticket.AssignedUserAccount)
+        .Include(ticket => ticket.NexaModule)
+        .Include(ticket => ticket.NexaCategory)
+        .Include(ticket => ticket.History.OrderBy(history => history.CreatedAtUtc))
+            .ThenInclude(history => history.ActorUserAccount)
+        .Include(ticket => ticket.Comments.OrderBy(comment => comment.CreatedAtUtc))
+            .ThenInclude(comment => comment.AuthorUserAccount)
+        .SingleOrDefaultAsync(ticket => ticket.Id == ticketId, cancellationToken);
+}
+
+static object BuildNexaTicketResponse(NexaTicket ticket, bool includeDetail = false)
+{
+    return new
+    {
+        ticket.Id,
+        ticket.TicketNumber,
+        ticket.CreatedAtUtc,
+        ticket.UpdatedAtUtc,
+        Requester = BuildNexaUserSummary(ticket.RequesterUserAccount),
+        ticket.Question,
+        Module = ticket.NexaModule is null ? null : new { ticket.NexaModule.Id, ticket.NexaModule.Code, ticket.NexaModule.Label },
+        Category = ticket.NexaCategory is null ? null : new { ticket.NexaCategory.Id, ticket.NexaCategory.Code, ticket.NexaCategory.Label },
+        ticket.PriorityCode,
+        ticket.StatusCode,
+        AssignedTo = BuildNexaUserSummary(ticket.AssignedUserAccount),
+        ticket.ReferentAnswer,
+        ticket.AnsweredAtUtc,
+        ticket.ValidatedAtUtc,
+        ticket.RejectedAtUtc,
+        ticket.RequesterValidationComment,
+        ticket.ClosedAtUtc,
+        History = includeDetail ? ticket.History.Select(history => new
+        {
+            history.Id,
+            history.ActionCode,
+            history.FromStatusCode,
+            history.ToStatusCode,
+            history.Detail,
+            Actor = BuildNexaUserSummary(history.ActorUserAccount),
+            history.CreatedAtUtc
+        }) : null,
+        Comments = includeDetail ? ticket.Comments.Select(comment => new
+        {
+            comment.Id,
+            comment.Comment,
+            Author = BuildNexaUserSummary(comment.AuthorUserAccount),
+            comment.CreatedAtUtc
+        }) : null
+    };
+}
+
+static object? BuildNexaUserSummary(UserAccount? account)
+{
+    return account is null ? null : new
+    {
+        account.Id,
+        account.Login,
+        account.DisplayName
+    };
+}
+
+static object BuildNexaKnowledgeResponse(NexaKnowledgeBase knowledge)
+{
+    return new
+    {
+        knowledge.Id,
+        knowledge.OriginalQuestion,
+        knowledge.Reformulations,
+        knowledge.Answer,
+        Module = knowledge.NexaModule is null ? null : new { knowledge.NexaModule.Id, knowledge.NexaModule.Code, knowledge.NexaModule.Label },
+        Category = knowledge.NexaCategory is null ? null : new { knowledge.NexaCategory.Id, knowledge.NexaCategory.Code, knowledge.NexaCategory.Label },
+        knowledge.Keywords,
+        knowledge.SourceType,
+        knowledge.SourceTicketId,
+        knowledge.Version,
+        knowledge.StatusCode,
+        knowledge.ReliabilityScore,
+        knowledge.LastUsedAtUtc,
+        knowledge.UsageCount,
+        knowledge.PositiveFeedbackCount,
+        knowledge.NegativeFeedbackCount,
+        knowledge.CreatedAtUtc,
+        knowledge.UpdatedAtUtc
+    };
+}
+
+static object BuildNexaRoutingRuleResponse(NexaRoutingRule rule)
+{
+    return new
+    {
+        rule.Id,
+        Module = rule.NexaModule is null ? null : new { rule.NexaModule.Id, rule.NexaModule.Code, rule.NexaModule.Label },
+        Category = rule.NexaCategory is null ? null : new { rule.NexaCategory.Id, rule.NexaCategory.Code, rule.NexaCategory.Label },
+        rule.KeywordPattern,
+        rule.PriorityCode,
+        Referent = BuildNexaUserSummary(rule.ReferentUserAccount),
+        SecondaryReferent = BuildNexaUserSummary(rule.SecondaryReferentUserAccount),
+        rule.IsActive,
+        rule.DisplayOrder
+    };
+}
+
+static string NormalizeNexaPriority(string? priorityCode)
+{
+    var normalized = NormalizeProfileCode(priorityCode ?? "NORMAL");
+    return string.IsNullOrWhiteSpace(normalized) ? "NORMAL" : normalized;
+}
+
+static string BuildNexaKeywords(string question)
+{
+    return string.Join(", ", BuildNexaSearchTokens(NormalizeSearchText(question)).Take(12));
+}
+
+static string BuildNexaReformulations(string question)
+{
+    var trimmed = question.Trim();
+    return JsonSerializer.Serialize(new[] { trimmed, trimmed.TrimEnd('?') });
+}
+
+static IReadOnlyList<object> BuildNexaPriorityOptions()
+{
+    return
+    [
+        new { Code = "BASSE", Label = "Basse" },
+        new { Code = "NORMAL", Label = "Normale" },
+        new { Code = "HAUTE", Label = "Haute" },
+        new { Code = "URGENTE", Label = "Urgente" }
+    ];
+}
+
+static IReadOnlyList<object> BuildNexaTicketStatusOptions()
+{
+    return
+    [
+        new { Code = "NOUVEAU", Label = "Nouveau" },
+        new { Code = "AFFECTE", Label = "Affecte" },
+        new { Code = "EN_COURS", Label = "En cours de traitement" },
+        new { Code = "REPONSE_APPORTEE", Label = "Reponse apportee" },
+        new { Code = "EN_ATTENTE_VALIDATION_DEMANDEUR", Label = "En attente de validation demandeur" },
+        new { Code = "VALIDE", Label = "Valide" },
+        new { Code = "REFUSE", Label = "Refuse" },
+        new { Code = "CLOTURE", Label = "Cloture" },
+        new { Code = "ANNULE", Label = "Annule" }
+    ];
+}
+
+static bool IsNexaStopWord(string token)
+{
+    return token switch
+    {
+        "avec" or "dans" or "des" or "les" or "pour" or "que" or "qui" or "quoi" or "comment" or "pourquoi" or "une" or "sur" => true,
+        "mon" or "mes" or "vos" or "notre" or "nexus" or "nexa" or "est" or "sont" or "avoir" or "faire" or "peux" or "peut" => true,
+        _ => false
+    };
+}
+
 internal sealed record LoginRequest(string Login, string Password);
 internal sealed record ForgotPasswordRequest(string LoginOrEmail);
 internal sealed record ResetPasswordRequest(string Token, string NewPassword, string ConfirmPassword);
@@ -6285,6 +7515,31 @@ internal sealed record NexaUsageSignalRequest(
     string? DashboardProfileCode);
 internal sealed record NexaChatRequest(string Message, List<NexaChatMessageRequest>? History);
 internal sealed record NexaChatMessageRequest(string Role, string Content);
+internal sealed record NexaAskRequest(string Question, Guid? ModuleId, Guid? CategoryId);
+internal sealed record NexaCreateTicketRequest(string Question, Guid ModuleId, Guid? CategoryId, string? PriorityCode, string? Comment);
+internal sealed record NexaAssignTicketRequest(Guid AssignedUserAccountId);
+internal sealed record NexaAnswerTicketRequest(string Answer);
+internal sealed record NexaValidateTicketRequest(string? Comment);
+internal sealed record NexaRejectTicketRequest(string Comment);
+internal sealed record NexaKnowledgeUpsertRequest(
+    string Question,
+    string Answer,
+    Guid ModuleId,
+    Guid? CategoryId,
+    string? Reformulations,
+    string? Keywords,
+    decimal? ReliabilityScore);
+internal sealed record NexaKnowledgeFeedbackRequest(bool IsPositive, string? Comment);
+internal sealed record NexaRoutingRuleRequest(
+    Guid? ModuleId,
+    Guid? CategoryId,
+    string? KeywordPattern,
+    string? PriorityCode,
+    Guid ReferentUserAccountId,
+    Guid? SecondaryReferentUserAccountId,
+    bool IsActive,
+    int DisplayOrder);
+internal sealed record NexaKnowledgeMatch(NexaKnowledgeBase Knowledge, decimal ConfidenceScore);
 internal sealed record NexaLocalAiOptions(
     bool Enabled,
     string Provider,

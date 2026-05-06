@@ -2312,3 +2312,29 @@ Ordre cible de construction:
 - validation a faire:
   - tester le chat direct Ollama avec `qwen2.5:1.5b`
   - rebuild, republier IIS et tester `/api/nexa/chat`
+
+## 2026-05-06 - Nexa MVP ticketing et connaissance validee
+
+- objectif:
+  - poser la V1 du compagnon interne Nexa sans appel IA externe
+  - combiner question, ticketing, validation et base de connaissance progressive
+- backend:
+  - ajout du domaine `NewNexus.Domain.Nexa`
+  - ajout du schema PostgreSQL `nexa` via migration `20260506124146_NexaTicketingMvp`
+  - tables MVP: conversations, messages, tickets, historiques, commentaires, pieces jointes, connaissances, versions, feedback, referents, regles de routage, index embeddings et logs IA
+  - endpoints ajoutes: `/api/nexa/reference`, `/api/nexa/ask`, `/api/nexa/tickets`, transitions ticket, `/api/nexa/knowledge`, feedback et regles de routage admin
+  - Nexa repond uniquement depuis les connaissances `VALIDE`; sinon elle propose explicitement l'ouverture d'un ticket
+  - l'apprentissage automatique cree une connaissance uniquement apres validation du ticket
+- frontend:
+  - panneau Nexa avec module/categorie, fiabilite, sources et creation de ticket
+  - entree Administration > Nexa pour suivre les tickets et consulter la base de connaissance
+- validations:
+  - migration appliquee sur PostgreSQL local
+  - `dotnet build NewNexus.slnx` OK
+  - `npm run build` OK
+  - publication IIS `/newNexus` OK
+  - test API complet avec `yannick / GroupeLaure`: question sans connaissance, creation ticket, affectation, reponse referent, validation demandeur, creation de connaissance, seconde question resolue avec confiance 98%
+- suites:
+  - administration avancee des regles/referents depuis l'UI
+  - pieces jointes effectives
+  - embeddings locaux et RAG Ollama controle en phase suivante

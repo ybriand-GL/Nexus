@@ -67,18 +67,76 @@ type NexaChatMessage = {
   content: string
   mode?: string
   warning?: string | null
+  confidenceScore?: number
+  sources?: NexaSource[]
+  canCreateTicket?: boolean
 }
 
-type NexaChatResponse = {
+type NexaReferenceModule = {
+  id: string
+  code: string
+  label: string
+  isIndexable: boolean
+}
+
+type NexaReferenceCategory = {
+  id: string
+  nexaModuleId: string | null
+  code: string
+  label: string
+}
+
+type NexaSource = {
+  type: string
+  id: string
+  label: string
+  reliabilityScore?: number
+}
+
+type NexaAskResponse = {
   companion: string
-  mode: string
-  provider: string
-  model: string
-  isLocalAiAvailable: boolean
+  conversationId: string
   answer: string
+  confidenceScore: number
+  isReliable: boolean
+  canCreateTicket: boolean
+  matchedKnowledgeId: string | null
+  sources: NexaSource[]
   generatedAtUtc: string
-  sources: string[]
-  warning: string | null
+}
+
+type NexaTicketItem = {
+  id: string
+  ticketNumber: string
+  createdAtUtc: string
+  updatedAtUtc: string
+  question: string
+  priorityCode: string
+  statusCode: string
+  referentAnswer: string | null
+  answeredAtUtc: string | null
+  validatedAtUtc: string | null
+  requesterValidationComment: string | null
+  module: NexaReferenceModule | null
+  category: NexaReferenceCategory | null
+  requester: { id: string; login: string; displayName: string } | null
+  assignedTo: { id: string; login: string; displayName: string } | null
+}
+
+type NexaKnowledgeItem = {
+  id: string
+  originalQuestion: string
+  answer: string
+  keywords: string | null
+  sourceType: string
+  version: number
+  statusCode: string
+  reliabilityScore: number
+  usageCount: number
+  positiveFeedbackCount: number
+  negativeFeedbackCount: number
+  module: NexaReferenceModule | null
+  category: NexaReferenceCategory | null
 }
 
 type SecurityModuleItem = {
@@ -669,7 +727,7 @@ type IntegrationCredentialFormState = {
 const commonDataNavigationLabel = 'Donn\u00e9es Communes'
 const navigationEntries = ['Administration', commonDataNavigationLabel, 'Exploitation', 'Gestion administrative']
 const administrationSettingsSection = 'Param\u00e8tres'
-const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Outils', administrationSettingsSection, 'Profils'] as const
+const administrationSubmenuEntries = ['Accueil', 'Comptes utilisateurs', 'Nexa', 'Outils', administrationSettingsSection, 'Profils'] as const
 const settingsCompaniesSection = 'Soci\u00e9t\u00e9s'
 const toolsApiKeysSection = 'Cl\u00e9s API'
 const toolsDiagnosticsSection = 'Diagnostics'
@@ -978,13 +1036,24 @@ function App() {
   const [nexaChatMessages, setNexaChatMessages] = useState<NexaChatMessage[]>([
     {
       role: 'assistant',
-      content: 'Je suis Nexa. Posez-moi une question sur vos droits, vos tableaux de bord, les interfaces ou les prochaines actions.',
+      content: 'Je suis Nexa. Je reponds uniquement a partir des connaissances internes validees. Si la reponse est incertaine, je vous propose un ticket.',
       mode: 'local-fallback',
     },
   ])
   const [nexaChatPrompt, setNexaChatPrompt] = useState('')
   const [isNexaThinking, setIsNexaThinking] = useState(false)
   const [nexaChatError, setNexaChatError] = useState<string | null>(null)
+  const [nexaModules, setNexaModules] = useState<NexaReferenceModule[]>([])
+  const [nexaCategories, setNexaCategories] = useState<NexaReferenceCategory[]>([])
+  const [nexaTickets, setNexaTickets] = useState<NexaTicketItem[]>([])
+  const [nexaKnowledge, setNexaKnowledge] = useState<NexaKnowledgeItem[]>([])
+  const [nexaSelectedModuleId, setNexaSelectedModuleId] = useState('')
+  const [nexaSelectedCategoryId, setNexaSelectedCategoryId] = useState('')
+  const [nexaTicketPriority, setNexaTicketPriority] = useState('NORMAL')
+  const [nexaTicketComment, setNexaTicketComment] = useState('')
+  const [nexaLastAsk, setNexaLastAsk] = useState<NexaAskResponse | null>(null)
+  const [isCreatingNexaTicket, setIsCreatingNexaTicket] = useState(false)
+  const [nexaTicketAnswers, setNexaTicketAnswers] = useState<Record<string, string>>({})
   const lastNexaUsageSignalRef = useRef('')
   const nexaUsageSignalTimerRef = useRef<number | null>(null)
   const [credentials, setCredentials] = useState({
@@ -1739,6 +1808,9 @@ function App() {
     setIsSidebarCollapsed(user.isSidebarCollapsed)
     setSessionInsight(buildSessionInsight(user))
     void loadNexaSessionInsight(user)
+    void loadNexaReferenceData()
+    void loadNexaTickets()
+    void loadNexaKnowledge()
     const hasContraventionsAccess = user.rights.some(
       (right) => right.moduleCode === contraventionsModuleCode && canAccessModule(right.accessLevel),
     )
@@ -1849,27 +1921,75 @@ function App() {
     }
   }
 
+  async function loadNexaReferenceData() {
+    try {
+      const response = await fetch(apiPath('api/nexa/reference'))
+      if (!response.ok) {
+        return
+      }
+
+      const payload = (await response.json()) as {
+        modules: NexaReferenceModule[]
+        categories: NexaReferenceCategory[]
+      }
+      setNexaModules(payload.modules)
+      setNexaCategories(payload.categories)
+      if (!nexaSelectedModuleId && payload.modules.length > 0) {
+        setNexaSelectedModuleId(payload.modules[0].id)
+      }
+    } catch {
+      // Nexa reference data is optional for the shell; the assistant will surface errors on action.
+    }
+  }
+
+  async function loadNexaTickets() {
+    try {
+      const response = await fetch(apiPath('api/nexa/tickets'))
+      if (!response.ok) {
+        return
+      }
+
+      setNexaTickets((await response.json()) as NexaTicketItem[])
+    } catch {
+      setNexaTickets([])
+    }
+  }
+
+  async function loadNexaKnowledge() {
+    try {
+      const response = await fetch(apiPath('api/nexa/knowledge'))
+      if (!response.ok) {
+        return
+      }
+
+      setNexaKnowledge((await response.json()) as NexaKnowledgeItem[])
+    } catch {
+      setNexaKnowledge([])
+    }
+  }
+
   async function sendNexaChatMessage(messageOverride?: string) {
     const message = (messageOverride ?? nexaChatPrompt).trim()
     if (!message || isNexaThinking) {
       return
     }
 
-    const history = nexaChatMessages.slice(-8)
     setNexaChatPrompt('')
     setNexaChatError(null)
+    setNexaLastAsk(null)
     setIsNexaThinking(true)
     setNexaChatMessages((current) => [...current, { role: 'user', content: message }])
 
     try {
-      const response = await fetch(apiPath('api/nexa/chat'), {
+      const response = await fetch(apiPath('api/nexa/ask'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message,
-          history: history.map((item) => ({ role: item.role, content: item.content })),
+          question: message,
+          moduleId: nexaSelectedModuleId || null,
+          categoryId: nexaSelectedCategoryId || null,
         }),
       })
 
@@ -1877,14 +1997,18 @@ function App() {
         throw new Error(await getRequestError(response, 'Nexa n\u2019a pas pu r\u00e9pondre.'))
       }
 
-      const payload = (await response.json()) as NexaChatResponse
+      const payload = (await response.json()) as NexaAskResponse
+      setNexaLastAsk(payload)
       setNexaChatMessages((current) => [
         ...current,
         {
           role: 'assistant',
           content: payload.answer,
-          mode: payload.mode,
-          warning: payload.warning,
+          mode: payload.isReliable ? 'knowledge-base' : 'ticket-proposed',
+          warning: payload.isReliable ? null : 'Connaissance insuffisante.',
+          confidenceScore: payload.confidenceScore,
+          sources: payload.sources,
+          canCreateTicket: payload.canCreateTicket,
         },
       ])
     } catch (chatError) {
@@ -1902,6 +2026,123 @@ function App() {
     } finally {
       setIsNexaThinking(false)
     }
+  }
+
+  async function createNexaTicketFromLastAsk() {
+    const sourceQuestion = [...nexaChatMessages].reverse().find((message) => message.role === 'user')?.content ?? nexaChatPrompt
+    const question = sourceQuestion.trim()
+    if (!question || !nexaSelectedModuleId || isCreatingNexaTicket) {
+      return
+    }
+
+    setIsCreatingNexaTicket(true)
+    setNexaChatError(null)
+    try {
+      const response = await fetch(apiPath('api/nexa/tickets'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question,
+          moduleId: nexaSelectedModuleId,
+          categoryId: nexaSelectedCategoryId || null,
+          priorityCode: nexaTicketPriority,
+          comment: nexaTicketComment.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await getRequestError(response, 'Impossible de creer le ticket Nexa.'))
+      }
+
+      const ticket = (await response.json()) as NexaTicketItem
+      setNexaTickets((current) => [ticket, ...current.filter((item) => item.id !== ticket.id)])
+      setNexaTicketComment('')
+      setNexaLastAsk(null)
+      setNexaChatMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          content: `Ticket ${ticket.ticketNumber} cree et affecte a ${ticket.assignedTo?.displayName ?? 'un referent a definir'}.`,
+          mode: 'ticketing',
+        },
+      ])
+    } catch (ticketError) {
+      const message = ticketError instanceof Error ? ticketError.message : 'Impossible de creer le ticket Nexa.'
+      setNexaChatError(message)
+    } finally {
+      setIsCreatingNexaTicket(false)
+    }
+  }
+
+  async function answerNexaTicket(ticketId: string) {
+    const answer = (nexaTicketAnswers[ticketId] ?? '').trim()
+    if (!answer) {
+      return
+    }
+
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}/answer`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ answer }),
+    })
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible d enregistrer la reponse.'))
+      return
+    }
+
+    const ticket = (await response.json()) as NexaTicketItem
+    setNexaTickets((current) => current.map((item) => item.id === ticket.id ? ticket : item))
+    setNexaTicketAnswers((current) => ({ ...current, [ticketId]: '' }))
+  }
+
+  async function validateNexaTicket(ticketId: string) {
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}/validate`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ comment: 'Reponse validee depuis Nexus.' }),
+    })
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible de valider la reponse.'))
+      return
+    }
+
+    const ticket = (await response.json()) as NexaTicketItem
+    setNexaTickets((current) => current.map((item) => item.id === ticket.id ? ticket : item))
+    await loadNexaKnowledge()
+  }
+
+  async function rejectNexaTicket(ticketId: string) {
+    const response = await fetch(apiPath(`api/nexa/tickets/${ticketId}/reject`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ comment: 'Reponse insuffisante.' }),
+    })
+    if (!response.ok) {
+      setNexaChatError(await getRequestError(response, 'Impossible de refuser la reponse.'))
+      return
+    }
+
+    const ticket = (await response.json()) as NexaTicketItem
+    setNexaTickets((current) => current.map((item) => item.id === ticket.id ? ticket : item))
+  }
+
+  async function sendNexaKnowledgeFeedback(knowledgeId: string, isPositive: boolean) {
+    await fetch(apiPath(`api/nexa/knowledge/${knowledgeId}/feedback`), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ isPositive, comment: null }),
+    })
+    await loadNexaKnowledge()
   }
 
   async function loadAdminSecurityData() {
@@ -4320,20 +4561,57 @@ function App() {
           <section className="nexa-assistant-panel" aria-label="Assistant Nexa">
             <div className="nexa-assistant-header">
               <div>
-                <span className="eyebrow">Assistant IA local</span>
+                <span className="eyebrow">Assistant interne</span>
                 <h2>Nexa</h2>
               </div>
               <button aria-label="Fermer Nexa" className="nexa-assistant-close" onClick={() => setIsNexaAssistantOpen(false)} type="button">
                 X
               </button>
             </div>
+            <div className="nexa-scope-grid">
+              <label>
+                <span>Module</span>
+                <select
+                  value={nexaSelectedModuleId}
+                  onChange={(event) => {
+                    setNexaSelectedModuleId(event.target.value)
+                    setNexaSelectedCategoryId('')
+                  }}
+                >
+                  {nexaModules.map((module) => (
+                    <option key={module.id} value={module.id}>{module.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Categorie</span>
+                <select value={nexaSelectedCategoryId} onChange={(event) => setNexaSelectedCategoryId(event.target.value)}>
+                  <option value="">Non precisee</option>
+                  {nexaCategories
+                    .filter((category) => !category.nexaModuleId || category.nexaModuleId === nexaSelectedModuleId)
+                    .map((category) => (
+                      <option key={category.id} value={category.id}>{category.label}</option>
+                    ))}
+                </select>
+              </label>
+            </div>
             <div className="nexa-assistant-messages" aria-live="polite">
               {nexaChatMessages.map((message, index) => (
                 <article className={`nexa-message nexa-message-${message.role}`} key={`${message.role}-${index}`}>
                   <span>{message.role === 'user' ? 'Vous' : 'Nexa'}</span>
                   <p>{message.content}</p>
+                  {typeof message.confidenceScore === 'number' ? (
+                    <small>Fiabilite: {Math.round(message.confidenceScore * 100)}%</small>
+                  ) : null}
+                  {message.sources?.length ? (
+                    <ul className="nexa-source-list">
+                      {message.sources.map((source) => (
+                        <li key={source.id}>{source.label}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                   {message.warning ? <small>{message.warning}</small> : null}
-                  {message.mode ? <small>{message.mode === 'local-llm' ? 'IA locale' : 'Fallback local'}</small> : null}
+                  {message.mode ? <small>{message.mode === 'knowledge-base' ? 'Base de connaissance' : message.mode === 'ticket-proposed' ? 'Ticket recommande' : message.mode}</small> : null}
                 </article>
               ))}
               {isNexaThinking ? (
@@ -4344,6 +4622,28 @@ function App() {
               ) : null}
             </div>
             {nexaChatError ? <p className="nexa-chat-error">{nexaChatError}</p> : null}
+            {nexaLastAsk?.canCreateTicket ? (
+              <div className="nexa-ticket-box">
+                <div className="nexa-scope-grid">
+                  <label>
+                    <span>Priorite</span>
+                    <select value={nexaTicketPriority} onChange={(event) => setNexaTicketPriority(event.target.value)}>
+                      <option value="BASSE">Basse</option>
+                      <option value="NORMAL">Normale</option>
+                      <option value="HAUTE">Haute</option>
+                      <option value="URGENTE">Urgente</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Complement</span>
+                    <input value={nexaTicketComment} onChange={(event) => setNexaTicketComment(event.target.value)} placeholder="Precision facultative" />
+                  </label>
+                </div>
+                <button className="secondary-button" disabled={isCreatingNexaTicket || !nexaSelectedModuleId} onClick={() => void createNexaTicketFromLastAsk()} type="button">
+                  {isCreatingNexaTicket ? 'Creation...' : 'Ouvrir un ticket'}
+                </button>
+              </div>
+            ) : null}
             <form
               className="nexa-chat-form"
               onSubmit={(event) => {
@@ -4564,6 +4864,123 @@ function App() {
               </article>
             )}
 
+          </section>
+        ) : null}
+
+        {selectedNavigation === 'Administration' && isInformatique && selectedAdministrationSection === 'Nexa' ? (
+          <section className="workspace-grid">
+            <article className="panel-card panel-card-wide nexa-admin-card">
+              <div className="panel-heading">
+                <span className="eyebrow">Nexa</span>
+                <h2>Assistant, tickets et connaissances</h2>
+              </div>
+              <p className="profiles-toolbar-copy">
+                Nexa reste interne a Nexus: le navigateur appelle uniquement le backend, les droits filtrent les donnees et seules les reponses validees alimentent la connaissance.
+              </p>
+              <section className="settings-kpis">
+                <div className="metric-card metric-card-navy">
+                  <span className="metric-label">Tickets</span>
+                  <strong>{nexaTickets.length}</strong>
+                </div>
+                <div className="metric-card metric-card-champagne">
+                  <span className="metric-label">A traiter</span>
+                  <strong>{nexaTickets.filter((ticket) => !['VALIDE', 'CLOTURE', 'ANNULE'].includes(ticket.statusCode)).length}</strong>
+                </div>
+                <div className="metric-card metric-card-cyan">
+                  <span className="metric-label">Connaissances</span>
+                  <strong>{nexaKnowledge.length}</strong>
+                </div>
+              </section>
+              <div className="nexa-admin-layout">
+                <section className="settings-list-section">
+                  <div className="settings-list-header">
+                    <div>
+                      <h3>Tickets Nexa</h3>
+                      <small>Demandes issues des questions non resolues</small>
+                    </div>
+                    <button className="secondary-button" onClick={() => void loadNexaTickets()} type="button">Actualiser</button>
+                  </div>
+                  <div className="settings-list">
+                    {nexaTickets.length === 0 ? (
+                      <div className="settings-empty">Aucun ticket Nexa pour le moment.</div>
+                    ) : nexaTickets.map((ticket) => (
+                      <article className="settings-edit-card nexa-ticket-card" key={ticket.id}>
+                        <div className="settings-list-header">
+                          <div>
+                            <h4>{ticket.ticketNumber}</h4>
+                            <small>{ticket.module?.label ?? 'Module non renseigne'} - {ticket.statusCode}</small>
+                          </div>
+                          <span className="profile-status-badge is-active">{ticket.priorityCode}</span>
+                        </div>
+                        <p>{ticket.question}</p>
+                        <small>Demandeur: {ticket.requester?.displayName ?? '-'} | Referent: {ticket.assignedTo?.displayName ?? 'Non affecte'}</small>
+                        {ticket.referentAnswer ? (
+                          <div className="nexa-ticket-answer">
+                            <strong>Reponse referent</strong>
+                            <p>{ticket.referentAnswer}</p>
+                          </div>
+                        ) : null}
+                        {!['VALIDE', 'CLOTURE', 'ANNULE'].includes(ticket.statusCode) ? (
+                          <div className="nexa-ticket-actions">
+                            <textarea
+                              placeholder="Reponse du referent"
+                              rows={3}
+                              value={nexaTicketAnswers[ticket.id] ?? ''}
+                              onChange={(event) => setNexaTicketAnswers((current) => ({ ...current, [ticket.id]: event.target.value }))}
+                            />
+                            <button className="secondary-button" disabled={!(nexaTicketAnswers[ticket.id] ?? '').trim()} onClick={() => void answerNexaTicket(ticket.id)} type="button">
+                              Repondre
+                            </button>
+                          </div>
+                        ) : null}
+                        {ticket.statusCode === 'EN_ATTENTE_VALIDATION_DEMANDEUR' ? (
+                          <div className="profile-action-row">
+                            <button className="primary-button" onClick={() => void validateNexaTicket(ticket.id)} type="button">
+                              Valider et enrichir Nexa
+                            </button>
+                            <button className="secondary-button" onClick={() => void rejectNexaTicket(ticket.id)} type="button">
+                              Refuser
+                            </button>
+                          </div>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+                <section className="settings-list-section">
+                  <div className="settings-list-header">
+                    <div>
+                      <h3>Base de connaissance</h3>
+                      <small>Reponses validees et reutilisables</small>
+                    </div>
+                    <button className="secondary-button" onClick={() => void loadNexaKnowledge()} type="button">Actualiser</button>
+                  </div>
+                  <div className="settings-list">
+                    {nexaKnowledge.length === 0 ? (
+                      <div className="settings-empty">Aucune connaissance validee pour le moment.</div>
+                    ) : nexaKnowledge.map((knowledge) => (
+                      <article className="settings-edit-card nexa-knowledge-card" key={knowledge.id}>
+                        <div className="settings-list-header">
+                          <h4>{knowledge.module?.label ?? 'Nexa'}</h4>
+                          <span className="profile-status-badge is-active">{Math.round(knowledge.reliabilityScore * 100)}%</span>
+                        </div>
+                        <strong>{knowledge.originalQuestion}</strong>
+                        <p>{knowledge.answer}</p>
+                        <small>{knowledge.keywords ?? 'Sans mot-cle'} - utilisee {knowledge.usageCount} fois</small>
+                        <div className="profile-action-row">
+                          <button className="secondary-button" onClick={() => void sendNexaKnowledgeFeedback(knowledge.id, true)} type="button">
+                            Utile
+                          </button>
+                          <button className="secondary-button" onClick={() => void sendNexaKnowledgeFeedback(knowledge.id, false)} type="button">
+                            A corriger
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </article>
           </section>
         ) : null}
 
